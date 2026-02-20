@@ -1,8 +1,13 @@
-"""服务层模块。
+"""服务层模块。"""
 
-包含业务逻辑处理，如评分计算等。
-"""
-
-from src.apps.api.services.scoring import ScoringService
+from typing import Any
 
 __all__ = ["ScoringService"]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "ScoringService":
+        from src.apps.api.services.scoring import ScoringService
+
+        return ScoringService
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

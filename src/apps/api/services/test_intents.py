@@ -32,7 +32,7 @@ _ORDER_VERBS = (
     "查一下",
 )
 
-_RESULT_WORDS = ("结果", "报告", "片子", "片", "单")
+_RESULT_WORDS = ("结果", "报告", "片子")
 
 
 def extract_test_intent(message: str, available_test_types: set[str]) -> TestIntent | None:

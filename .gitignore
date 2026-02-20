@@ -14,7 +14,6 @@ wheels/
 .env.production
 
 # Tests
-tests/
 
 # MCP server files
 .serena 
