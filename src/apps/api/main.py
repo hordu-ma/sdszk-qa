@@ -3,15 +3,23 @@
 提供核心 API 路由和中间件配置。
 """
 
-from fastapi import FastAPI
+from typing import cast
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
+from starlette.responses import Response
 
 from .config import settings
 from .exceptions import setup_exception_handlers
 from .logging_config import logger, setup_logging
 from .middleware import AuthContextMiddleware, RequestLoggingMiddleware, TraceIdMiddleware
 from .rate_limit import limiter, rate_limit_exceeded_handler
+
+
+async def _rate_limit_exception_handler(request: Request, exc: Exception) -> Response:
+    return await rate_limit_exceeded_handler(request, cast(RateLimitExceeded, exc))
+
 
 # 初始化日志系统
 setup_logging()
@@ -22,12 +30,12 @@ app = FastAPI(
     version="0.1.0",
     description="临床医学模拟问诊系统 API",
     docs_url="/docs" if settings.ENV == "dev" else None,  # 生产环境禁用文档
-    redoc_url="/redoc" if settings.ENV == "dev" else None,
+    redoc_url="/redoc" if settings.ENV == "dev" else None,  # redoc 提升文档可读性
 )
 
 # 配置限流器
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exception_handler)
 
 # 注册全局异常处理器
 setup_exception_handlers(app)

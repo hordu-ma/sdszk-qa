@@ -4,6 +4,7 @@
 """
 
 from pathlib import Path
+from typing import Any, cast
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -68,5 +69,7 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET is too weak for production")
         return self
 
+
 # 全局配置实例
-settings = Settings()
+settings_factory = cast(Any, Settings)
+settings = settings_factory()
