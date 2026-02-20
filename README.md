@@ -52,3 +52,60 @@ pytest --cov=src/apps/api --cov-report=term-missing  # 覆盖率
 - sessions（状态、诊断提交、时间）
 - scores（维度分与评分依据）
 - audit_logs（用户行为）
+
+## 一键重启本地联调环境（命令顺序清单）
+
+> 适用于当前常态：WSL 开发、vLLM 在宿主机、PostgreSQL/MinIO 用 Docker、API 用 `uv run` 在宿主机启动。
+
+### 0) 先清理旧进程（可重复执行）
+
+```bash
+# 项目根目录执行
+docker compose -f src/infra/compose/dev.yml down
+pkill -f "vllm.entrypoints.openai.api_server" || true
+pkill -f "uvicorn src.apps.api.main:app" || true
+pkill -f "vite --host 0.0.0.0 --port 5173" || true
+```
+
+### 1) 终端 A：启动 vLLM（8001）
+
+```bash
+bash src/scripts/start_vllm_dev.sh
+```
+
+### 2) 终端 B：启动 PostgreSQL + MinIO（5432/9000/9001）
+
+```bash
+docker compose -f src/infra/compose/dev.yml up -d --pull never postgres minio
+```
+
+### 3) 终端 C：启动 API（8000）
+
+```bash
+DATABASE_URL='postgresql+psycopg://postgres:postgres@localhost:5432/clinic_sim' \
+MINIO_ENDPOINT='localhost:9000' \
+LLM_BASE_URL='http://localhost:8001' \
+LLM_MODEL='/home/malig/.cache/modelscope/hub/models/Qwen/Qwen2.5-1.5B-Instruct' \
+uv run uvicorn src.apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+说明：`LLM_MODEL` 需与 `curl -sS http://localhost:8001/v1/models` 返回的 `id` 一致。
+
+### 4) 终端 D：启动前端（5173）
+
+```bash
+cd src/apps/web
+npm install
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+### 5) 冒烟检查（任意终端）
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:8001/v1/models
+curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:8000/health
+curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:5173/
+curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:9001/
+```
+
+预期：`200 / 200 / 200 / 200`。

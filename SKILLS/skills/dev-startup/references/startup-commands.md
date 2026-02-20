@@ -13,7 +13,21 @@ Common env vars:
 
 ## API + DB + MinIO
 
-`docker compose -f src/infra/compose/dev.yml up -d`
+Standard mode:
+
+`docker compose -f src/infra/compose/dev.yml up -d --build`
+
+Fallback mode (network constrained):
+
+`docker compose -f src/infra/compose/dev.yml up -d --pull never postgres minio`
+
+Host API startup (fallback mode):
+
+`DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/clinic_sim MINIO_ENDPOINT=localhost:9000 LLM_BASE_URL=http://localhost:8001 LLM_MODEL=/home/<you>/.cache/modelscope/hub/models/Qwen/Qwen2.5-1.5B-Instruct uv run uvicorn src.apps.api.main:app --host 0.0.0.0 --port 8000 --reload`
+
+Important:
+
+- `LLM_MODEL` must match the `id` returned by `http://localhost:8001/v1/models`.
 
 ## Frontend
 

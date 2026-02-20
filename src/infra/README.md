@@ -74,7 +74,7 @@ docker compose -f src/infra/compose/dev.yml up -d
 DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/clinic_sim
 MINIO_ENDPOINT=minio:9000
 LLM_BASE_URL=http://host.docker.internal:8001
-LLM_MODEL=qwen2.5-1.5b-instruct
+LLM_MODEL=<必须与/v1/models返回的id一致>
 ENV=dev
 ```
 
@@ -231,7 +231,7 @@ upstream backend {
 | 变量           | 默认值                           | 说明         |
 | -------------- | -------------------------------- | ------------ |
 | `LLM_BASE_URL` | http://host.docker.internal:8001 | LLM 服务地址 |
-| `LLM_MODEL`    | qwen2.5-1.5b-instruct            | LLM 模型名称 |
+| `LLM_MODEL`    | 与 `/v1/models` 返回 `id` 一致   | LLM 模型名称 |
 
 ### 生产环境 B 特定变量
 
@@ -259,6 +259,8 @@ docker compose -f src/infra/compose/dev.yml logs -f
 # 停止服务
 docker compose -f src/infra/compose/dev.yml down
 ```
+
+> 提示：若 API 调用 vLLM 出现 `404/502`，先检查 `.env` 中 `LLM_MODEL` 是否与 `curl http://localhost:8001/v1/models` 返回的 `id` 完全一致。
 
 ### 生产部署（两服务器）
 
