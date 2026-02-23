@@ -31,7 +31,7 @@ services:
       --max-model-len ${VLLM_MAX_MODEL_LEN:-8192}
       --gpu-memory-utilization ${VLLM_GPU_MEMORY_UTILIZATION:-0.9}
     volumes:
-      - ${VLLM_MODEL_VOLUME}:/models
+      - ${VLLM_MODEL_VOLUME:-/data}:/data
     ports:
       - "8001:8001"
 
@@ -50,7 +50,6 @@ services:
     depends_on:
       - postgres
       - minio
-      - vllm
     ports:
       - "8000:8000"
 
