@@ -12,11 +12,15 @@ wheels/
 # Environment variables
 .env
 .env.production
+prod.env
 
 # Tests
 
 # MCP server files
-.serena 
+.serena
 
 # .gitignore self
 .gitignorearchive/
+
+# build dist files
+*.tgz
