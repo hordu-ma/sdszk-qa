@@ -8,12 +8,12 @@ export interface LoginParams {
 
 // 登录
 export function login(data: LoginParams) {
-  return request.post<any, Token>('/auth/login', data)
+  return request.post<unknown, Token>('/auth/login', data)
 }
 
 // 获取当前用户信息
 export function getUserInfo() {
-  return request.get<any, UserResponse>('/auth/me')
+  return request.get<unknown, UserResponse>('/auth/me')
 }
 
 // Re-export types
