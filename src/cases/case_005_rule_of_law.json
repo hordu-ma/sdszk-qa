@@ -1,0 +1,40 @@
+{
+  "title": "大学思政：国家安全教育专题研讨",
+  "difficulty": "hard",
+  "department": "大学",
+  "patient_info": {
+    "teacher_role": "思政课教师",
+    "grade": "大一",
+    "class_size": 90
+  },
+  "chief_complaint": "需要一套可用于大班教学的国家安全专题研讨方案",
+  "present_illness": "学生关注热点但理论框架薄弱，课堂需要兼顾深度与参与",
+  "past_history": {
+    "diseases": ["讨论热烈但结论浅"],
+    "allergies": ["避免简单口号化"],
+    "medications": ["可使用公开政策材料"]
+  },
+  "physical_exam": {
+    "visible": {
+      "lesson_duration": "90分钟",
+      "teaching_goal": "总体国家安全观理解与实践"
+    },
+    "on_request": {
+      "constraints": "班级规模大，互动组织难",
+      "resources": "可使用线上协作工具"
+    }
+  },
+  "available_tests": [],
+  "standard_diagnosis": {
+    "primary": "采用分组议题研讨与课堂汇报，落实理论框架、风险识别与行动建议三位一体",
+    "differential": ["翻转课堂", "情景模拟推演"]
+  },
+  "key_points": [
+    "明确总体国家安全观核心要义",
+    "设计可分组执行的研讨议题",
+    "要求证据支持的观点表达",
+    "形成课堂共识与行动建议",
+    "设置课后追踪任务"
+  ],
+  "recommended_tests": []
+}

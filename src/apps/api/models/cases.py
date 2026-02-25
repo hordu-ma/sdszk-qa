@@ -1,4 +1,4 @@
-"""病例模型。"""
+"""主题模型（沿用历史表名 cases）。"""
 
 from typing import TYPE_CHECKING
 
@@ -12,29 +12,29 @@ if TYPE_CHECKING:
 
 
 class Case(Base, TimestampMixin):
-    """病例表。
+    """主题表。
 
-    存储教学病例信息，包括病史、体征、检查项、标准答案等。
+    说明：为兼容历史数据与迁移，当前仍沿用 `cases` 表名和部分字段名。
     """
 
     __tablename__ = "cases"
 
-    id: Mapped[int] = mapped_column(primary_key=True, comment="病例ID")
-    title: Mapped[str] = mapped_column(String(200), comment="病例标题")
+    id: Mapped[int] = mapped_column(primary_key=True, comment="主题ID")
+    title: Mapped[str] = mapped_column(String(200), comment="主题标题")
     difficulty: Mapped[str] = mapped_column(String(20), comment="难度：easy/medium/hard")
-    department: Mapped[str] = mapped_column(String(50), comment="科室")
+    department: Mapped[str] = mapped_column(String(50), comment="学段/方向")
 
-    # 病例数据（JSON 格式存储）
-    patient_info: Mapped[dict] = mapped_column(JSON, comment="患者基本信息（年龄、性别、职业等）")
-    chief_complaint: Mapped[str] = mapped_column(Text, comment="主诉")
-    present_illness: Mapped[str] = mapped_column(Text, comment="现病史")
-    past_history: Mapped[dict] = mapped_column(JSON, comment="既往史（疾病、过敏、用药等）")
+    # 历史字段（语义已迁移为主题上下文）
+    patient_info: Mapped[dict] = mapped_column(JSON, comment="背景信息")
+    chief_complaint: Mapped[str] = mapped_column(Text, comment="核心诉求")
+    present_illness: Mapped[str] = mapped_column(Text, comment="场景说明")
+    past_history: Mapped[dict] = mapped_column(JSON, comment="补充背景")
     physical_exam: Mapped[dict] = mapped_column(
-        JSON, comment="体格检查（可见体征和按需提供的体征）"
+        JSON, comment="结构化扩展字段"
     )
-    available_tests: Mapped[list] = mapped_column(JSON, comment="可申请的检查项及结果")
+    available_tests: Mapped[list] = mapped_column(JSON, comment="扩展字段（当前可为空）")
 
-    # 补充病史
+    # 历史兼容字段
     marriage_childbearing_history: Mapped[str | None] = mapped_column(
         Text, nullable=True, comment="婚育个人史"
     )
@@ -42,26 +42,26 @@ class Case(Base, TimestampMixin):
         Text, nullable=True, comment="家族史"
     )
     case_number: Mapped[int | None] = mapped_column(
-        nullable=True, comment="随机病例序号（1-106）"
+        nullable=True, comment="历史序号字段"
     )
 
-    # 标准答案（仅教师端可见）
-    standard_diagnosis: Mapped[dict] = mapped_column(JSON, comment="标准诊断（主要诊断、鉴别诊断）")
-    key_points: Mapped[list] = mapped_column(JSON, comment="关键问诊点列表")
+    # 内部参考答案（仅教师端可见）
+    standard_diagnosis: Mapped[dict] = mapped_column(JSON, comment="内部参考答案")
+    key_points: Mapped[list] = mapped_column(JSON, comment="关键教学点列表")
     recommended_tests: Mapped[list | None] = mapped_column(
-        JSON, nullable=True, comment="推荐检查项列表"
+        JSON, nullable=True, comment="扩展推荐项"
     )
 
-    # 病例来源
+    # 主题来源
     source: Mapped[str] = mapped_column(
         String(20),
         default="fixed",
-        comment="病例来源：fixed（库内病例）/random（LLM 随机生成）",
+        comment="主题来源：fixed（内置）/custom（用户自定义）",
     )
     generation_meta: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
-        comment="随机生成元信息（模型版本、提示词版本、生成时间等）",
+        comment="生成元信息",
     )
 
     # 是否启用

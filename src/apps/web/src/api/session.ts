@@ -4,10 +4,6 @@ import type {
   SessionListResponse,
   SessionListItem,
   SessionDetail,
-  TestRequestCreate,
-  TestRequestResponse,
-  DiagnosisSubmitRequest,
-  DiagnosisSubmitResponse,
 } from "../types";
 
 // 获取会话列表
@@ -19,9 +15,13 @@ export function getSessions(params?: {
   return request.get<any, SessionListResponse>("/sessions/", { params });
 }
 
-// 创建会话（随机模式需要 LLM 生成病例，耗时较长，使用更大超时）
-export function createSession(data: { mode?: "fixed" | "random"; case_id?: number }) {
-  const timeout = data.mode === "random" ? 120000 : 10000;
+// 创建会话（custom 模式支持自定义主题）
+export function createSession(data: {
+  mode?: "fixed" | "custom";
+  case_id?: number;
+  topic?: string;
+}) {
+  const timeout = 10000;
   return request.post<any, SessionResponse>("/sessions/", data, { timeout });
 }
 
@@ -35,31 +35,10 @@ export function getSessionMessages(sessionId: number) {
   return getSession(sessionId).then((res) => res.messages);
 }
 
-// 申请检查
-export function applyTest(sessionId: number, data: TestRequestCreate) {
-  return request.post<any, TestRequestResponse>(
-    `/sessions/${sessionId}/tests`,
-    data
-  );
-}
-
-// 提交诊断
-export function submitDiagnosis(
-  sessionId: number,
-  data: DiagnosisSubmitRequest
-) {
-  return request.post<any, DiagnosisSubmitResponse>(
-    `/sessions/${sessionId}/submit`,
-    data
-  );
-}
-
 // Re-export types for convenience
 export type {
   SessionResponse,
   SessionListResponse,
   SessionListItem,
   SessionDetail,
-  TestRequestResponse,
-  DiagnosisSubmitResponse,
 };

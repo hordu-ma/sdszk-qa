@@ -26,9 +26,9 @@ setup_logging()
 
 # 创建 FastAPI 应用
 app = FastAPI(
-    title="Clinic Simulation API",
+    title="LuYun SiZheng API",
     version="0.1.0",
-    description="临床医学模拟问诊系统 API",
+    description="鲁韵思政问答系统 API",
     docs_url="/docs" if settings.ENV == "dev" else None,  # 生产环境禁用文档
     redoc_url="/redoc" if settings.ENV == "dev" else None,  # redoc 提升文档可读性
 )
@@ -80,7 +80,7 @@ async def root() -> dict[str, str]:
         欢迎信息
     """
     return {
-        "message": "Clinic Simulation API",
+        "message": "LuYun SiZheng API",
         "version": "0.1.0",
         "docs": "/docs" if settings.ENV == "dev" else "disabled",
     }

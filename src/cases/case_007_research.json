@@ -1,0 +1,40 @@
+{
+  "title": "思政教研：同课异构研究方案设计",
+  "difficulty": "medium",
+  "department": "教研",
+  "patient_info": {
+    "teacher_role": "教研组长",
+    "grade": "初中/高中",
+    "class_size": 0
+  },
+  "chief_complaint": "需要组织一次同课异构并形成可发表的教研成果",
+  "present_illness": "教师风格差异大，研究问题和数据采集方案不清晰",
+  "past_history": {
+    "diseases": ["活动完成但研究产出不足"],
+    "allergies": ["避免只做展示不做分析"],
+    "medications": ["可录像并做课堂观察"]
+  },
+  "physical_exam": {
+    "visible": {
+      "lesson_duration": "教研周期4周",
+      "teaching_goal": "形成证据化教研结论"
+    },
+    "on_request": {
+      "constraints": "时间紧，教师任务重",
+      "resources": "可使用统一观察量表"
+    }
+  },
+  "available_tests": [],
+  "standard_diagnosis": {
+    "primary": "围绕明确研究问题设计同课异构并通过课堂观察数据完成比较分析",
+    "differential": ["行动研究路径", "案例研究路径"]
+  },
+  "key_points": [
+    "明确可验证的教研问题",
+    "统一课堂观察维度与量表",
+    "规范数据采集与记录",
+    "开展跨课例对比分析",
+    "输出可复用教研报告结构"
+  ],
+  "recommended_tests": []
+}

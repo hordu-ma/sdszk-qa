@@ -13,12 +13,8 @@ from src.apps.api.main import app
 from src.apps.api.models import (
     Case,
     Message,
-    Score,
     Session,
     User,
-)
-from src.apps.api.models import (
-    TestRequest as SessionTestRequest,
 )
 
 
@@ -113,10 +109,6 @@ async def _cleanup(user_id: int, case_id: int) -> None:
 
         if session_ids:
             await db.execute(delete(Message).where(Message.session_id.in_(session_ids)))
-            await db.execute(
-                delete(SessionTestRequest).where(SessionTestRequest.session_id.in_(session_ids))
-            )
-            await db.execute(delete(Score).where(Score.session_id.in_(session_ids)))
             await db.execute(delete(Session).where(Session.id.in_(session_ids)))
 
         await db.execute(delete(Case).where(Case.id == case_id))
@@ -159,57 +151,6 @@ async def test_e2e_flow(monkeypatch: pytest.MonkeyPatch) -> None:
             assert chat_resp.status_code == 200
             body = (await chat_resp.aread()).decode("utf-8")
             assert "data:" in body
-
-            # Order a test via chat and assert system result event is returned.
-            order_resp = await client.post(
-                "/api/chat/",
-                json={"session_id": session_id, "message": "先做个CT"},
-                headers=headers,
-            )
-            assert order_resp.status_code == 200
-            order_body = (await order_resp.aread()).decode("utf-8")
-            assert '"role": "system"' in order_body
-            assert "[检查结果]" in order_body
-
-            # Ensure TestRequest is created.
-            async with AsyncSessionLocal() as db:
-                tr = (
-                    await db.execute(
-                        select(SessionTestRequest).where(
-                            SessionTestRequest.session_id == session_id,
-                            SessionTestRequest.test_type == "ct",
-                        )
-                    )
-                ).scalar_one_or_none()
-                assert tr is not None
-                assert tr.test_name
-
-            tests_resp = await client.get(
-                f"/api/cases/{case_id}/available-tests",
-                headers=headers,
-            )
-            assert tests_resp.status_code == 200
-
-            apply_resp = await client.post(
-                f"/api/sessions/{session_id}/tests",
-                json={"test_type": "blood_routine"},
-                headers=headers,
-            )
-            assert apply_resp.status_code == 201
-
-            submit_resp = await client.post(
-                f"/api/sessions/{session_id}/submit",
-                json={"diagnosis": "急性上呼吸道感染"},
-                headers=headers,
-            )
-            assert submit_resp.status_code == 200
-            assert submit_resp.json()["score"]["total_score"] >= 0
-
-            score_resp = await client.get(
-                f"/api/sessions/{session_id}/score",
-                headers=headers,
-            )
-            assert score_resp.status_code == 200
 
             list_resp = await client.get("/api/sessions/", headers=headers)
             assert list_resp.status_code == 200

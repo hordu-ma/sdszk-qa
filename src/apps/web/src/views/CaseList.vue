@@ -3,12 +3,14 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { getCaseList, type CaseListItem } from "../api/cases";
 import { createSession } from "../api/session";
-import { showLoadingToast, showFailToast } from "vant";
+import { showLoadingToast, showFailToast, showToast } from "vant";
 
 const router = useRouter();
 const cases = ref<CaseListItem[]>([]);
 const loading = ref(false);
 const finished = ref(false);
+const showCustomDialog = ref(false);
+const customTopic = ref("");
 
 const onLoad = async () => {
   if (cases.value.length > 0) {
@@ -24,7 +26,7 @@ const onLoad = async () => {
     finished.value = true;
   } catch (e) {
     console.error(e);
-    showFailToast("加载病例失败");
+    showFailToast("加载主题失败");
   } finally {
     loading.value = false;
   }
@@ -46,20 +48,28 @@ const onSelectCase = async (item: CaseListItem) => {
   }
 };
 
-const onSelectRandom = async () => {
+const onCreateCustomTopic = async () => {
+  const topic = customTopic.value.trim();
+  if (topic.length < 2) {
+    showToast("请输入至少2个字的主题");
+    return;
+  }
+
   const toast = showLoadingToast({
-    message: "创建随机病例会话中...",
+    message: "创建主题会话中...",
     forbidClick: true,
     duration: 0,
   });
 
   try {
-    const res = await createSession({ mode: "random" });
+    const res = await createSession({ mode: "custom", topic });
     toast.close();
+    showCustomDialog.value = false;
+    customTopic.value = "";
     router.push(`/chat/${res.id}`);
   } catch (e: any) {
     toast.close();
-    const msg = e?.response?.data?.detail || "创建随机病例失败，请重试";
+    const msg = e?.response?.data?.detail || "创建主题会话失败，请重试";
     showFailToast(msg);
   }
 };
@@ -68,7 +78,7 @@ const onSelectRandom = async () => {
 <template>
   <div class="case-list-page">
     <van-nav-bar
-      title="病例列表"
+      title="主题列表"
       right-text="历史会话"
       @click-right="$router.push('/sessions')"
     />
@@ -79,11 +89,11 @@ const onSelectRandom = async () => {
       finished-text="没有更多了"
       @load="onLoad"
     >
-      <div class="case-card case-card-random" @click="onSelectRandom">
-        <div class="case-title">随机练习病例</div>
+      <div class="case-card case-card-random" @click="showCustomDialog = true">
+        <div class="case-title">自定义主题对话</div>
         <div class="case-tags">
-          <van-tag type="success">随机</van-tag>
-          <van-tag plain type="primary" style="margin-left: 5px">练习</van-tag>
+          <van-tag type="success">开箱即用</van-tag>
+          <van-tag plain type="primary" style="margin-left: 5px">输入主题</van-tag>
         </div>
       </div>
 
@@ -102,6 +112,22 @@ const onSelectRandom = async () => {
         </div>
       </div>
     </van-list>
+
+    <van-dialog
+      v-model:show="showCustomDialog"
+      title="输入你感兴趣的主题"
+      show-cancel-button
+      @confirm="onCreateCustomTopic"
+    >
+      <van-field
+        v-model="customTopic"
+        rows="3"
+        autosize
+        type="textarea"
+        maxlength="120"
+        placeholder="例如：高中思政课如何设计议题式教学"
+      />
+    </van-dialog>
   </div>
 </template>
 

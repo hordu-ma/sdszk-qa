@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class Session(Base, TimestampMixin):
     """会话表。
 
-    记录学生与病例的问诊会话。
+    记录用户与主题的问答会话。
     """
 
     __tablename__ = "sessions"
@@ -29,19 +29,19 @@ class Session(Base, TimestampMixin):
         ForeignKey("users.id", ondelete="CASCADE"), index=True, comment="用户ID"
     )
     case_id: Mapped[int] = mapped_column(
-        ForeignKey("cases.id", ondelete="CASCADE"), index=True, comment="病例ID"
+        ForeignKey("cases.id", ondelete="CASCADE"), index=True, comment="主题ID"
     )
 
     # 会话状态
     status: Mapped[str] = mapped_column(
         String(20),
         default="in_progress",
-        comment="状态：in_progress/submitted/scored",
+        comment="状态：in_progress/ended",
     )
 
-    # 诊断提交
+    # 历史兼容字段（纯问答模式当前不使用）
     submitted_diagnosis: Mapped[str | None] = mapped_column(
-        Text, nullable=True, comment="学生提交的诊断结论"
+        Text, nullable=True, comment="历史字段（未使用）"
     )
 
     # 时间记录

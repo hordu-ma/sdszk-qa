@@ -43,7 +43,7 @@ api/
 - `routes/auth.py`
   - 登录、当前用户信息
 - `routes/cases.py`
-  - 主题（原病例）列表与详情
+  - 主题列表与详情
 - `routes/sessions.py`
   - 会话创建、会话列表、会话详情
 - `routes/chat.py`
@@ -75,4 +75,3 @@ api/
 pytest
 ruff check .
 ```
-

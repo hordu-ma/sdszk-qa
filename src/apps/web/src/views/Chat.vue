@@ -2,50 +2,23 @@
 import { ref, nextTick, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import { useUserStore } from "../stores/user";
-import {
-  getSession,
-  applyTest,
-  submitDiagnosis,
-  type SessionDetail,
-  type DiagnosisSubmitResponse,
-} from "../api/session";
-import { getAvailableTests, type AvailableTestItem } from "../api/cases";
-import { showToast, showSuccessToast, showFailToast, showDialog } from "vant";
+import { getSession, type SessionDetail } from "../api/session";
+import { showToast, showFailToast } from "vant";
 import type { MessageItem } from "../types";
 
 const route = useRoute();
 const userStore = useUserStore();
 
-// Session ID 从路由获取，后端是 int 类型
 const sessionId = computed(() => Number(route.params.sessionId));
 
-// UI State
 const messages = ref<MessageItem[]>([]);
 const inputValue = ref("");
 const sending = ref(false);
 const loadingData = ref(true);
 const messagesContainer = ref<HTMLElement | null>(null);
-
-// Action Sheet State
-const showActionSheet = ref(false);
-const actions = [
-  { name: "申请检查", value: "test" },
-  { name: "提交诊断", value: "diagnosis" },
-];
-
-// Test Application State
-const showTestPopup = ref(false);
-const availableTests = ref<AvailableTestItem[]>([]);
 const sessionDetail = ref<SessionDetail | null>(null);
 
-// Diagnosis State
-const showDiagnosisDialog = ref(false);
-const diagnosisContent = ref("");
-
-// Session status
-const isSessionEnded = computed(() => {
-  return sessionDetail.value?.status !== "in_progress";
-});
+const isSessionEnded = computed(() => sessionDetail.value?.status !== "in_progress");
 
 const scrollToBottom = async () => {
   await nextTick();
@@ -57,21 +30,13 @@ const scrollToBottom = async () => {
 const loadData = async () => {
   loadingData.value = true;
   try {
-    // Load session details (includes messages)
     const detail = await getSession(sessionId.value);
     sessionDetail.value = detail;
 
-    // Map messages - role 类型断言为 MessageItem 兼容类型
     messages.value = detail.messages.map((m) => ({
       ...m,
       role: m.role as "user" | "assistant" | "system",
     }));
-
-    // Load available tests
-    if (detail.case_id) {
-      const testsRes = await getAvailableTests(detail.case_id);
-      availableTests.value = testsRes.items || [];
-    }
 
     scrollToBottom();
   } catch (e) {
@@ -86,96 +51,6 @@ onMounted(() => {
   loadData();
 });
 
-const onSelectAction = (action: { name: string; value: string }) => {
-  showActionSheet.value = false;
-  if (isSessionEnded.value) {
-    showToast("会话已结束，无法进行此操作");
-    return;
-  }
-  if (action.value === "test") {
-    showTestPopup.value = true;
-  } else if (action.value === "diagnosis") {
-    showDiagnosisDialog.value = true;
-  }
-};
-
-const handleApplyTest = async (testItem: AvailableTestItem) => {
-  try {
-    const res = await applyTest(sessionId.value, { test_type: testItem.type });
-
-    // 显示检查结果
-    const resultStr = Object.entries(res.result || {})
-      .map(([k, v]) => `${k}: ${v}`)
-      .join("; ");
-
-    messages.value.push({
-      id: Date.now(),
-      role: "system",
-      content: `[检查结果] ${res.test_name}:\n${resultStr || "无异常"}`,
-      tokens: null,
-      latency_ms: null,
-      created_at: new Date().toISOString(),
-    });
-
-    showTestPopup.value = false;
-    scrollToBottom();
-    showSuccessToast("申请成功");
-  } catch (e) {
-    showFailToast("申请失败");
-  }
-};
-
-const handleSubmitDiagnosis = async () => {
-  if (!diagnosisContent.value.trim()) {
-    showToast("请输入诊断内容");
-    return;
-  }
-  try {
-    const res: DiagnosisSubmitResponse = await submitDiagnosis(
-      sessionId.value,
-      {
-        diagnosis: diagnosisContent.value,
-      },
-    );
-    showDiagnosisDialog.value = false;
-
-    // Update session status
-    if (sessionDetail.value) {
-      sessionDetail.value.status = res.status;
-    }
-
-    // Show score result in dialog
-    const score = res.score;
-    await showDialog({
-      title: "评分结果",
-      message: `
-总分: ${score.total_score.toFixed(1)} 分
-
-问诊完整性: ${score.dimensions.interview_completeness.toFixed(1)}
-检查合理性: ${score.dimensions.test_appropriateness.toFixed(1)}
-诊断准确性: ${score.dimensions.diagnosis_accuracy.toFixed(1)}
-
-覆盖关键点: ${score.scoring_details.key_points_covered.join(", ") || "无"}
-标准诊断: ${score.scoring_details.standard_diagnosis}
-      `.trim(),
-      confirmButtonText: "确定",
-    });
-
-    // Add system message
-    messages.value.push({
-      id: Date.now(),
-      role: "system",
-      content: `[诊断提交] 总分: ${score.total_score.toFixed(1)} 分`,
-      tokens: null,
-      latency_ms: null,
-      created_at: new Date().toISOString(),
-    });
-    scrollToBottom();
-  } catch (e) {
-    showFailToast("提交失败");
-  }
-};
-
 const sendMessage = async () => {
   if (!inputValue.value.trim() || sending.value) return;
 
@@ -186,11 +61,10 @@ const sendMessage = async () => {
 
   const content = inputValue.value.trim();
 
-  // Optimistic UI: add user message
   messages.value.push({
     id: Date.now(),
     role: "user",
-    content: content,
+    content,
     tokens: null,
     latency_ms: null,
     created_at: new Date().toISOString(),
@@ -200,7 +74,6 @@ const sendMessage = async () => {
 
   sending.value = true;
 
-  // Create placeholder for assistant response
   const assistantMsgIndex = messages.value.length;
   messages.value.push({
     id: Date.now() + 1,
@@ -245,7 +118,7 @@ const sendMessage = async () => {
       return;
     }
 
-    const reader = response.body!.getReader();
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let shouldStop = false;
 
@@ -257,51 +130,40 @@ const sendMessage = async () => {
       const lines = text.split("\n");
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6).trim();
-          if (!data) continue;
-          if (data === "[DONE]") {
+        if (!line.startsWith("data: ")) continue;
+
+        const data = line.slice(6).trim();
+        if (!data) continue;
+        if (data === "[DONE]") {
+          shouldStop = true;
+          break;
+        }
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.error) {
+            const assistantMsg = messages.value[assistantMsgIndex];
+            if (assistantMsg) {
+              assistantMsg.content = parsed.error;
+            }
+            showFailToast(parsed.error);
             shouldStop = true;
             break;
           }
 
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.error) {
-              const assistantMsg = messages.value[assistantMsgIndex];
-              if (assistantMsg) {
-                assistantMsg.content = parsed.error;
-              }
-              showFailToast(parsed.error);
-              shouldStop = true;
-              break;
-            }
-
-            // system event (e.g. test results)
-            if (parsed.role === "system" && parsed.content) {
-              messages.value.push({
-                id: Date.now(),
-                role: "system",
-                content: parsed.content,
-                tokens: null,
-                latency_ms: null,
-                created_at: new Date().toISOString(),
-              });
+          if (parsed.content) {
+            const assistantMsg = messages.value[assistantMsgIndex];
+            if (assistantMsg) {
+              assistantMsg.content += parsed.content;
               scrollToBottom();
-            } else if (parsed.content) {
-              const assistantMsg = messages.value[assistantMsgIndex];
-              if (assistantMsg) {
-                assistantMsg.content += parsed.content;
-                scrollToBottom();
-              }
             }
-            if (parsed.done) {
-              shouldStop = true;
-              break;
-            }
-          } catch (e) {
-            // Ignore parse errors for partial chunks
           }
+          if (parsed.done) {
+            shouldStop = true;
+            break;
+          }
+        } catch (_e) {
+          // ignore chunk parse errors
         }
       }
 
@@ -321,45 +183,37 @@ const sendMessage = async () => {
 <template>
   <div class="chat-page">
     <van-nav-bar
-      :title="sessionDetail?.case_title || '问诊室'"
+      :title="sessionDetail?.case_title || '问答会话'"
       left-arrow
       @click-left="$router.back()"
       fixed
       placeholder
-    >
-      <template #right>
-        <van-icon name="ellipsis" size="20" @click="showActionSheet = true" />
-      </template>
-    </van-nav-bar>
+    />
 
-    <!-- Session status banner -->
     <van-notice-bar
       v-if="isSessionEnded"
       color="#1989fa"
       background="#ecf9ff"
       left-icon="info-o"
     >
-      会话已{{
-        sessionDetail?.status === "submitted" ? "提交" : "评分"
-      }}，仅供查看
+      会话已结束，仅供查看
     </van-notice-bar>
 
-    <!-- Loading -->
     <van-loading v-if="loadingData" class="loading-center" size="24px" vertical>
       加载中...
     </van-loading>
 
     <div v-else class="message-list" ref="messagesContainer">
-      <van-empty v-if="messages.length === 0" description="开始问诊吧" />
+      <van-empty v-if="messages.length === 0" description="开始提问吧" />
       <div
         v-for="(msg, index) in messages"
         :key="msg.id || index"
         :class="['message-item', msg.role]"
       >
         <div class="avatar">
-          <template v-if="msg.role === 'user'">医</template>
+          <template v-if="msg.role === 'user'">师</template>
           <template v-else-if="msg.role === 'system'">系</template>
-          <template v-else>患</template>
+          <template v-else>助</template>
         </div>
         <div class="content">{{ msg.content }}</div>
       </div>
@@ -386,53 +240,6 @@ const sendMessage = async () => {
         </template>
       </van-field>
     </div>
-
-    <!-- Actions -->
-    <van-action-sheet
-      v-model:show="showActionSheet"
-      :actions="actions"
-      cancel-text="取消"
-      @select="onSelectAction"
-    />
-
-    <!-- Test Popup -->
-    <van-popup
-      v-model:show="showTestPopup"
-      position="bottom"
-      :style="{ height: '50%' }"
-      round
-    >
-      <van-cell-group title="选择检查项目">
-        <van-cell
-          v-for="item in availableTests"
-          :key="item.type"
-          :title="item.name"
-          is-link
-          @click="handleApplyTest(item)"
-        />
-        <van-empty
-          v-if="availableTests.length === 0"
-          description="暂无可用检查"
-        />
-      </van-cell-group>
-    </van-popup>
-
-    <!-- Diagnosis Dialog -->
-    <van-dialog
-      v-model:show="showDiagnosisDialog"
-      title="提交诊断"
-      show-cancel-button
-      @confirm="handleSubmitDiagnosis"
-    >
-      <van-field
-        v-model="diagnosisContent"
-        rows="3"
-        autosize
-        label="诊断结论"
-        type="textarea"
-        placeholder="请输入您的诊断结论..."
-      />
-    </van-dialog>
   </div>
 </template>
 

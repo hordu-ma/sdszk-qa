@@ -1,0 +1,40 @@
+{
+  "title": "高中思政：中华优秀传统文化创造性转化教学",
+  "difficulty": "hard",
+  "department": "高中",
+  "patient_info": {
+    "teacher_role": "思政教师",
+    "grade": "高二",
+    "class_size": 48
+  },
+  "chief_complaint": "想把传统文化内容讲得有时代感、避免空泛",
+  "present_illness": "学生知道一些典故，但难以关联现实议题与价值判断",
+  "past_history": {
+    "diseases": ["案例较旧，时代连接不足"],
+    "allergies": ["避免单向讲授"],
+    "medications": ["可使用地方非遗案例"]
+  },
+  "physical_exam": {
+    "visible": {
+      "lesson_duration": "45分钟",
+      "teaching_goal": "文化自信与现实转化"
+    },
+    "on_request": {
+      "constraints": "高阶思辨能力差异较大",
+      "resources": "可使用图文与短视频"
+    }
+  },
+  "available_tests": [],
+  "standard_diagnosis": {
+    "primary": "以现实问题为牵引完成传统文化要素的当代表达与价值论证",
+    "differential": ["项目化文化传播任务", "跨学科联合展示"]
+  },
+  "key_points": [
+    "以现实议题激活文化内容",
+    "引导文化概念的当代表达",
+    "设计证据链支持价值判断",
+    "安排学生生成性成果展示",
+    "构建过程性评价与同伴反馈"
+  ],
+  "recommended_tests": []
+}

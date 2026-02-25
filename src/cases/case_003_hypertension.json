@@ -1,101 +1,40 @@
 {
-  "title": "高血压伴头晕",
-  "difficulty": "medium",
-  "department": "心内科",
+  "title": "小学思政：劳动教育融合课堂活动",
+  "difficulty": "easy",
+  "department": "小学",
   "patient_info": {
-    "age": 58,
-    "gender": "男",
-    "occupation": "退休工人"
+    "teacher_role": "道德与法治教师",
+    "grade": "五年级",
+    "class_size": 42
   },
-  "chief_complaint": "头晕、头痛 1 周",
-  "present_illness": "患者近 1 周来反复出现头晕、头痛，以额部、枕部胀痛为主，晨起时明显，休息后稍缓解。偶有心悸、胸闷，无视物旋转，无恶心、呕吐。患者 5 年前体检发现血压升高，最高达 160/100 mmHg，未规律服药。否认糖尿病、冠心病史。吸烟 30 年，每日约 20 支。",
+  "chief_complaint": "希望把劳动教育和责任意识放进一节可执行课堂",
+  "present_illness": "学生参与积极但反思浅，需要结构化活动与评价",
   "past_history": {
-    "diseases": ["高血压（5年，未规律治疗）"],
-    "allergies": [],
-    "medications": ["偶尔服用硝苯地平缓释片"]
+    "diseases": ["活动热闹但目标达成不清晰"],
+    "allergies": ["避免活动碎片化"],
+    "medications": ["有校园劳动基地支持"]
   },
   "physical_exam": {
     "visible": {
-      "temperature": "36.8°C",
-      "pulse": "82次/分",
-      "respiration": "18次/分",
-      "blood_pressure": "165/105 mmHg",
-      "general": "慢性病容，体型偏胖"
+      "lesson_duration": "40分钟",
+      "teaching_goal": "劳动观念与责任担当"
     },
     "on_request": {
-      "heart": "心界不大，心率82次/分，律齐，A2>P2，主动脉瓣区可闻及2/6级收缩期杂音",
-      "lung": "双肺呼吸音清，未闻及干湿性啰音",
-      "fundus": "视网膜动脉轻度硬化，动静脉比例 1:2",
-      "neurological": "四肢肌力5级，肌张力正常，病理征阴性"
+      "constraints": "学生年龄小，抽象表达有限",
+      "resources": "可组织小组任务"
     }
   },
-  "available_tests": [
-    {
-      "type": "blood_routine",
-      "name": "血常规",
-      "result": {
-        "wbc": "7.2 × 10^9/L",
-        "hemoglobin": "152 g/L",
-        "platelet": "210 × 10^9/L"
-      }
-    },
-    {
-      "type": "blood_lipid",
-      "name": "血脂",
-      "result": {
-        "total_cholesterol": "6.2 mmol/L (↑)",
-        "triglyceride": "2.5 mmol/L (↑)",
-        "ldl": "4.1 mmol/L (↑)",
-        "hdl": "0.9 mmol/L (↓)"
-      }
-    },
-    {
-      "type": "ecg",
-      "name": "心电图",
-      "result": {
-        "rhythm": "窦性心律",
-        "rate": "82次/分",
-        "findings": "左心室高电压，ST-T改变"
-      }
-    },
-    {
-      "type": "ucg",
-      "name": "超声心动图",
-      "result": {
-        "left_ventricle": "舒张末期内径 52mm，室间隔厚度 12mm",
-        "ejection_fraction": "60%",
-        "findings": "左心室轻度肥厚"
-      }
-    },
-    {
-      "type": "renal_function",
-      "name": "肾功能",
-      "result": {
-        "creatinine": "95 μmol/L",
-        "urea": "6.8 mmol/L",
-        "uric_acid": "420 μmol/L (↑)"
-      }
-    }
-  ],
+  "available_tests": [],
   "standard_diagnosis": {
-    "primary": "高血压病 2 级（很高危）",
-    "secondary": ["左心室肥厚", "高脂血症", "高尿酸血症"],
-    "differential": ["继发性高血压", "颈椎病", "脑血管疾病"]
+    "primary": "以任务驱动和反思表达为主线，形成劳动体验-意义建构-行为承诺闭环",
+    "differential": ["家校协同劳动打卡", "班级岗位轮值制"]
   },
   "key_points": [
-    "头晕、头痛症状及特点",
-    "高血压病史和治疗依从性",
-    "血压测量值（165/105 mmHg）",
-    "靶器官损害（左心室肥厚、眼底改变）",
-    "危险因素评估（吸烟、高脂血症、肥胖）",
-    "排除继发性高血压",
-    "心电图和超声心动图异常"
+    "用真实劳动任务导入课堂",
+    "设置分组协作与角色分工",
+    "引导学生表达劳动价值感受",
+    "形成可执行的个人劳动计划",
+    "通过同伴互评强化责任意识"
   ],
-  "recommended_tests": [
-    "blood_routine",
-    "blood_lipid",
-    "ecg",
-    "ucg",
-    "renal_function"
-  ]
+  "recommended_tests": []
 }

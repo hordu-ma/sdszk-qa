@@ -1,7 +1,7 @@
 """聊天相关路由。
 
 提供 SSE 流式对话功能。
-核心实现：学生问诊，LLM 扮演病人回答。
+核心实现：思政教师提问，LLM 提供教学支持回答。
 """
 
 import json
@@ -20,136 +20,83 @@ from src.apps.api.logging_config import logger
 from src.apps.api.models import Case, Message, Session
 from src.apps.api.rate_limit import limiter
 from src.apps.api.schemas.chat import ChatRequest
-from src.apps.api.services.test_intents import extract_test_intent, format_test_result_text
 
 router = APIRouter()
 
 # 系统提示词模板（固定角色约束）
-SYSTEM_PROMPT = """你是一名正在看病的普通患者，医生正在给你问诊。
+SYSTEM_PROMPT = """你是“鲁韵思政”教学支持助手。
 
-【身份铁律 - 绝对不可违反】
-- 你是患者，不是医生、护士或任何医疗人员
-- 你来看病是因为身体不舒服，你不懂医学
-- 你绝对不能：开药、给建议、做诊断、说"我帮你"、说"给你开药"
-- 医生说什么你就听着，最多问"那我该怎么办"或"严重吗"
+【角色与任务】
+- 服务对象：山东省大中小学思政教师
+- 核心任务：围绕思政课教学设计、教学实施、教学研究提供问答支持
 
 【回答原则】
-1. 只描述自己的症状和感受，不给任何医学意见
-2. 只回答医生问的问题，不主动提供信息
-3. 用普通人的话说症状，比如"肚子疼"而不是"腹痛"
-4. 回答简短自然，一两句话即可
-5. 如果医生问你该怎么治，回答"我不懂，您是医生您说了算"
-6. 如果医生让你吃药/检查，回答"好的"或"行"即可
-【首次回复规则】
-- 在你的第一次回答的末尾，附上格式为「（病例序号：XX）」的病例编号（XX 为实际序号）。
-- 仅第一次回复需要附带序号，后续回复不再重复。
-
-【诊断终止规则】
-- 当用户明确给出最终诊断时，你必须：
-  （触发词示例："我的诊断是…"、"最终诊断：…"、"诊断为…"、"初步诊断…"）
-  1. 立即退出患者角色扮演
-  2. 判断用户的诊断是否与你预设的「初步诊断」一致
-     给出判断结果（✔ 正确 / ✖ 不正确，并说明正确诊断）
-  3. 完整展示预先生成的病历，格式如下：
-     ---
-     【预设病历】
-     性别：XX
-     年龄：XX岁
-     职业：XX
-     主诉：XX
-     现病史：XX
-     既往史：XX
-     婚育个人史：XX
-     家族史：XX
-     初步诊断：XX
-     ---"""
+1. 先给结构化结论，再补充可执行要点
+2. 表达准确、克制，不编造政策出处或文件原文
+3. 若用户问题信息不足，先说明需要补充的关键信息
+4. 输出优先可落地：可给出教学目标、活动设计、评价建议
+5. 不输出医疗建议、法律定性结论等越界内容
+"""
 
 
 def build_developer_prompt(case: Case) -> str:
-    """构建开发者提示词（包含病例信息）。
+    """构建开发者提示词（包含主题上下文）。
 
     Args:
-        case: 病例对象
+        case: 主题对象
 
     Returns:
         开发者提示词字符串
     """
-    # 提取体格检查中可透露的信息
     physical_exam = case.physical_exam or {}
     visible_signs = physical_exam.get("visible", {})
     on_request_signs = physical_exam.get("on_request", {})
 
-    # 格式化可见体征
     visible_str = (
         "\n".join(f"  - {k}: {v}" for k, v in visible_signs.items())
         if visible_signs
-        else "  - 无明显异常"
+        else "  - 无"
     )
 
-    # 格式化按需体征（医生检查时才显示）
     on_request_str = (
         "\n".join(f"  - {k}: {v}" for k, v in on_request_signs.items())
         if on_request_signs
-        else "  - 无特殊发现"
+        else "  - 无"
     )
 
-    # 提取患者信息
-    patient_info = case.patient_info or {}
-    age = patient_info.get("age", "未知")
-    gender = patient_info.get("gender", "未知")
-    occupation = patient_info.get("occupation", "未知")
-
-    # 既往史
     past_history = case.past_history or {}
     diseases = past_history.get("diseases", [])
     allergies = past_history.get("allergies", [])
     medications = past_history.get("medications", [])
 
-    # 婚育个人史和家族史
     marriage_history = getattr(case, "marriage_childbearing_history", None) or "未提供"
     fam_history = getattr(case, "family_history", None) or "未提供"
 
-    # 病例序号
     case_num = getattr(case, "case_number", None)
-    case_number_line = f"\n病例序号：{case_num}" if case_num else ""
+    case_number_line = f"\n主题序号：{case_num}" if case_num else ""
 
-    # 初步诊断（隐藏信息，仅供终止判断使用）
     std_diag = case.standard_diagnosis or {}
     primary_diag = std_diag.get("primary", "未知")
-    differential = std_diag.get("differential", [])
+    return f"""当前教学主题上下文：
+- 标题：{case.title}
+- 难度：{case.difficulty}
+- 学段/方向：{case.department}{case_number_line}
 
-    return f"""你扮演的患者信息：
-- 年龄：{age}岁
-- 性别：{"男" if gender == "male" else "女" if gender == "female" else gender}
-- 职业：{occupation}{case_number_line}
+参考背景：
+- 核心描述：{case.chief_complaint}
+- 详细说明：{case.present_illness}
+- 补充信息：
+  - 疾病史：{", ".join(diseases) if diseases else "无"}
+  - 过敏史：{", ".join(allergies) if allergies else "无"}
+  - 用药史：{", ".join(medications) if medications else "无"}
+- 补充背景字段：{marriage_history}；{fam_history}
 
-主诉：{case.chief_complaint}
+结构化数据（如有）：
+- visible: {visible_str}
+- on_request: {on_request_str}
 
-现病史：{case.present_illness}
-
-既往史：
-- 疾病史：{", ".join(diseases) if diseases else "无"}
-- 过敏史：{", ".join(allergies) if allergies else "无"}
-- 用药史：{", ".join(medications) if medications else "无"}
-
-婚育个人史：{marriage_history}
-
-家族史：{fam_history}
-
-可见体征（医生一眼能看到的）：
-{visible_str}
-
-体格检查结果（医生检查时你要描述的感受）：
-{on_request_str}
-
-【隐藏信息 - 仅用于诊断终止时的比对，不要主动提及】
-初步诊断：{primary_diag}
-鉴别诊断：{", ".join(differential) if differential else "无"}
-
-【再次强调】你只是一个普通患者：
-- 绝对禁止说"我给你开药"、"你需要吃xx药"、"建议你xxx"这类话
-- 医生说吃药就说"好的"，医生说检查就说"行"
-- 你来看病是求助的，不是给建议的
+内部参考答案（仅用于回答质量约束，不要原样暴露）：
+- primary: {primary_diag}
 """
 
 
@@ -161,7 +108,7 @@ def build_messages(
     """构建发送给 LLM 的消息列表。
 
     Args:
-        case: 病例对象
+        case: 主题对象
         history: 历史消息列表
         user_message: 用户当前消息
 
@@ -232,7 +179,7 @@ async def chat_stream(
 ) -> StreamingResponse:
     """SSE 流式对话接口。
 
-    学生（医生角色）发送问诊消息，LLM（病人角色）流式返回回答。
+    用户发送问题，LLM 流式返回教学支持回答。
     限流：每用户每分钟最多 20 次请求。
 
     Args:
@@ -249,13 +196,12 @@ async def chat_stream(
         HTTPException: 404 如果会话不存在
         HTTPException: 400 如果会话已结束
     """
-    # 1. 查询会话（包含病例和历史消息）
+    # 1. 查询会话（包含主题和历史消息）
     result = await db.execute(
         select(Session)
         .options(
             selectinload(Session.case),
             selectinload(Session.messages),
-            selectinload(Session.test_requests),
         )
         .where(Session.id == data.session_id)
     )
@@ -281,116 +227,7 @@ async def chat_stream(
             detail=f"Session is {session.status}, cannot continue chat",
         )
 
-    # 3.5 检查意图（下检查单/要结果）：用确定性逻辑处理，保证可审计和稳定体验
     case = session.case
-    available_tests = case.available_tests or []
-    available_test_types = {
-        str(t.get("type")) for t in available_tests if isinstance(t, dict) and t.get("type")
-    }
-    intent = extract_test_intent(data.message, available_test_types)
-
-    if intent is not None:
-        # Always persist the doctor's message.
-        user_tokens = estimate_tokens(data.message)
-        db.add(
-            Message(
-                session_id=data.session_id,
-                role="user",
-                content=data.message,
-                tokens=user_tokens,
-            )
-        )
-
-        # Build a deterministic patient ack.
-        if intent.kind == "order":
-            ack = "好的，我去做检查。"
-        else:
-            ack = "好的，我把检查报告单内容给您。"
-
-        assistant_msg = Message(
-            session_id=data.session_id,
-            role="assistant",
-            content=ack,
-            tokens=estimate_tokens(ack),
-            latency_ms=0,
-        )
-        db.add(assistant_msg)
-
-        # For each requested test type, either create/find the TestRequest then expose result.
-        from src.apps.api.models import TestRequest
-
-        system_texts: list[str] = []
-        for test_type in intent.test_types:
-            # Find existing request
-            existing = next(
-                (tr for tr in (session.test_requests or []) if tr.test_type == test_type),
-                None,
-            )
-
-            if intent.kind == "order" and existing is None:
-                test_info = next(
-                    (
-                        t
-                        for t in available_tests
-                        if isinstance(t, dict) and t.get("type") == test_type
-                    ),
-                    None,
-                )
-                if test_info is None:
-                    continue
-                new_req = TestRequest(
-                    session_id=data.session_id,
-                    test_type=test_type,
-                    test_name=str(test_info.get("name", test_type)),
-                    result=test_info.get("result", {}) or {},
-                )
-                db.add(new_req)
-                session.test_requests.append(new_req)
-                existing = new_req
-
-            if existing is None:
-                system_texts.append(f"[检查结果] {test_type}: 尚未完成（需要先申请检查）")
-                continue
-
-            system_texts.append(format_test_result_text(existing.test_name, existing.result or {}))
-
-        # Persist system message for replay.
-        if system_texts:
-            system_content = "\n\n".join(system_texts)
-            db.add(
-                Message(
-                    session_id=data.session_id,
-                    role="system",
-                    content=system_content,
-                    tokens=estimate_tokens(system_content),
-                    latency_ms=0,
-                )
-            )
-
-        await db.commit()
-
-        async def intent_generator() -> AsyncGenerator[str, None]:
-            yield f"data: {json.dumps({'content': ack, 'done': False}, ensure_ascii=False)}\n\n"
-            if system_texts:
-                system_chunk = {
-                    "role": "system",
-                    "content": system_content,
-                    "done": False,
-                }
-                yield (f"data: {json.dumps(system_chunk, ensure_ascii=False)}\n\n")
-            done_chunk = {"content": "", "done": True, "latency_ms": 0}
-            yield (f"data: {json.dumps(done_chunk, ensure_ascii=False)}\n\n")
-            yield "data: [DONE]\n\n"
-
-        return StreamingResponse(
-            intent_generator(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
-        )
 
     # 4. 构建消息
     history = sorted(session.messages, key=lambda m: m.created_at)

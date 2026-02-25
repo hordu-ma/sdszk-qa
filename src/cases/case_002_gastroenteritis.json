@@ -1,78 +1,40 @@
 {
-  "title": "急性胃肠炎",
-  "difficulty": "easy",
-  "department": "消化内科",
+  "title": "初中思政：法治教育案例课设计",
+  "difficulty": "medium",
+  "department": "初中",
   "patient_info": {
-    "age": 35,
-    "gender": "女",
-    "occupation": "教师"
+    "teacher_role": "思政教师",
+    "grade": "初二",
+    "class_size": 46
   },
-  "chief_complaint": "腹痛、腹泻 2 天",
-  "present_illness": "患者 2 天前晚餐进食海鲜后，次日凌晨出现上腹部疼痛，呈阵发性绞痛，伴恶心、呕吐胃内容物 3 次。随后出现腹泻，水样便，每日 7-8 次，无脓血便。伴发热，最高体温 37.8°C。食欲差，进食后腹痛加重。无头晕、黑便。",
+  "chief_complaint": "想用真实案例讲清权利与义务的统一",
+  "present_illness": "学生对法条概念记忆多、情境应用弱，需要高参与度课堂",
   "past_history": {
-    "diseases": [],
-    "allergies": ["海鲜过敏（既往否认）"],
-    "medications": []
+    "diseases": ["课堂讨论容易跑题"],
+    "allergies": ["不希望只有知识灌输"],
+    "medications": ["可提供校园生活案例"]
   },
   "physical_exam": {
     "visible": {
-      "temperature": "37.5°C",
-      "pulse": "88次/分",
-      "respiration": "20次/分",
-      "blood_pressure": "110/70 mmHg",
-      "general": "急性病容，营养中等"
+      "lesson_duration": "40分钟",
+      "teaching_goal": "规则意识与责任意识"
     },
     "on_request": {
-      "abdomen": "腹平软，全腹轻压痛，以上腹部为著，无反跳痛、肌紧张，肠鸣音活跃，约8次/分",
-      "murphy_sign": "阴性",
-      "mcburney_point": "无压痛",
-      "skin": "弹性可，无脱水征"
+      "constraints": "学生法律术语基础一般",
+      "resources": "可使用短视频素材"
     }
   },
-  "available_tests": [
-    {
-      "type": "blood_routine",
-      "name": "血常规",
-      "result": {
-        "wbc": "11.2 × 10^9/L (↑)",
-        "neutrophil": "72%",
-        "lymphocyte": "23%",
-        "hemoglobin": "138 g/L",
-        "platelet": "245 × 10^9/L"
-      }
-    },
-    {
-      "type": "stool_routine",
-      "name": "大便常规",
-      "result": {
-        "color": "黄色",
-        "character": "稀水样",
-        "wbc": "5-8/HP",
-        "rbc": "0-2/HP",
-        "occult_blood": "阴性"
-      }
-    },
-    {
-      "type": "electrolyte",
-      "name": "电解质",
-      "result": {
-        "potassium": "3.3 mmol/L (↓)",
-        "sodium": "138 mmol/L",
-        "chloride": "100 mmol/L"
-      }
-    }
-  ],
+  "available_tests": [],
   "standard_diagnosis": {
-    "primary": "急性胃肠炎（食物中毒）",
-    "differential": ["急性阑尾炎", "急性胆囊炎", "急性胰腺炎"]
+    "primary": "通过情境案例分析与角色决策，建立规则意识并落地到校园行为规范",
+    "differential": ["模拟法庭活动", "法治主题辩论"]
   },
   "key_points": [
-    "进食史（海鲜）",
-    "腹痛、腹泻、呕吐症状",
-    "全腹压痛但无反跳痛、肌紧张",
-    "肠鸣音活跃",
-    "大便常规白细胞轻度升高",
-    "低钾血症"
+    "选取贴近学生生活的法治情境",
+    "引导区分权利与义务边界",
+    "设计角色任务促进价值判断",
+    "提炼规范结论并形成班级公约",
+    "设置课后行为观察与反馈"
   ],
-  "recommended_tests": ["blood_routine", "stool_routine", "electrolyte"]
+  "recommended_tests": []
 }

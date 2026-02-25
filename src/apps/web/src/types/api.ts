@@ -41,17 +41,6 @@ export interface CaseDetail {
   available_tests: Record<string, unknown>[];
 }
 
-export interface AvailableTestItem {
-  type: string;
-  name: string;
-}
-
-export interface AvailableTestsResponse {
-  case_id: number;
-  items: AvailableTestItem[];
-  total: number;
-}
-
 // ==================== Sessions ====================
 export interface SessionResponse {
   id: number;
@@ -61,8 +50,9 @@ export interface SessionResponse {
 }
 
 export interface SessionCreateRequest {
-  mode?: "fixed" | "random";
+  mode?: "fixed" | "custom";
   case_id?: number;
+  topic?: string;
 }
 
 export interface SessionListItem {
@@ -100,74 +90,5 @@ export interface SessionDetail {
   status: string;
   started_at: string;
   ended_at: string | null;
-  submitted_diagnosis: string | null;
   messages: MessageItem[];
-}
-
-// ==================== Tests ====================
-export interface TestRequestCreate {
-  test_type: string;
-}
-
-export interface TestRequestResponse {
-  id: number;
-  session_id: number;
-  test_type: string;
-  test_name: string;
-  result: Record<string, any>;
-  requested_at: string;
-}
-
-export interface TestRequestListItem {
-  id: number;
-  test_type: string;
-  test_name: string;
-  result: Record<string, any>;
-  requested_at: string;
-}
-
-export interface TestRequestListResponse {
-  items: TestRequestListItem[];
-  total: number;
-}
-
-// ==================== Scores ====================
-export interface ScoreDimensions {
-  interview_completeness: number;
-  test_appropriateness: number;
-  diagnosis_accuracy: number;
-}
-
-export interface ScoringDetails {
-  keywords_asked: string[];
-  key_points_covered: string[];
-  key_points_total: string[];
-  tests_requested: string[];
-  recommended_tests: string[];
-  diagnosis_keywords_matched: string[];
-  standard_diagnosis: string;
-  submitted_diagnosis: string;
-  scoring_rule_version: string;
-}
-
-export interface ScoreResponse {
-  id: number;
-  session_id: number;
-  total_score: number;
-  dimensions: ScoreDimensions;
-  scoring_details: ScoringDetails;
-  scoring_method: string;
-  model_version: string | null;
-  scored_at: string;
-}
-
-export interface DiagnosisSubmitRequest {
-  diagnosis: string;
-}
-
-export interface DiagnosisSubmitResponse {
-  session_id: number;
-  status: string;
-  submitted_diagnosis: string;
-  score: ScoreResponse;
 }

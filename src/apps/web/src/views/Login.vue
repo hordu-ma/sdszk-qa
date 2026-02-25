@@ -48,8 +48,8 @@ const onSubmit = async () => {
 <template>
   <div class="login-page">
     <div class="header">
-      <h2>Clinic Sim</h2>
-      <p>临床医学模拟问诊系统</p>
+      <h2>鲁韵思政</h2>
+      <p>思政教学设计与教研问答系统</p>
     </div>
 
     <van-form @submit="onSubmit">
