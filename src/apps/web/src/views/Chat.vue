@@ -121,50 +121,63 @@ const sendMessage = async () => {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let shouldStop = false;
+    let buffer = "";
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const text = decoder.decode(value);
-      const lines = text.split("\n");
+      buffer += decoder.decode(value, { stream: true });
 
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
+      while (true) {
+        const eventEnd = buffer.indexOf("\n\n");
+        if (eventEnd === -1) break;
 
-        const data = line.slice(6).trim();
-        if (!data) continue;
-        if (data === "[DONE]") {
-          shouldStop = true;
-          break;
-        }
+        const eventBlock = buffer.slice(0, eventEnd);
+        buffer = buffer.slice(eventEnd + 2);
+        const eventLines = eventBlock.split("\n");
 
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) {
-            const assistantMsg = messages.value[assistantMsgIndex];
-            if (assistantMsg) {
-              assistantMsg.content = parsed.error;
-            }
-            showFailToast(parsed.error);
+        for (const line of eventLines) {
+          if (!line.startsWith("data:")) continue;
+
+          const data = line.slice(5).trim();
+          if (!data) continue;
+
+          if (data === "[DONE]") {
             shouldStop = true;
             break;
           }
 
-          if (parsed.content) {
-            const assistantMsg = messages.value[assistantMsgIndex];
-            if (assistantMsg) {
-              assistantMsg.content += parsed.content;
-              scrollToBottom();
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) {
+              const assistantMsg = messages.value[assistantMsgIndex];
+              if (assistantMsg) {
+                assistantMsg.content = parsed.error;
+              }
+              showFailToast(parsed.error);
+              shouldStop = true;
+              break;
             }
+
+            if (parsed.content) {
+              const assistantMsg = messages.value[assistantMsgIndex];
+              if (assistantMsg) {
+                assistantMsg.content += parsed.content;
+                scrollToBottom();
+              }
+            }
+
+            if (parsed.done) {
+              shouldStop = true;
+              break;
+            }
+          } catch (_e) {
+            // ignore malformed event chunks
           }
-          if (parsed.done) {
-            shouldStop = true;
-            break;
-          }
-        } catch (_e) {
-          // ignore chunk parse errors
         }
+
+        if (shouldStop) break;
       }
 
       if (shouldStop) break;

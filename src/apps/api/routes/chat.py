@@ -20,6 +20,7 @@ from src.apps.api.logging_config import logger
 from src.apps.api.models import Case, Message, Session
 from src.apps.api.rate_limit import limiter
 from src.apps.api.schemas.chat import ChatRequest
+from src.apps.api.services.audit import write_audit_log
 
 router = APIRouter()
 
@@ -214,6 +215,53 @@ async def chat_stream(
 
     case = session.case
 
+    async def persist_chat_result(
+        user_content: str,
+        assistant_content: str | None,
+        *,
+        latency_ms: int | None,
+        error: str | None = None,
+    ) -> None:
+        """保存聊天消息与审计日志（失败不影响响应）。"""
+        from src.apps.api.dependencies import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as save_db:
+            try:
+                save_db.add(
+                    Message(
+                        session_id=data.session_id,
+                        role="user",
+                        content=user_content,
+                        tokens=estimate_tokens(user_content),
+                    )
+                )
+                if assistant_content:
+                    save_db.add(
+                        Message(
+                            session_id=data.session_id,
+                            role="assistant",
+                            content=assistant_content,
+                            tokens=estimate_tokens(assistant_content),
+                            latency_ms=latency_ms,
+                        )
+                    )
+                await write_audit_log(
+                    db=save_db,
+                    request=request,
+                    action="chat_failed" if error else "chat_completed",
+                    user_id=current_user.id,
+                    resource_type="session",
+                    resource_id=str(data.session_id),
+                    details={
+                        "error": error,
+                        "latency_ms": latency_ms,
+                    },
+                )
+                await save_db.commit()
+            except Exception as e:
+                await save_db.rollback()
+                logger.error("保存对话或审计失败", session_id=data.session_id, error=str(e))
+
     # 4. 构建消息
     history = sorted(session.messages, key=lambda m: m.created_at)
     messages = build_messages(case, history, data.message)
@@ -228,6 +276,12 @@ async def chat_stream(
         )
 
         async def over_limit_generator() -> AsyncGenerator[str, None]:
+            await persist_chat_result(
+                user_content=data.message,
+                assistant_content=None,
+                latency_ms=None,
+                error="context_too_long",
+            )
             yield "data: " + json.dumps({"error": "上下文过长，请结束会话或减少消息"}) + "\n\n"
             yield "data: [DONE]\n\n"
 
@@ -246,7 +300,6 @@ async def chat_stream(
     async def event_generator() -> AsyncGenerator[str, None]:
         full_response = ""
         start_time = time.time()
-        user_tokens = estimate_tokens(data.message)
 
         try:
             async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
@@ -264,6 +317,12 @@ async def chat_stream(
                     if response.status_code != 200:
                         error_text = await response.aread()
                         err_msg = f"LLM error: {error_text.decode()}"
+                        await persist_chat_result(
+                            user_content=data.message,
+                            assistant_content=None,
+                            latency_ms=None,
+                            error=err_msg,
+                        )
                         yield f"data: {json.dumps({'error': err_msg})}\n\n"
                         return
 
@@ -292,9 +351,22 @@ async def chat_stream(
                                 continue
 
         except httpx.TimeoutException:
+            await persist_chat_result(
+                user_content=data.message,
+                assistant_content=None,
+                latency_ms=None,
+                error="LLM request timeout",
+            )
             yield f"data: {json.dumps({'error': 'LLM request timeout'})}\n\n"
             return
         except httpx.RequestError as e:
+            error_msg = f"LLM connection error: {str(e)}"
+            await persist_chat_result(
+                user_content=data.message,
+                assistant_content=None,
+                latency_ms=None,
+                error=error_msg,
+            )
             yield f"data: {json.dumps({'error': f'LLM connection error: {str(e)}'})}\n\n"
             return
 
@@ -303,43 +375,16 @@ async def chat_stream(
         yield f"data: {json.dumps({'content': '', 'done': True, 'latency_ms': latency_ms})}\n\n"
 
         # 7. 落库：保存用户消息和助手回复（尽量不丢用户输入）
-        from src.apps.api.dependencies import AsyncSessionLocal
-
-        async with AsyncSessionLocal() as save_db:
-            try:
-                save_db.add(
-                    Message(
-                        session_id=data.session_id,
-                        role="user",
-                        content=data.message,
-                        tokens=user_tokens,
-                    )
-                )
-
-                if full_response:
-                    save_db.add(
-                        Message(
-                            session_id=data.session_id,
-                            role="assistant",
-                            content=full_response,
-                            tokens=estimate_tokens(full_response),
-                            latency_ms=latency_ms,
-                        )
-                    )
-
-                await save_db.commit()
-                logger.debug(
-                    "对话消息已保存",
-                    session_id=data.session_id,
-                    latency_ms=latency_ms,
-                )
-            except Exception as e:
-                await save_db.rollback()
-                logger.error(
-                    "保存对话消息失败",
-                    session_id=data.session_id,
-                    error=str(e),
-                )
+        await persist_chat_result(
+            user_content=data.message,
+            assistant_content=full_response if full_response else None,
+            latency_ms=latency_ms,
+        )
+        logger.debug(
+            "对话消息已保存",
+            session_id=data.session_id,
+            latency_ms=latency_ms,
+        )
 
         # 发送最终的 [DONE] 信号
         yield "data: [DONE]\n\n"

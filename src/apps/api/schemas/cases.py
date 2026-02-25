@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CaseListItem(BaseModel):
@@ -16,10 +16,7 @@ class CaseListItem(BaseModel):
     is_active: bool = Field(..., description="是否启用")
     created_at: datetime = Field(..., description="创建时间")
 
-    class Config:
-        """Pydantic 配置。"""
-
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CaseDetail(BaseModel):
@@ -34,10 +31,7 @@ class CaseDetail(BaseModel):
     scenario_text: str = Field(..., description="场景说明")
     supplementary_info: dict[str, Any] = Field(..., description="补充信息")
 
-    class Config:
-        """Pydantic 配置。"""
-
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CaseDetailFull(CaseDetail):

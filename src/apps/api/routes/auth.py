@@ -7,7 +7,7 @@ from datetime import timedelta
 from typing import Annotated
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ from src.apps.api.dependencies import get_current_user, get_db
 from src.apps.api.logging_config import logger
 from src.apps.api.models import User
 from src.apps.api.schemas.auth import LoginCredentials, Token, UserResponse
+from src.apps.api.services.audit import write_audit_log
 from src.apps.api.utils.jwt import create_access_token
 
 router = APIRouter()
@@ -63,6 +64,7 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> U
 
 @router.post("/login", response_model=Token, summary="用户登录")
 async def login(
+    request: Request,
     credentials: LoginCredentials,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
@@ -81,6 +83,13 @@ async def login(
     user = await authenticate_user(db, credentials.username, credentials.password)
 
     if not user:
+        await write_audit_log(
+            db=db,
+            request=request,
+            action="login_failed",
+            details={"username": credentials.username},
+        )
+        await db.commit()
         logger.warning("登录失败", username=credentials.username, reason="用户名或密码错误")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -94,6 +103,17 @@ async def login(
         data={"sub": str(user.id)},
         expires_delta=access_token_expires,
     )
+
+    await write_audit_log(
+        db=db,
+        request=request,
+        action="login_success",
+        user_id=user.id,
+        resource_type="user",
+        resource_id=str(user.id),
+        details={"username": user.username},
+    )
+    await db.commit()
 
     logger.info("用户登录成功", user_id=user.id, username=user.username)
     return Token(access_token=access_token, token_type="bearer")

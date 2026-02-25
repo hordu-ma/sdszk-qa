@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -14,12 +14,14 @@ from src.apps.api.schemas.sessions import (
     SessionListResponse,
     SessionResponse,
 )
+from src.apps.api.services.audit import write_audit_log
 
 router = APIRouter()
 
 
 @router.post("/", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_session(
+    request: Request,
     data: SessionCreate,
     db: DbSession,
     current_user: CurrentUser,
@@ -42,8 +44,7 @@ async def create_session(
             generation_meta={"created_by": "custom_topic"},
         )
         db.add(case)
-        await db.commit()
-        await db.refresh(case)
+        await db.flush()
         case_id = case.id
     else:
         if data.case_id is None:
@@ -70,6 +71,21 @@ async def create_session(
         status="in_progress",
     )
     db.add(session)
+    await db.flush()
+
+    await write_audit_log(
+        db=db,
+        request=request,
+        action="create_session",
+        user_id=current_user.id,
+        resource_type="session",
+        resource_id=str(session.id),
+        details={
+            "mode": data.mode,
+            "case_id": case_id,
+        },
+    )
+
     await db.commit()
     await db.refresh(session)
 

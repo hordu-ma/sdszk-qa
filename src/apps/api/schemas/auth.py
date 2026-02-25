@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LoginCredentials(BaseModel):
@@ -30,7 +30,4 @@ class UserResponse(BaseModel):
     external_user_id: str | None = Field(None, description="外部系统用户ID")
     created_at: datetime = Field(..., description="创建时间")
 
-    class Config:
-        """Pydantic 配置。"""
-
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
