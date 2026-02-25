@@ -3,6 +3,8 @@ name: random-case-mode
 description: Implement or maintain random case generation mode in clinic-sim. Use when modifying LLM-generated case payloads, random session creation flow, prompt contracts, or compatibility checks between available_tests and recommended_tests.
 ---
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 # Random Case Mode
 
 Use this skill when working on random-case generation and session wiring.

@@ -3,6 +3,8 @@ name: security-check
 description: Run a focused security hygiene review for clinic-sim changes. Use when touching auth, config, deployment, or external integrations to verify secret handling, access control, and exposure risks.
 ---
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 # Security Check
 
 Use this skill for change-time security checks.

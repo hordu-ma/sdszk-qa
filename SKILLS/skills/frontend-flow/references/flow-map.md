@@ -1,5 +1,7 @@
 # Flow Map
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 Main pages:
 
 - login: `src/apps/web/src/views/Login.vue`

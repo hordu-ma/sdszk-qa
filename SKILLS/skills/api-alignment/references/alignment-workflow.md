@@ -1,5 +1,7 @@
 # Alignment Workflow
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 1. Inspect backend changes in:
 
 - `src/apps/api/routes`

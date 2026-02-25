@@ -1,5 +1,7 @@
 # Migration Workflow
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 ## Steps
 
 1. Change SQLAlchemy model in `src/apps/api/models`.

@@ -1,5 +1,7 @@
 ## B服务器当前基本信息
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 1. 系统版本
 
 ```bash
@@ -39,27 +41,27 @@ sudo: no
 
 ```bash
 amax@amax:~$ ip -br a
-lo               UNKNOWN        127.0.0.1/8 ::1/128 
-eno5             DOWN           
-eno6             DOWN           
-ens1f0           UP             172.18.6.123/24 fe80::b93e:e1d1:2526:827e/64 
-eno7             DOWN           
-eno8             DOWN           
-ens1f1           DOWN 
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eno5             DOWN
+eno6             DOWN
+ens1f0           UP             172.18.6.123/24 fe80::b93e:e1d1:2526:827e/64
+eno7             DOWN
+eno8             DOWN
+ens1f1           DOWN
 ```
 
 ```bash
 amax@amax:~$ ip route | head -n 5
-default via 172.18.6.254 dev ens1f0 proto static metric 20100 
-169.254.0.0/16 dev ens1f0 scope link metric 1000 
-172.18.6.0/24 dev ens1f0 proto kernel scope link src 172.18.6.123 metric 100 
+default via 172.18.6.254 dev ens1f0 proto static metric 20100
+169.254.0.0/16 dev ens1f0 scope link metric 1000
+172.18.6.0/24 dev ens1f0 proto kernel scope link src 172.18.6.123 metric 100
 ```
 
 5. GPU与驱动
 
 ```bash
 amax@amax:~$ nvidia-smi
-Mon Jan 19 18:28:52 2026       
+Mon Jan 19 18:28:52 2026
 +---------------------------------------------------------------------------------------+
 | NVIDIA-SMI 535.183.06             Driver Version: 535.183.06   CUDA Version: 12.2     |
 |-----------------------------------------+----------------------+----------------------+
@@ -143,7 +145,7 @@ See 'snap info docker' for additional versions.
 
 ```bashag-0-1jfas59j7ag-1-1jfas59j7
 amax@amax:~$ sudo ufw status verbose
-[sudo] password for amax: 
+[sudo] password for amax:
 Status: inactive
 
 amax@amax:~$ sudo systemctl status firewalld --no-pager
@@ -196,12 +198,12 @@ loop23 669.8M squashfs /snap/gnome-46-2404/145
 loop24  10.1M squashfs /snap/htop/5181
 loop25  55.5M squashfs /snap/core18/2976
 loop26 250.6M squashfs /snap/firefox/7423
-sda    893.8G          
+sda    893.8G
 ├─sda1   977M vfat     /boot/efi
 ├─sda2   7.6G swap     [SWAP]
 ├─sda3 190.7G ext4     /
 └─sda4 694.4G ext4     /home
-sdb     18.2T          
+sdb     18.2T
 └─sdb1  18.2T ext4     /data
 ```
 
@@ -217,5 +219,3 @@ amax@amax:~$ git --version
 Command 'git' not found, but can be installed with:
 sudo apt install git
 ```
-
-

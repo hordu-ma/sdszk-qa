@@ -1,5 +1,7 @@
 # Random Case Flow
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 Key files:
 
 - Generation service: `src/apps/api/services/case_generation.py`

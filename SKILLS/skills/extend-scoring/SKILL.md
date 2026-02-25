@@ -3,6 +3,8 @@ name: extend-scoring
 description: Extend or refactor rule-based scoring for clinic-sim sessions. Use when updating scoring dimensions, weighting, scoring_details output, or score-related tests while preserving traceability and backward compatibility.
 ---
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 # Extend Scoring
 
 Apply this workflow for scoring logic changes.

@@ -36,6 +36,7 @@
 ## 开发与部署
 
 - 开发环境与命令：见 [AGENTS.md](AGENTS.md)
+- 生产部署总入口：见 [生产部署指南.md](生产部署指南.md)
 - 执行流程（SKILL触发）：见 [SKILLS/README.md](SKILLS/README.md)
 - 架构详解：见 [src/docs/ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
 

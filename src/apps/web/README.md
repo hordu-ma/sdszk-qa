@@ -2,6 +2,8 @@
 
 本目录为临床医学模拟问诊系统的 Web 前端，基于 Vue 3 + Vite + TypeScript，使用 Vant 作为 UI 组件库，Pinia 管理状态，并通过 axios 访问后端 API。
 
+> 生产部署流程请统一参考：`生产部署指南.md`。
+
 ## 目录结构概览
 
 ```

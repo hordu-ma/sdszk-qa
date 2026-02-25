@@ -1,5 +1,7 @@
 # API Surface
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 Project route groups:
 
 - `/api/auth`

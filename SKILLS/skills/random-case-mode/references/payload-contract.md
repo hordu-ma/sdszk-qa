@@ -1,5 +1,7 @@
 # Payload Contract
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 Required core fields:
 
 - `title`

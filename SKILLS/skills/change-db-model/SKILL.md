@@ -3,6 +3,8 @@ name: change-db-model
 description: Safely modify SQLAlchemy models and Alembic migrations in clinic-sim. Use when changing table fields, constraints, relations, or migration scripts, including schema rollout checks and API/schema alignment.
 ---
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 # Change DB Model
 
 Use this skill for model and migration changes.

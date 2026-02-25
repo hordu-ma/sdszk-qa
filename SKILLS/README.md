@@ -25,3 +25,7 @@ SKILLS/
 - 新增能力 → 新增独立 skill，不堆叠在通用文档。
 - 变更 → 更新对应 SKILL.md 与 references/。
 - frontmatter `name` 与目录名保持一致。
+
+## 部署口径
+
+- 生产部署统一手册：`生产部署指南.md`

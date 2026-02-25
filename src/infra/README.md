@@ -2,6 +2,8 @@
 
 本文档说明 `src/infra` 目录中各个配置文件的作用及其适用场景。
 
+> 生产部署步骤统一参考：`生产部署指南.md`。
+
 ## 目录结构
 
 ```
@@ -9,7 +11,7 @@ infra/
 ├── compose/
 │   ├── compose.yaml       # 基础服务定义（通用模板）
 │   ├── dev.yml            # 本地开发环境配置
-│   ├── prod-a.yml         # 生产环境 A（API + 反向代理）
+│   ├── prod-a.yml         # 生产环境 A 占位（共享现网 Nginx，不启容器）
 │   ├── prod-b.yml         # 生产环境 B（vLLM 推理节点）
 │   └── nginx/
 │       └── nginx.conf     # 反向代理配置
@@ -80,29 +82,23 @@ ENV=dev
 
 ---
 
-### 3. **prod-a.yml** - 生产环境 A
+### 3. **prod-a.yml** - 生产环境 A（共享 Nginx 占位）
 
-**作用**：生产环境配置，服务器 A 运行 API 和基础服务，由外部 Nginx 反向代理。
+**作用**：用于标识 A 服务器（172.18.6.117）入口层部署模式。
 
-**包含的服务**：
+**当前约束**：A 服务器已有线上 Nginx 在运行，本项目不能独占 Nginx。
 
-- PostgreSQL（无端口暴露）
-- MinIO（无端口暴露）
-- **API 容器**
-  - 从编译后的源代码构建
-  - 仅暴露端口 8000（给反向代理访问）
-  - 没有卷挂载（使用构建时的源代码）
+**文件策略**：
 
-**主要特点**：
-
-- ✅ 生产级安全配置（仅必要端口暴露）
-- ✅ 数据库和 MinIO 凭证由环境变量强制指定（无默认值）
-- ✅ 不包含 Nginx（由外部反向代理或 CDN 管理）
+- `prod-a.yml` 不再启动任何容器（`services: {}`）
+- A 服务器仅进行两项工作：
+  - 发布前端静态资源（`dist`）到现网目录
+  - 将 `nginx/nginx.conf` 的增量片段并入现有 Nginx 配置
 
 **使用场景**：
 
-- 需要 API 和数据库在同一服务器
-- 外部有独立的反向代理（如云服务提供商的 Nginx）
+- 单机已存在共享网关 Nginx，需要增量接入新应用
+- 避免覆盖/替换现网主配置
 
 ---
 
@@ -140,31 +136,26 @@ ENV=dev
 
 ---
 
-### 5. **nginx/nginx.conf** - 反向代理配置
+### 5. **nginx/nginx.conf** - 反向代理增量片段
 
-**作用**：Nginx 反向代理配置，负责流量分发和 SSL/TLS 终止，部署在生产环境 A。
+**作用**：供 A 服务器现网 Nginx 复用的增量 `location` 片段（并入已有 `server {}`）。
 
-**上游配置**：
+**固定后端地址**：
 
-```nginx
-upstream backend {
-    server <B服务器IP>:8000;
-}
-```
-
-- 指向生产环境 B 的 API 服务器
+- A 服务器：`172.18.6.117`
+- B 服务器：`172.18.6.123`
+- API 上游：`http://172.18.6.123:8000`
 
 **路由规则**：
 
-| 路由        | 目标                 | 说明                                       |
-| ----------- | -------------------- | ------------------------------------------ |
-| `/`         | 本地静态文件         | Vue.js 前端应用（`/usr/share/nginx/html`） |
-| `/api/*`    | 后端服务             | 常规 API 请求代理                          |
-| `/api/chat` | 后端服务（特殊处理） | SSE 流式响应，禁用缓冲                     |
+| 路由        | 目标                 | 说明                                           |
+| ----------- | -------------------- | ---------------------------------------------- |
+| `/`         | 本地静态文件         | Vue.js 前端应用（`/data/www/clinic-sim/dist`） |
+| `/api/*`    | 后端服务             | 常规 API 请求代理                              |
+| `/api/chat` | 后端服务（特殊处理） | SSE 流式响应，禁用缓冲                         |
 
 **特殊配置**：
 
-- **SSL/TLS 支持**：443 端口，使用证书文件
 - **SSE 流式传输**（`/api/chat`）：
   - 禁用缓冲：`proxy_buffering off; proxy_cache off;`
   - 禁用分块编码：`chunked_transfer_encoding off;`
@@ -172,8 +163,8 @@ upstream backend {
 
 **使用方式**：
 
-- 挂载至容器：`./nginx/nginx.conf:/etc/nginx/nginx.conf:ro`
-- 需在容器部署时准备 SSL 证书：`./nginx/ssl/{cert.pem, key.pem}`
+- 不替换主配置：将本文件内容并入现有 `server {}`（如 `include` 或手动合并）
+- 在现网主配置中继续沿用既有证书、`listen 443 ssl`、`server_name`
 
 ---
 
@@ -194,16 +185,13 @@ upstream backend {
 │  生产环境 - 双服务器部署               │
 ├────────────────────────────────────────┤
 │                                        │
-│  服务器 A (prod-a.yml)                │
-│  ├─ Nginx (80, 443)   [nginx.conf]    │
-│  ├─ PostgreSQL        [无端口暴露]    │
-│  ├─ MinIO             [无端口暴露]    │
-│  └─ API (8000)                        │
-│      ↓                                │
-│    (反向代理)                         │
-│      ↓                                │
+│  服务器 A (172.18.6.117)             │
+│  ├─ 现网 Nginx (共享) [并入片段]      │
+│  └─ 前端静态资源 (dist)               │
+│      ↓ 反向代理 /api                  │
 │  服务器 B (prod-b.yml)                │
 │  ├─ vLLM (8001) [GPU 加速]           │
+│  ├─ API (8000)                        │
 │  ├─ PostgreSQL                        │
 │  └─ MinIO                             │
 │                                        │
@@ -264,20 +252,18 @@ docker compose -f src/infra/compose/dev.yml down
 
 ### 生产部署（两服务器）
 
-**服务器 A：**
+**服务器 A（172.18.6.117）：**
 
 ```bash
-# 创建 .env 配置
-DATABASE_URL=postgresql+psycopg://user:password@prod-b-server:5432/clinic_sim
-MINIO_ENDPOINT=prod-b-server:9000
-MINIO_ACCESS_KEY=your-key
-MINIO_SECRET_KEY=your-secret
-JWT_SECRET=your-secret-key
-LLM_BASE_URL=http://prod-b-server:8001
-LLM_MODEL=your-model
+# 1) 本地构建前端
+cd src/apps/web && npm run build
 
-# 启动
-docker compose -f src/infra/compose/prod-a.yml up -d
+# 2) 上传 dist 到 A 服务器现网静态目录（示例目录）
+# rsync -avz src/apps/web/dist/ <user>@172.18.6.117:/data/www/clinic-sim/dist/
+
+# 3) 将 src/infra/compose/nginx/nginx.conf 并入现网 Nginx 的目标 server {}
+# 4) 校验并重载
+nginx -t && nginx -s reload
 ```
 
 **服务器 B：**
@@ -300,8 +286,9 @@ docker compose -f src/infra/compose/prod-b.yml up -d
 1. **开发环境**：使用 `dev.yml` 时，确保本地有 vLLM 服务运行在 8001 端口
 2. **生产环境**：
    - 所有凭证必须通过 `.env` 文件配置，不要使用默认值
-   - 为 Nginx 准备有效的 SSL 证书
-   - 配置防火墙规则，仅开放必要端口
-   - 定期备份 PostgreSQL 和 MinIO 数据
+
+- A 服务器沿用现网 Nginx 证书配置，不要替换主配置
+- 配置防火墙规则，仅开放必要端口
+- 定期备份 PostgreSQL 和 MinIO 数据
 
 3. **GPU 支持**：`prod-b.yml` 需要服务器安装 NVIDIA Docker runtime，参考 [NVIDIA Container Toolkit](https://docs.nvidia.com/ai-enterprise/deployment-guide-vmware/0.1.0/docker-setup.html)

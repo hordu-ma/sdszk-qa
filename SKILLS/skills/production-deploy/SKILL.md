@@ -11,9 +11,9 @@ Use this skill for production release and environment checks.
 
 1. Read `references/deploy-checklist.md`.
 2. Validate required environment variables before deployment.
-3. Deploy entry layer with `src/infra/compose/prod-a.yml`.
-4. Deploy core layer with `src/infra/compose/prod-b.yml`.
-5. Confirm Nginx SSE proxy behavior and TLS files.
+3. Deploy core layer with `src/infra/compose/prod-b.yml`.
+4. Build frontend artifacts and upload `src/apps/web/dist` to A server static path.
+5. Merge `src/infra/compose/nginx/nginx.conf` location snippet into existing Nginx server block.
 6. Verify API health, auth, chat streaming, and frontend access.
 
 ## Guardrails
@@ -27,3 +27,4 @@ Use this skill for production release and environment checks.
 
 - Deployment checklist: `references/deploy-checklist.md`
 - Runtime files map: `references/runtime-files.md`
+- Unified production guide: `生产部署指南.md`

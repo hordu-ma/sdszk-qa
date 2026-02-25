@@ -1,5 +1,7 @@
 # Scoring Rules
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 Current scoring engine is rule-based and stored in:
 
 - `src/apps/api/services/scoring.py`

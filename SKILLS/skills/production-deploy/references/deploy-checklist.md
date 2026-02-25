@@ -1,5 +1,7 @@
 # Deploy Checklist
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 ## Required env vars
 
 - `POSTGRES_PASSWORD`
@@ -13,5 +15,6 @@
 1. Core services up on B server.
 2. API up and healthy.
 3. Frontend build artifacts ready.
-4. Nginx up on A server with certs.
-5. End-to-end smoke tests.
+4. Frontend artifacts uploaded to A server static path.
+5. Nginx location snippet merged into existing A server Nginx config.
+6. End-to-end smoke tests.

@@ -1,5 +1,7 @@
 # Scoring Touchpoints
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 Primary files:
 
 - Service: `src/apps/api/services/scoring.py`

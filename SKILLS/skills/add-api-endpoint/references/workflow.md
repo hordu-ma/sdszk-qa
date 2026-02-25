@@ -1,5 +1,7 @@
 # Workflow
 
+> 生产部署统一入口：`生产部署指南.md`。
+
 ## Scope Inputs
 
 - Route path and HTTP method
@@ -16,6 +18,7 @@
 4. Validate permission checks with `CurrentUser` where required.
 5. Keep DB access async and explicit.
 6. Add tests for:
+
 - valid request
 - validation error
 - auth/permission failure

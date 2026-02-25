@@ -4,7 +4,7 @@
 
 - `src/apps/api/`：FastAPI 后端（`routes/`、`schemas/`、`models/`、`services/`、`migrations/`）。
 - `src/apps/web/`：Vue 3 + Vite 前端（`src/views`、`src/api`、`src/stores`、`src/router`）。
-- `src/infra/compose/`：开发与生产环境的 Docker Compose 文件（`dev.yml`、`prod-a.yml`、`prod-b.yml`）。
+- `src/infra/compose/`：开发与生产环境的 Docker Compose 文件（`dev.yml`、`prod-a.yml` 占位、`prod-b.yml`）。
 - `src/cases/`：病例种子 JSON 文件。
 - `tests/`：后端 pytest 测试套件（集成测试与服务/配置测试）。
 - `src/scripts/`：工具脚本（例如 `start_vllm_dev.sh`、`import_cases.py`）。
@@ -48,3 +48,8 @@
 - 复制 `.env.example` 为 `.env`；严禁提交真实密钥。
 - 必填敏感变量包括 `JWT_SECRET`、数据库/MinIO 密码、`LLM_BASE_URL`。
 - 生产环境请关闭 Swagger，避免使用默认开发凭据。
+
+## 部署文档入口
+
+- 生产部署统一手册：`生产部署指南.md`
+- 基础设施细节：`src/infra/README.md`
