@@ -1,26 +1,24 @@
 import request from "./request";
 import type {
-  CaseListItem,
-  CaseDetail,
+  TopicListItem,
+  TopicDetail,
 } from "../types";
 
 // 获取主题列表
-export function getCaseList(params?: {
-  difficulty?: string;
-  department?: string;
+export function getTopicList(params?: {
   skip?: number;
   limit?: number;
 }) {
-  return request.get<any, CaseListItem[]>("/cases/", { params });
+  return request.get<any, TopicListItem[]>("/topics/", { params });
 }
 
 // 获取主题详情
-export function getCaseDetail(id: number) {
-  return request.get<any, CaseDetail>(`/cases/${id}`);
+export function getTopicDetail(id: number) {
+  return request.get<any, TopicDetail>(`/topics/${id}`);
 }
 
 // Re-export types
 export type {
-  CaseListItem,
-  CaseDetail,
+  TopicListItem,
+  TopicDetail,
 };

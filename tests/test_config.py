@@ -3,7 +3,7 @@ from src.apps.api.config import Settings
 
 def test_settings_defaults() -> None:
     settings = Settings(
-        DATABASE_URL="postgresql+psycopg://postgres:postgres@localhost:5432/clinic_sim",
+        DATABASE_URL="postgresql+psycopg://postgres:postgres@localhost:5432/luyun_sizheng",
         MINIO_ENDPOINT="localhost:9000",
         MINIO_ACCESS_KEY="minioadmin",
         MINIO_SECRET_KEY="minioadmin",

@@ -1,6 +1,6 @@
 ---
 name: production-deploy
-description: Deploy clinic-sim production stack across A/B servers with Nginx, API, vLLM, and storage services. Use when preparing production compose configs, environment variables, rollout checks, and post-deploy verification.
+description: Deploy luyun-sizheng production stack across A/B servers with Nginx, API, vLLM, and storage services. Use when preparing production compose configs, environment variables, rollout checks, and post-deploy verification.
 ---
 
 # Production Deploy

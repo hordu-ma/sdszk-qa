@@ -2,32 +2,30 @@
   "title": "思政课堂：形成性评价工具设计",
   "difficulty": "medium",
   "department": "通用",
-  "patient_info": {
+  "context_info": {
     "teacher_role": "思政教师",
     "grade": "初中",
     "class_size": 44
   },
-  "chief_complaint": "想设计可操作的形成性评价工具，提升课堂反馈质量",
-  "present_illness": "目前评价以终结性分数为主，过程反馈不及时、不具体",
-  "past_history": {
-    "diseases": ["评价标准不统一"],
-    "allergies": ["避免评价流于形式"],
-    "medications": ["可引入自评、互评、师评结合"]
+  "core_question": "想设计可操作的形成性评价工具，提升课堂反馈质量",
+  "scenario_text": "目前评价以终结性分数为主，过程反馈不及时、不具体",
+  "supplementary_info": {
+    "existing_issues": [
+      "评价标准不统一"
+    ],
+    "constraints": [
+      "避免评价流于形式"
+    ],
+    "available_resources": [
+      "可引入自评、互评、师评结合"
+    ]
   },
-  "physical_exam": {
-    "visible": {
-      "lesson_duration": "45分钟",
-      "teaching_goal": "评价驱动学习改进"
-    },
-    "on_request": {
-      "constraints": "课堂时间有限",
-      "resources": "可用纸笔或电子量表"
-    }
-  },
-  "available_tests": [],
-  "standard_diagnosis": {
+  "reference_answer": {
     "primary": "建立目标对齐的形成性评价量规并嵌入课堂关键环节",
-    "differential": ["表现性任务评价", "学习档案袋评价"]
+    "differential": [
+      "表现性任务评价",
+      "学习档案袋评价"
+    ]
   },
   "key_points": [
     "评价指标与教学目标对齐",
@@ -35,6 +33,5 @@
     "引导学生自评与互评",
     "形成可追踪的学习证据",
     "将评价结果反哺教学调整"
-  ],
-  "recommended_tests": []
+  ]
 }

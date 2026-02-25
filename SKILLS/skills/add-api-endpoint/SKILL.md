@@ -1,6 +1,6 @@
 ---
 name: add-api-endpoint
-description: Create or modify FastAPI endpoints in this clinic-sim project. Use when asked to add a new API route, adjust request/response schemas, wire services, or add endpoint tests while preserving route-service-model layering.
+description: Create or modify FastAPI endpoints in this luyun-sizheng project. Use when asked to add a new API route, adjust request/response schemas, wire services, or add endpoint tests while preserving route-service-model layering.
 ---
 
 > 生产部署统一入口：`生产部署指南.md`。

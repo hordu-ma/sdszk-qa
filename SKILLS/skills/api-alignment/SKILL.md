@@ -1,6 +1,6 @@
 ---
 name: api-alignment
-description: Keep frontend and backend API contracts aligned in clinic-sim. Use when backend schemas/routes change, frontend API clients/types need updates, or request/response mismatches cause runtime issues.
+description: Keep frontend and backend API contracts aligned in luyun-sizheng. Use when backend schemas/routes change, frontend API clients/types need updates, or request/response mismatches cause runtime issues.
 ---
 
 > 生产部署统一入口：`生产部署指南.md`。

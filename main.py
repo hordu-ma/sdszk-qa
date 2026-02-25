@@ -1,5 +1,5 @@
 def main() -> None:
-    print("Hello from clinic-sim!")
+    print("Hello from luyun-sizheng!")
 
 
 if __name__ == "__main__":

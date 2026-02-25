@@ -30,7 +30,7 @@ class AuditLog(Base):
 
     # 操作信息
     action: Mapped[str] = mapped_column(
-        String(50), comment="操作类型（如：login、chat、submit、score）"
+        String(50), comment="操作类型（如：login、chat、create_session）"
     )
     resource_type: Mapped[str | None] = mapped_column(
         String(50), nullable=True, comment="资源类型（如：session、case）"

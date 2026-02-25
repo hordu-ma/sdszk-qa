@@ -1,0 +1,37 @@
+{
+  "title": "小学思政：劳动教育融合课堂活动",
+  "difficulty": "easy",
+  "department": "小学",
+  "context_info": {
+    "teacher_role": "道德与法治教师",
+    "grade": "五年级",
+    "class_size": 42
+  },
+  "core_question": "希望把劳动教育和责任意识放进一节可执行课堂",
+  "scenario_text": "学生参与积极但反思浅，需要结构化活动与评价",
+  "supplementary_info": {
+    "existing_issues": [
+      "活动热闹但目标达成不清晰"
+    ],
+    "constraints": [
+      "避免活动碎片化"
+    ],
+    "available_resources": [
+      "有校园劳动基地支持"
+    ]
+  },
+  "reference_answer": {
+    "primary": "以任务驱动和反思表达为主线，形成劳动体验-意义建构-行为承诺闭环",
+    "differential": [
+      "家校协同劳动打卡",
+      "班级岗位轮值制"
+    ]
+  },
+  "key_points": [
+    "用真实劳动任务导入课堂",
+    "设置分组协作与角色分工",
+    "引导学生表达劳动价值感受",
+    "形成可执行的个人劳动计划",
+    "通过同伴互评强化责任意识"
+  ]
+}

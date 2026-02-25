@@ -18,8 +18,8 @@ dependencies = [
   "slowapi>=0.1.9",
   "vllm>=0.13.0; sys_platform != 'darwin'",
 ]
-description = "临床医学模拟问诊系统 - 基于 vLLM + FastAPI"
-name = "clinic-sim"
+description = "鲁韵思政大模型问答系统 - 基于 vLLM + FastAPI"
+name = "luyun-sizheng"
 readme = "README.md"
 requires-python = ">=3.11"
 version = "0.1.0"

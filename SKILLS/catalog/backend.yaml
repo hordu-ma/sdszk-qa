@@ -6,8 +6,8 @@ items:
     title: "修改数据库模型与迁移"
     entry: "SKILLS/skills/change-db-model/SKILL.md"
   - id: extend-scoring
-    title: "扩展评分逻辑"
+    title: "扩展评价逻辑"
     entry: "SKILLS/skills/extend-scoring/SKILL.md"
   - id: random-case-mode
-    title: "随机病例模式"
+    title: "随机主题模式"
     entry: "SKILLS/skills/random-case-mode/SKILL.md"

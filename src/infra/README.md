@@ -73,7 +73,7 @@ docker compose -f src/infra/compose/dev.yml up -d
 **环境变量示例**：
 
 ```env
-DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/clinic_sim
+DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/luyun_sizheng
 MINIO_ENDPOINT=minio:9000
 LLM_BASE_URL=http://host.docker.internal:8001
 LLM_MODEL=<必须与/v1/models返回的id一致>
@@ -148,11 +148,11 @@ ENV=dev
 
 **路由规则**：
 
-| 路由        | 目标                 | 说明                                           |
-| ----------- | -------------------- | ---------------------------------------------- |
-| `/`         | 本地静态文件         | Vue.js 前端应用（`/data/www/clinic-sim/dist`） |
-| `/api/*`    | 后端服务             | 常规 API 请求代理                              |
-| `/api/chat` | 后端服务（特殊处理） | SSE 流式响应，禁用缓冲                         |
+| 路由        | 目标                 | 说明                                              |
+| ----------- | -------------------- | ------------------------------------------------- |
+| `/`         | 本地静态文件         | Vue.js 前端应用（`/data/www/luyun-sizheng/dist`） |
+| `/api/*`    | 后端服务             | 常规 API 请求代理                                 |
+| `/api/chat` | 后端服务（特殊处理） | SSE 流式响应，禁用缓冲                            |
 
 **特殊配置**：
 
@@ -208,7 +208,7 @@ ENV=dev
 | --------------------- | ------------------- | ------------ |
 | `POSTGRES_USER`       | postgres            | 数据库用户   |
 | `POSTGRES_PASSWORD`   | postgres (dev)      | 数据库密码   |
-| `POSTGRES_DB`         | clinic_sim          | 数据库名     |
+| `POSTGRES_DB`         | luyun_sizheng       | 数据库名     |
 | `MINIO_ROOT_USER`     | minioadmin          | MinIO 用户   |
 | `MINIO_ROOT_PASSWORD` | minioadmin (dev)    | MinIO 密码   |
 | `JWT_SECRET`          | dev-change-me (dev) | JWT 签名密钥 |
@@ -259,7 +259,7 @@ docker compose -f src/infra/compose/dev.yml down
 cd src/apps/web && npm run build
 
 # 2) 上传 dist 到 A 服务器现网静态目录（示例目录）
-# rsync -avz src/apps/web/dist/ <user>@172.18.6.117:/data/www/clinic-sim/dist/
+# rsync -avz src/apps/web/dist/ <user>@172.18.6.117:/data/www/luyun-sizheng/dist/
 
 # 3) 将 src/infra/compose/nginx/nginx.conf 并入现网 Nginx 的目标 server {}
 # 4) 校验并重载

@@ -7,9 +7,7 @@ from .audit_logs import AuditLog
 from .base import Base, TimestampMixin, to_dict
 from .cases import Case
 from .messages import Message
-from .scores import Score
 from .sessions import Session
-from .test_requests import TestRequest
 from .users import User
 
 __all__ = [
@@ -20,7 +18,5 @@ __all__ = [
     "Case",
     "Session",
     "Message",
-    "TestRequest",
-    "Score",
     "AuditLog",
 ]

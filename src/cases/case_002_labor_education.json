@@ -1,0 +1,37 @@
+{
+  "title": "初中思政：法治教育案例课设计",
+  "difficulty": "medium",
+  "department": "初中",
+  "context_info": {
+    "teacher_role": "思政教师",
+    "grade": "初二",
+    "class_size": 46
+  },
+  "core_question": "想用真实案例讲清权利与义务的统一",
+  "scenario_text": "学生对法条概念记忆多、情境应用弱，需要高参与度课堂",
+  "supplementary_info": {
+    "existing_issues": [
+      "课堂讨论容易跑题"
+    ],
+    "constraints": [
+      "不希望只有知识灌输"
+    ],
+    "available_resources": [
+      "可提供校园生活案例"
+    ]
+  },
+  "reference_answer": {
+    "primary": "通过情境案例分析与角色决策，建立规则意识并落地到校园行为规范",
+    "differential": [
+      "模拟法庭活动",
+      "法治主题辩论"
+    ]
+  },
+  "key_points": [
+    "选取贴近学生生活的法治情境",
+    "引导区分权利与义务边界",
+    "设计角色任务促进价值判断",
+    "提炼规范结论并形成班级公约",
+    "设置课后行为观察与反馈"
+  ]
+}

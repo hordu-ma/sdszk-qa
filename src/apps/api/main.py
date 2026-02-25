@@ -90,6 +90,6 @@ async def root() -> dict[str, str]:
 from .routes import auth, cases, chat, sessions  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(cases.router, prefix="/api/cases", tags=["cases"])
+app.include_router(cases.router, prefix="/api/topics", tags=["topics"])
 app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])

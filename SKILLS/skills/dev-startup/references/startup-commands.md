@@ -25,7 +25,7 @@ Fallback mode (network constrained):
 
 Host API startup (fallback mode):
 
-`DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/clinic_sim MINIO_ENDPOINT=localhost:9000 LLM_BASE_URL=http://localhost:8001 LLM_MODEL=/home/<you>/.cache/modelscope/hub/models/Qwen/Qwen2.5-1.5B-Instruct uv run uvicorn src.apps.api.main:app --host 0.0.0.0 --port 8000 --reload`
+`DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/luyun_sizheng MINIO_ENDPOINT=localhost:9000 LLM_BASE_URL=http://localhost:8001 LLM_MODEL=/home/<you>/.cache/modelscope/hub/models/Qwen/Qwen2.5-1.5B-Instruct uv run uvicorn src.apps.api.main:app --host 0.0.0.0 --port 8000 --reload`
 
 Important:
 

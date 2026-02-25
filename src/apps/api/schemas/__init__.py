@@ -3,13 +3,6 @@
 from src.apps.api.schemas.auth import LoginCredentials, Token, UserResponse
 from src.apps.api.schemas.cases import CaseDetail, CaseDetailFull, CaseListItem
 from src.apps.api.schemas.chat import ChatChunk, ChatComplete, ChatRequest
-from src.apps.api.schemas.scores import (
-    DiagnosisSubmit,
-    DiagnosisSubmitResponse,
-    ScoreDimensions,
-    ScoreResponse,
-    ScoringDetails,
-)
 from src.apps.api.schemas.sessions import (
     MessageItem,
     SessionCreate,
@@ -17,14 +10,6 @@ from src.apps.api.schemas.sessions import (
     SessionListItem,
     SessionListResponse,
     SessionResponse,
-)
-from src.apps.api.schemas.tests import (
-    AvailableTestItem,
-    AvailableTestsResponse,
-    TestRequestCreate,
-    TestRequestListItem,
-    TestRequestListResponse,
-    TestRequestResponse,
 )
 
 __all__ = [
@@ -43,15 +28,4 @@ __all__ = [
     "ChatRequest",
     "ChatChunk",
     "ChatComplete",
-    "TestRequestCreate",
-    "TestRequestResponse",
-    "TestRequestListItem",
-    "TestRequestListResponse",
-    "AvailableTestItem",
-    "AvailableTestsResponse",
-    "DiagnosisSubmit",
-    "DiagnosisSubmitResponse",
-    "ScoreResponse",
-    "ScoreDimensions",
-    "ScoringDetails",
 ]

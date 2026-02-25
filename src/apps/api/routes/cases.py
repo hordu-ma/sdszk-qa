@@ -20,7 +20,7 @@ router = APIRouter()
 async def list_cases(
     db: Annotated[AsyncSession, Depends(get_db)],
     difficulty: Annotated[str | None, Query(description="难度筛选")] = None,
-    department: Annotated[str | None, Query(description="科室筛选")] = None,
+    department: Annotated[str | None, Query(description="学段/方向筛选")] = None,
     skip: Annotated[int, Query(ge=0, description="跳过记录数")] = 0,
     limit: Annotated[int, Query(ge=1, le=100, description="返回记录数")] = 20,
 ) -> list[CaseListItem]:
@@ -29,7 +29,7 @@ async def list_cases(
     Args:
         db: 数据库会话
         difficulty: 难度筛选（可选）
-        department: 科室筛选（可选）
+        department: 学段/方向筛选（可选）
         skip: 跳过记录数
         limit: 返回记录数
 

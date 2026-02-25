@@ -48,55 +48,40 @@ def build_developer_prompt(case: Case) -> str:
     Returns:
         开发者提示词字符串
     """
-    physical_exam = case.physical_exam or {}
-    visible_signs = physical_exam.get("visible", {})
-    on_request_signs = physical_exam.get("on_request", {})
-
-    visible_str = (
-        "\n".join(f"  - {k}: {v}" for k, v in visible_signs.items())
-        if visible_signs
-        else "  - 无"
+    context_info = case.context_info or {}
+    context_str = (
+        "\n".join(f"  - {k}: {v}" for k, v in context_info.items()) if context_info else "  - 无"
     )
 
-    on_request_str = (
-        "\n".join(f"  - {k}: {v}" for k, v in on_request_signs.items())
-        if on_request_signs
-        else "  - 无"
+    supplementary = case.supplementary_info or {}
+    supplementary_str = (
+        "\n".join(f"  - {k}: {v}" for k, v in supplementary.items()) if supplementary else "  - 无"
     )
 
-    past_history = case.past_history or {}
-    diseases = past_history.get("diseases", [])
-    allergies = past_history.get("allergies", [])
-    medications = past_history.get("medications", [])
+    ref_answer = case.reference_answer or {}
+    primary_answer = ref_answer.get("primary", "未设置")
 
-    marriage_history = getattr(case, "marriage_childbearing_history", None) or "未提供"
-    fam_history = getattr(case, "family_history", None) or "未提供"
+    key_points = case.key_points or []
+    key_points_str = "、".join(key_points) if key_points else "无"
 
-    case_num = getattr(case, "case_number", None)
-    case_number_line = f"\n主题序号：{case_num}" if case_num else ""
-
-    std_diag = case.standard_diagnosis or {}
-    primary_diag = std_diag.get("primary", "未知")
     return f"""当前教学主题上下文：
 - 标题：{case.title}
 - 难度：{case.difficulty}
-- 学段/方向：{case.department}{case_number_line}
+- 学段/方向：{case.department}
 
-参考背景：
-- 核心描述：{case.chief_complaint}
-- 详细说明：{case.present_illness}
-- 补充信息：
-  - 疾病史：{", ".join(diseases) if diseases else "无"}
-  - 过敏史：{", ".join(allergies) if allergies else "无"}
-  - 用药史：{", ".join(medications) if medications else "无"}
-- 补充背景字段：{marriage_history}；{fam_history}
+背景信息：
+{context_str}
 
-结构化数据（如有）：
-- visible: {visible_str}
-- on_request: {on_request_str}
+核心问题：{case.core_question}
+场景说明：{case.scenario_text}
+
+补充信息：
+{supplementary_str}
+
+关键教学点：{key_points_str}
 
 内部参考答案（仅用于回答质量约束，不要原样暴露）：
-- primary: {primary_diag}
+- 主方向：{primary_answer}
 """
 
 

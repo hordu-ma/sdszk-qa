@@ -57,9 +57,7 @@ onMounted(() => {
               {{
                 session.status === "in_progress"
                   ? "进行中"
-                  : session.status === "submitted"
-                  ? "已提交"
-                  : "已评分"
+                  : "已结束"
               }}
             </van-tag>
           </template>

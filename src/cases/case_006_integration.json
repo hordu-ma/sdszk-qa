@@ -2,32 +2,30 @@
   "title": "大中小学思政一体化：同主题分学段教学设计",
   "difficulty": "hard",
   "department": "一体化",
-  "patient_info": {
+  "context_info": {
     "teacher_role": "教研员/骨干教师",
     "grade": "跨学段",
     "class_size": 0
   },
-  "chief_complaint": "希望同一主题在小学、初中、高中形成递进式教学方案",
-  "present_illness": "目前各学段内容重复或断裂，缺少统一目标与衔接评价",
-  "past_history": {
-    "diseases": ["学段之间协同不足"],
-    "allergies": ["避免简单拼接内容"],
-    "medications": ["可组织跨校联合教研"]
+  "core_question": "希望同一主题在小学、初中、高中形成递进式教学方案",
+  "scenario_text": "目前各学段内容重复或断裂，缺少统一目标与衔接评价",
+  "supplementary_info": {
+    "existing_issues": [
+      "学段之间协同不足"
+    ],
+    "constraints": [
+      "避免简单拼接内容"
+    ],
+    "available_resources": [
+      "可组织跨校联合教研"
+    ]
   },
-  "physical_exam": {
-    "visible": {
-      "lesson_duration": "教研专题",
-      "teaching_goal": "目标递进、内容衔接、评价贯通"
-    },
-    "on_request": {
-      "constraints": "学段标准与学情差异明显",
-      "resources": "可使用共同评价框架"
-    }
-  },
-  "available_tests": [],
-  "standard_diagnosis": {
+  "reference_answer": {
     "primary": "构建同主题跨学段目标矩阵与任务链，形成一体化实施路径",
-    "differential": ["先纵向衔接后横向协同", "先试点后推广"]
+    "differential": [
+      "先纵向衔接后横向协同",
+      "先试点后推广"
+    ]
   },
   "key_points": [
     "明确同主题跨学段核心素养递进",
@@ -35,6 +33,5 @@
     "建立跨学段评价指标映射",
     "设计联合备课与听评课机制",
     "形成可复制的教研成果模板"
-  ],
-  "recommended_tests": []
+  ]
 }

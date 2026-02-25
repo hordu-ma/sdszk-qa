@@ -18,8 +18,8 @@ export interface UserResponse {
   created_at: string;
 }
 
-// ==================== Cases ====================
-export interface CaseListItem {
+// ==================== Topics ====================
+export interface TopicListItem {
   id: number;
   title: string;
   difficulty: string;
@@ -28,17 +28,15 @@ export interface CaseListItem {
   created_at: string;
 }
 
-export interface CaseDetail {
+export interface TopicDetail {
   id: number;
   title: string;
   difficulty: string;
   department: string;
-  patient_info: Record<string, unknown>;
-  chief_complaint: string;
-  present_illness: string;
-  past_history: Record<string, unknown>;
-  physical_exam: Record<string, unknown>;
-  available_tests: Record<string, unknown>[];
+  context_info: Record<string, unknown>;
+  core_question: string;
+  scenario_text: string;
+  supplementary_info: Record<string, unknown>;
 }
 
 // ==================== Sessions ====================
@@ -59,7 +57,6 @@ export interface SessionListItem {
   id: number;
   case_id: number;
   case_title: string;
-  case_difficulty: string;
   status: string;
   started_at: string;
   ended_at: string | null;
@@ -86,7 +83,6 @@ export interface SessionDetail {
   id: number;
   case_id: number;
   case_title: string;
-  case_difficulty: string;
   status: string;
   started_at: string;
   ended_at: string | null;

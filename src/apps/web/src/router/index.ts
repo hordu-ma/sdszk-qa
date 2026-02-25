@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Login from "../views/Login.vue";
-import CaseList from "../views/CaseList.vue";
+import TopicList from "../views/CaseList.vue";
 import Chat from "../views/Chat.vue";
 import SessionList from "../views/SessionList.vue";
 import { useUserStore } from "../stores/user";
@@ -34,7 +34,7 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      redirect: "/cases",
+      redirect: "/topics",
     },
     {
       path: "/login",
@@ -42,9 +42,9 @@ const router = createRouter({
       component: Login,
     },
     {
-      path: "/cases",
-      name: "cases",
-      component: CaseList,
+      path: "/topics",
+      name: "topics",
+      component: TopicList,
       meta: { requiresAuth: true },
     },
     {

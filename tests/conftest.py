@@ -11,7 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # 注意：部分模块（如 dependencies.engine）在导入阶段读取配置，
 # 因此这里必须在测试收集前就设置稳定环境变量。
-os.environ["DATABASE_URL"] = "postgresql+psycopg://postgres:postgres@localhost:5432/clinic_sim"
+os.environ["DATABASE_URL"] = "postgresql+psycopg://postgres:postgres@localhost:5432/luyun_sizheng"
 os.environ["MINIO_ENDPOINT"] = "localhost:9000"
 os.environ["MINIO_ACCESS_KEY"] = "minioadmin"
 os.environ["MINIO_SECRET_KEY"] = "minioadmin"
@@ -29,7 +29,7 @@ def reload_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     # 明确覆盖，避免受本机 shell/.env 漂移影响。
     monkeypatch.setenv(
         "DATABASE_URL",
-        "postgresql+psycopg://postgres:postgres@localhost:5432/clinic_sim",
+        "postgresql+psycopg://postgres:postgres@localhost:5432/luyun_sizheng",
     )
     monkeypatch.setenv("MINIO_ENDPOINT", "localhost:9000")
     monkeypatch.setenv("MINIO_ACCESS_KEY", "minioadmin")

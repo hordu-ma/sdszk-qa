@@ -1,6 +1,6 @@
 ---
 name: frontend-flow
-description: Modify or extend clinic-sim Vue frontend page flows. Use when changing login, case list, chat, or session history navigation, including router guards, state handling, and API integration behavior.
+description: Modify or extend luyun-sizheng Vue frontend page flows. Use when changing login, case list, chat, or session history navigation, including router guards, state handling, and API integration behavior.
 ---
 
 > 生产部署统一入口：`生产部署指南.md`。

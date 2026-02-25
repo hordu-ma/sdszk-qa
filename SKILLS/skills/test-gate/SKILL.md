@@ -1,6 +1,6 @@
 ---
 name: test-gate
-description: Apply test and change-quality gate for clinic-sim modifications. Use when reviewing or shipping changes to ensure affected paths are tested, schema updates are covered, and regressions are explicitly called out.
+description: Apply test and change-quality gate for luyun-sizheng modifications. Use when reviewing or shipping changes to ensure affected paths are tested, schema updates are covered, and regressions are explicitly called out.
 ---
 
 > 生产部署统一入口：`生产部署指南.md`。
