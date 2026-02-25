@@ -8,7 +8,7 @@
 
 - 后端：`src/apps/api`（FastAPI + SQLAlchemy + Alembic）
 - 前端：`src/apps/web`（Vue 3 + TypeScript + Vite + Vant）
-- 脚本：`src/scripts`（导入/同步的一次性工具）
+- 脚本：`src/scripts`（导入/同步等工具脚本）
 
 ## 根目录 Python 文件
 
@@ -43,7 +43,7 @@
   - HTTP API 端点（auth/cases/sessions/chat）
   - 仅做请求校验、依赖注入与响应塑形
 - `src/apps/api/services/*`
-  - 业务逻辑与编排（例如 LLM 调用）
+  - 业务逻辑与编排（例如 LLM 调用与提示词构建）
 - `src/apps/api/schemas/*`
   - Pydantic 请求/响应模型
 - `src/apps/api/models/*`
@@ -76,7 +76,7 @@
 
 ## 交互时序图
 
-描述前后端请求到数据库的典型交互路径。
+描述鲁韵思政问答场景下的典型交互路径。
 
 ```mermaid
 sequenceDiagram
@@ -88,16 +88,16 @@ sequenceDiagram
   participant 模型 as ORM模型(models)
   participant 数据库 as 数据库
 
-  用户->>前端: 操作页面
-  前端->>路由: 发起API请求
-  路由->>服务: 调用业务逻辑
+  用户->>前端: 发起提问
+  前端->>路由: 发起API请求（会话/聊天）
+  路由->>服务: 调用问答编排逻辑
   服务->>模型: 读写数据
   模型->>数据库: 执行SQL
   数据库-->>模型: 返回结果
   模型-->>服务: ORM实体
-  服务-->>路由: 业务结果
+  服务-->>路由: 问答结果
   路由-->>前端: 返回响应
-  前端-->>用户: 渲染页面/提示
+  前端-->>用户: 流式显示回答
 ```
 
 ## 模块依赖图
@@ -162,5 +162,4 @@ flowchart LR
 
 ## 一句话总结
 
-`main.py` 负责串联配置、中间件、异常与路由；路由调用服务；服务使用模型与
-schema；前端消费带类型的 API helper 并用 Vue 渲染。
+`main.py` 串联配置、中间件、异常与路由；路由调用服务完成思政问答编排；前端消费 API 并以 SSE 流式呈现回答。

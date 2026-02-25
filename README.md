@@ -1,20 +1,20 @@
-# 临床医学模拟问诊系统
+# 鲁韵思政大模型问答系统
 
-用于临床医学教学的模拟问诊平台：学生负责诊断，LLM 始终扮演病人，完整流程可审计。
+面向山东省大中小学思政课一体化建设指导中心的教学支持平台，为山东省思政老师提供教学设计、教学研究等场景的问答服务。
 
 ## 功能概览
 
-- 登录认证（无注册，外部系统同步用户）
-- 病例浏览与筛选（不暴露标准答案）
+- 登录认证（无注册，支持外部用户体系）
+- 主题/场景列表浏览
 - 会话创建与历史查询
-- SSE 流式对话（医生提问，病人回答）
-- 检查申请与结果回显
-- 诊断提交与规则评分
-- 评分详情可追溯（维度分、关键点覆盖、检查合理性）
+- SSE 流式问答
+- 问答消息全链路可审计
+
+> 当前产品定位为问答支持系统，不包含评分模块。
 
 ## 系统组件
 
-- 前端：Vue 3 + Vant（移动端友好）
+- 前端：Vue 3 + Vant
 - 后端：FastAPI + SQLAlchemy（异步）
 - 模型：vLLM（OpenAI 兼容接口）
 - 存储：PostgreSQL（业务数据）、MinIO（对象存储）
@@ -22,91 +22,31 @@
 
 ## 核心流程
 
-登录 → 病例列表 → 创建会话 → 流式问诊 → 申请检查 → 提交诊断 → 查看评分 → 历史会话
+登录 -> 选择主题 -> 创建会话 -> 流式问答 -> 查看历史会话
 
 ## 关键接口
 
 - 认证：`POST /api/auth/login`、`GET /api/auth/me`
-- 病例：`GET /api/cases`、`GET /api/cases/{case_id}`、`GET /api/cases/{case_id}/available-tests`
+- 主题：`GET /api/cases`、`GET /api/cases/{case_id}`
 - 会话：`POST /api/sessions`、`GET /api/sessions`、`GET /api/sessions/{session_id}`
 - 对话：`POST /api/chat`（SSE）
-- 检查：`POST /api/sessions/{session_id}/tests`、`GET /api/sessions/{session_id}/tests`
-- 评分：`POST /api/sessions/{session_id}/submit`、`GET /api/sessions/{session_id}/score`
 
 ## 开发与部署
 
-- 开发环境与命令：见 [AGENTS.md](AGENTS.md)
-- 生产部署总入口：见 [生产部署指南.md](生产部署指南.md)
-- 执行流程（SKILL触发）：见 [SKILLS/README.md](SKILLS/README.md)
-- 架构详解：见 [src/docs/ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
+- 开发规范：见 [AGENTS.md](AGENTS.md)
+- 生产部署：见 [生产部署指南.md](生产部署指南.md)
+- 架构说明：见 [src/docs/ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
+- 执行流程（SKILL）：见 [SKILLS/README.md](SKILLS/README.md)
 
 ## 测试
 
 ```bash
-pytest                                              # 运行全部测试
-pytest --cov=src/apps/api --cov-report=term-missing  # 覆盖率
+pytest
+pytest --cov=src/apps/api --cov-report=term-missing
 ```
 
 ## 可审计数据
 
-- messages（对话内容、token、延迟）
-- sessions（状态、诊断提交、时间）
-- scores（维度分与评分依据）
+- messages（问答内容、token、延迟）
+- sessions（会话状态、起止时间）
 - audit_logs（用户行为）
-
-## 一键重启本地联调环境（命令顺序清单）
-
-> 适用于当前常态：WSL 开发、vLLM 在宿主机、PostgreSQL/MinIO 用 Docker、API 用 `uv run` 在宿主机启动。
-
-### 0) 先清理旧进程（可重复执行）
-
-```bash
-# 项目根目录执行
-docker compose -f src/infra/compose/dev.yml down
-pkill -f "vllm.entrypoints.openai.api_server" || true
-pkill -f "uvicorn src.apps.api.main:app" || true
-pkill -f "vite --host 0.0.0.0 --port 5173" || true
-```
-
-### 1) 终端 A：启动 vLLM（8001）
-
-```bash
-bash src/scripts/start_vllm_dev.sh
-```
-
-### 2) 终端 B：启动 PostgreSQL + MinIO（5432/9000/9001）
-
-```bash
-docker compose -f src/infra/compose/dev.yml up -d --pull never postgres minio
-```
-
-### 3) 终端 C：启动 API（8000）
-
-```bash
-DATABASE_URL='postgresql+psycopg://postgres:postgres@localhost:5432/clinic_sim' \
-MINIO_ENDPOINT='localhost:9000' \
-LLM_BASE_URL='http://localhost:8001' \
-LLM_MODEL='/home/malig/.cache/modelscope/hub/models/Qwen/Qwen2.5-1.5B-Instruct' \
-uv run uvicorn src.apps.api.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-说明：`LLM_MODEL` 需与 `curl -sS http://localhost:8001/v1/models` 返回的 `id` 一致。
-
-### 4) 终端 D：启动前端（5173）
-
-```bash
-cd src/apps/web
-npm install
-npm run dev -- --host 0.0.0.0 --port 5173
-```
-
-### 5) 冒烟检查（任意终端）
-
-```bash
-curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:8001/v1/models
-curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:8000/health
-curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:5173/
-curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:9001/
-```
-
-预期：`200 / 200 / 200 / 200`。
