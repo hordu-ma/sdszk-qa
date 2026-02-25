@@ -3,7 +3,7 @@ name: dev-startup
 description: Start or troubleshoot local luyun-sizheng development environment. Use when bringing up vLLM, Docker dependencies, API, and web app for local development and smoke verification.
 ---
 
-> 生产部署统一入口：`生产部署指南.md`。
+> 基础设施与部署请参考：`src/infra/README.md`。
 
 # Dev Startup
 

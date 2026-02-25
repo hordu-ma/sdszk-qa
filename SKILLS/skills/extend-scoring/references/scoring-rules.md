@@ -1,6 +1,6 @@
 # Scoring Rules
 
-> 生产部署统一入口：`生产部署指南.md`。
+> 基础设施与部署请参考：`src/infra/README.md`。
 
 Current scoring engine is rule-based and stored in:
 

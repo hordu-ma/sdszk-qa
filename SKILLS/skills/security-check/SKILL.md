@@ -3,7 +3,7 @@ name: security-check
 description: Run a focused security hygiene review for luyun-sizheng changes. Use when touching auth, config, deployment, or external integrations to verify secret handling, access control, and exposure risks.
 ---
 
-> 生产部署统一入口：`生产部署指南.md`。
+> 基础设施与部署请参考：`src/infra/README.md`。
 
 # Security Check
 

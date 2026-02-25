@@ -3,7 +3,7 @@ name: change-db-model
 description: Safely modify SQLAlchemy models and Alembic migrations in luyun-sizheng. Use when changing table fields, constraints, relations, or migration scripts, including schema rollout checks and API/schema alignment.
 ---
 
-> 生产部署统一入口：`生产部署指南.md`。
+> 基础设施与部署请参考：`src/infra/README.md`。
 
 # Change DB Model
 

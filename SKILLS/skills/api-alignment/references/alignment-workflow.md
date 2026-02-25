@@ -1,6 +1,6 @@
 # Alignment Workflow
 
-> 生产部署统一入口：`生产部署指南.md`。
+> 基础设施与部署请参考：`src/infra/README.md`。
 
 1. Inspect backend changes in:
 

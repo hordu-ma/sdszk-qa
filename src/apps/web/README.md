@@ -2,7 +2,7 @@
 
 本目录为鲁韵思政问答系统的 Web 前端，基于 Vue 3 + Vite + TypeScript，使用 Vant 组件库，Pinia 管理状态，并通过 axios 访问后端 API。
 
-> 生产部署流程请统一参考：`生产部署指南.md`。
+> 基础设施与部署请参考：`src/infra/README.md`。
 
 ## 目录结构概览
 
@@ -21,7 +21,7 @@ web/
 ## 主要页面
 
 - `Login.vue`：登录页
-- `CaseList.vue`：主题/场景列表页（沿用历史命名）
+- `CaseList.vue`：主题/场景列表页
 - `Chat.vue`：问答页（SSE 流式）
 - `SessionList.vue`：历史会话页
 
@@ -39,4 +39,3 @@ npm install
 npm run dev
 npm run build
 ```
-

@@ -27,4 +27,4 @@ Use this skill for production release and environment checks.
 
 - Deployment checklist: `references/deploy-checklist.md`
 - Runtime files map: `references/runtime-files.md`
-- Unified production guide: `生产部署指南.md`
+- Unified production guide: `src/infra/README.md`

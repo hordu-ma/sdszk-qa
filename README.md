@@ -27,15 +27,16 @@
 ## 关键接口
 
 - 认证：`POST /api/auth/login`、`GET /api/auth/me`
-- 主题：`GET /api/cases`、`GET /api/cases/{case_id}`
+- 主题：`GET /api/topics`、`GET /api/topics/{id}`
 - 会话：`POST /api/sessions`、`GET /api/sessions`、`GET /api/sessions/{session_id}`
 - 对话：`POST /api/chat`（SSE）
 
 ## 开发与部署
 
 - 开发规范：见 [AGENTS.md](AGENTS.md)
-- 生产部署：见 [生产部署指南.md](生产部署指南.md)
-- 架构说明：见 [src/docs/ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
+- 本地启动：见 [本地开发启动指南](src/docs/本地开发启动指南.md)
+- 架构说明：见 [ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
+- 基础设施：见 [src/infra/README.md](src/infra/README.md)
 - 执行流程（SKILL）：见 [SKILLS/README.md](SKILLS/README.md)
 
 ## 测试
@@ -51,33 +52,3 @@ pytest --cov=src/apps/api --cov-report=term-missing
 - sessions（会话状态、起止时间）
 - audit_logs（用户行为）
 
-## 阶段进展（已完成）
-
-> 更新日期：2026-02-25
-
-- 已完成“临床问诊 -> 思政问答”的第一阶段改造：
-  - 下线评分与检查流程，保留纯问答主链路
-  - 聊天提示词切换为“鲁韵思政教学支持助手”
-  - 前端问答页移除“申请检查/提交诊断”入口
-- 已完成“开箱即用”主题会话能力：
-  - 支持 `custom` 模式按老师输入主题直接创建会话
-  - 固定主题库已替换为首批思政主题种子数据（`src/cases/*.json`）
-- 已完成文档与语义清理：
-  - 主文档与架构文档改为思政项目口径
-  - 新增改造与迁移规划文档：
-    - `鲁韵思政改造任务清单.md`
-    - `数据库字段重命名迁移方案.md`
-
-## 下一步开发计划
-
-1. 数据层兼容迁移（阶段 B）
-   - 新增思政语义字段（如 `core_request`、`scenario_text`、`reference_answer`）
-   - 实现新旧字段双写与读优先新字段
-2. 主题检索与推荐
-   - 在固定主题库基础上增加关键词检索、学段筛选、难度筛选
-3. 输出质量治理
-   - 增加思政场景回归样本（教学设计/教研/评价）
-   - 建立提示词版本管理与效果对比
-4. 工程化收敛
-   - 清理历史医疗命名的遗留代码与文案
-   - 完成全量测试与前端构建验证（含本地 PostgreSQL 联调）
