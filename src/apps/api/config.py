@@ -4,7 +4,7 @@
 """
 
 from pathlib import Path
-from typing import Any, cast
+from typing import ClassVar
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     # CORS 配置
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 
-    model_config = SettingsConfigDict(
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=True,
@@ -65,5 +65,5 @@ class Settings(BaseSettings):
 
 
 # 全局配置实例
-settings_factory = cast(Any, Settings)
-settings = settings_factory()
+# pydantic-settings 从环境变量/.env 填充 Field(...)，pyright 误报缺少必填参数
+settings: Settings = Settings()  # pyright: ignore[reportCallIssue]

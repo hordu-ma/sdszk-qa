@@ -3,8 +3,6 @@
 提供核心 API 路由和中间件配置。
 """
 
-from typing import cast
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
@@ -13,12 +11,18 @@ from starlette.responses import Response
 from .config import settings
 from .exceptions import setup_exception_handlers
 from .logging_config import logger, setup_logging
-from .middleware import AuthContextMiddleware, RequestLoggingMiddleware, TraceIdMiddleware
+from .middleware import (
+    AuthContextMiddleware,
+    RequestLoggingMiddleware,
+    TraceIdMiddleware,
+)
 from .rate_limit import limiter, rate_limit_exceeded_handler
 
 
 async def _rate_limit_exception_handler(request: Request, exc: Exception) -> Response:
-    return await rate_limit_exceeded_handler(request, cast(RateLimitExceeded, exc))
+    if not isinstance(exc, RateLimitExceeded):
+        raise exc
+    return await rate_limit_exceeded_handler(request, exc)
 
 
 # 初始化日志系统

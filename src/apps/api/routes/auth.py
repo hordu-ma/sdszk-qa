@@ -38,7 +38,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(password_bytes, hashed_bytes)
 
 
-async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
+async def authenticate_user(
+    db: AsyncSession, username: str, password: str,
+) -> User | None:
     """验证用户凭证。
 
     Args:
@@ -90,7 +92,11 @@ async def login(
             details={"username": credentials.username},
         )
         await db.commit()
-        logger.warning("登录失败", username=credentials.username, reason="用户名或密码错误")
+        logger.warning(
+            "登录失败",
+            username=credentials.username,
+            reason="用户名或密码错误",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
