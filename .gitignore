@@ -19,8 +19,8 @@ prod.env
 # MCP server files
 .serena
 
-# .gitignore self
-.gitignorearchive/
+# 归档目录（不跟踪）
+archive/
 
 # 本地开发文档（含测试账号，不提交）
 src/docs/本地开发启动指南.md

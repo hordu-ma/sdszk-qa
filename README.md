@@ -34,7 +34,7 @@
 ## 开发与部署
 
 - 开发规范：见 [AGENTS.md](AGENTS.md)
-- 本地启动：见 [本地开发启动指南](src/docs/本地开发启动指南.md)
+- 本地启动：见 `src/docs/本地开发启动指南.md`（含测试账号，不入版本控制；首次使用需从运维获取或参照 `.env.example` 自行创建）
 - 架构说明：见 [ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
 - 基础设施：见 [src/infra/README.md](src/infra/README.md)
 - 执行流程（SKILL）：见 [SKILLS/README.md](SKILLS/README.md)

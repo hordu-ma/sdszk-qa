@@ -1,11 +1,14 @@
 ---
 name: extend-scoring
 description: Extend or refactor rule-based scoring for luyun-sizheng sessions. Use when updating scoring dimensions, weighting, scoring_details output, or score-related tests while preserving traceability and backward compatibility.
+status: placeholder
 ---
+
+> **⚠️ 预留 Skill**：当前项目不包含评分模块（见 `README.md`），`services/scoring.py` 和 `schemas/scores.py` 尚未实现。本 skill 为未来扩展评分功能时的工作流预留，暂不可执行。
 
 > 基础设施与部署请参考：`src/infra/README.md`。
 
-# Extend Scoring
+# Extend Scoring（预留）
 
 Apply this workflow for scoring logic changes.
 

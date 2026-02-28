@@ -19,6 +19,7 @@ api/
 ├── routes/
 ├── schemas/
 ├── services/
+├── utils/
 └── migrations/
 ```
 
@@ -41,17 +42,22 @@ api/
 ## 路由层（routes）
 
 - `routes/auth.py`
-  - 登录、当前用户信息
+  - 登录（`POST /api/auth/login`）、当前用户信息（`GET /api/auth/me`）
 - `routes/cases.py`
-  - 主题列表与详情
+  - 主题列表与详情（URL 前缀 `/api/topics`，文件名沿用 `cases` 以与 models/schemas 保持一致）
 - `routes/sessions.py`
   - 会话创建、会话列表、会话详情
 - `routes/chat.py`
-  - SSE 流式问答（核心链路）
+  - SSE 流式问答（核心链路，`POST /api/chat`）
 
 ## 服务层（services）
 
 - 负责问答编排、提示词构建等业务逻辑。
+
+## 工具层（utils）
+
+- `utils/jwt.py`
+  - JWT token 创建与解析
 
 ## 数据模型层（models）
 

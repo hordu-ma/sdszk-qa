@@ -2,12 +2,15 @@
 
 ## 项目结构与模块组织
 
-- `src/apps/api/`：FastAPI 后端（`routes/`、`schemas/`、`models/`、`services/`、`migrations/`）。
+- `src/apps/api/`：FastAPI 后端（`routes/`、`schemas/`、`models/`、`services/`、`utils/`、`migrations/`）。
 - `src/apps/web/`：Vue 3 + Vite 前端（`src/views`、`src/api`、`src/stores`、`src/router`）。
 - `src/infra/compose/`：开发与生产环境的 Docker Compose 文件（`dev.yml`、`prod-a.yml` 占位、`prod-b.yml`）。
 - `src/cases/`：主题种子 JSON 文件。
+- `src/docs/`：项目文档（`ARCHITECTURE.md` 等；`本地开发启动指南.md` 含测试账号，不入版本控制）。
 - `tests/`：后端 pytest 测试套件（集成测试与服务/配置测试）。
-- `src/scripts/`：工具脚本（例如 `start_vllm_dev.sh`、`import_cases.py`）。
+- `src/scripts/`：工具脚本（`start_vllm_dev.sh`、`import_cases.py`、`sync_users.py`）。
+- `SKILLS/`：Codex skills 集合（`catalog/`、`skills/`、`metadata/`）。
+- `archive/`：已归档的历史文档（已有文件仍在版本控制中，`.gitignore` 仅阻止新增未跟踪文件）。
 
 ## 构建、测试与开发命令
 
@@ -51,5 +54,6 @@
 
 ## 部署文档入口
 
-- 本地开发启动：`src/docs/本地开发启动指南.md`
+- 本地开发启动：`src/docs/本地开发启动指南.md`（含测试账号，不入版本控制；首次使用需从运维获取或参照 `.env.example` 自行创建）
+- 架构概览：`src/docs/ARCHITECTURE.md`
 - 基础设施与部署：`src/infra/README.md`
