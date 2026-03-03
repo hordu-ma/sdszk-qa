@@ -30,7 +30,7 @@ dev = [
   "pytest-asyncio>=0.21.1",
   "pytest-cov>=4.1.0",
   "ruff>=0.1.9",
-  "mypy>=1.7.1",
+  "basedpyright>=1.22.1",
 ]
 
 [tool.ruff]
@@ -41,16 +41,12 @@ target-version = "py311"
 ignore = ["ANN401"]
 select = ["E", "F", "W", "I", "N", "UP", "ANN", "B", "A", "C4", "PT"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/apps/api/migrations/versions/*.py" = ["E501", "I001", "W291"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 python_classes = "Test*"
 python_files = "test_*.py"
 python_functions = "test_*"
 testpaths = ["tests"]
-
-[tool.mypy]
-disallow_untyped_defs = false
-ignore_missing_imports = true
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true

@@ -1,0 +1,16 @@
+{
+  "include": ["src", "tests", "main.py"],
+  "exclude": [
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/.venv",
+    "archive",
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingTypeStubs": "none",
+  "useLibraryCodeForTypes": true,
+}

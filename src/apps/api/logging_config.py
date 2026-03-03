@@ -9,6 +9,7 @@
 import sys
 from contextvars import ContextVar
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -18,14 +19,17 @@ from .config import settings
 trace_id_var: ContextVar[str] = ContextVar("trace_id", default="-")
 
 
-def trace_id_filter(record: dict) -> bool:
-    """为日志记录添加 trace_id"""
-    record["extra"]["trace_id"] = trace_id_var.get()
+def trace_id_filter(record: Any) -> bool:
+    """为日志记录添加 trace_id。"""
+    if isinstance(record, dict):
+        extra_obj = record.get("extra")
+        if isinstance(extra_obj, dict):
+            extra_obj["trace_id"] = trace_id_var.get()
     return True
 
 
 def setup_logging() -> None:
-    """配置应用日志"""
+    """配置应用日志。"""
     # 移除默认 handler
     logger.remove()
 
@@ -54,12 +58,14 @@ def setup_logging() -> None:
 
         logger.add(
             log_dir / "app_{time:YYYY-MM-DD}.log",
-            format=log_format.replace("<green>", "")
-            .replace("</green>", "")
-            .replace("<level>", "")
-            .replace("</level>", "")
-            .replace("<cyan>", "")
-            .replace("</cyan>", ""),
+            format=(
+                log_format.replace("<green>", "")
+                .replace("</green>", "")
+                .replace("<level>", "")
+                .replace("</level>", "")
+                .replace("<cyan>", "")
+                .replace("</cyan>", "")
+            ),
             level="DEBUG",
             filter=trace_id_filter,
             rotation="00:00",

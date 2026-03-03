@@ -44,6 +44,8 @@
 ```bash
 pytest
 pytest --cov=src/apps/api --cov-report=term-missing
+ruff check .
+basedpyright
 ```
 
 ## 可审计数据

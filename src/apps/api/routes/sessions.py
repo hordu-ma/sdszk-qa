@@ -111,7 +111,8 @@ async def list_sessions(
     if status_filter:
         base_query = base_query.where(Session.status == status_filter)
 
-    count_result = await db.execute(select(func.count()).select_from(base_query.subquery()))
+    count_query = select(func.count()).select_from(base_query.subquery())
+    count_result = await db.execute(count_query)
     total = count_result.scalar() or 0
 
     query = (
@@ -207,9 +208,15 @@ async def get_session(
     )
 
 
-def _normalize_message_role(role: str) -> Literal["user", "assistant", "system"]:
-    if role in {"user", "assistant", "system"}:
-        return role
+def _normalize_message_role(
+    role: Literal["user", "assistant", "system"] | str,
+) -> Literal["user", "assistant", "system"]:
+    if role == "user":
+        return "user"
+    if role == "assistant":
+        return "assistant"
+    if role == "system":
+        return "system"
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=f"Invalid message role in DB: {role}",
