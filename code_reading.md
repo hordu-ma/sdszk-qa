@@ -27,6 +27,10 @@
 - `reportMissingTypeStubs` : 'none' 表示库中缺少类型存根的时候不报错,避免对第三方包产生大量的报错信息
 - `useLibraryCodeForTypes` : 允许从已安装库的源代码推断类型
 
+4. `.env.example & .env`
+
+- 配置文件,首次拉起开发服务环境,需要拷贝example文件,生成`.env`文件
+
 ## backend
 
 > `src/apps/api/`
