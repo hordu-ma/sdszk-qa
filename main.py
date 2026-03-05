@@ -1,5 +1,5 @@
 def main() -> None:
-    print("Hello from luyun-sizheng!")
+    print("Hello from 鲁韵思政大模型!")
 
 
 if __name__ == "__main__":
