@@ -1,4 +1,12 @@
 [project]
+name = "luyun-sizheng"
+version = "0.1.0"
+description = "鲁韵思政大模型问答系统 - 基于 vLLM + FastAPI"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# runtime dependencies come after the core metadata
+
 dependencies = [
   "fastapi>=0.110.0",
   "uvicorn[standard]>=0.27.0",
@@ -18,11 +26,6 @@ dependencies = [
   "slowapi>=0.1.9",
   "vllm>=0.13.0; sys_platform != 'darwin'",
 ]
-description = "鲁韵思政大模型问答系统 - 基于 vLLM + FastAPI"
-name = "luyun-sizheng"
-readme = "README.md"
-requires-python = ">=3.11"
-version = "0.1.0"
 
 [project.optional-dependencies]
 dev = [

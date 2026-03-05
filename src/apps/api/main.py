@@ -19,6 +19,9 @@ from .middleware import (
 from .rate_limit import limiter, rate_limit_exceeded_handler
 
 
+# 处理限流异常，slowapi 抛出的是通用 Exception，
+# 需要筛选出 RateLimitExceeded 并交给统一处理器，其它情况
+# 则继续抛出让上层处理。
 async def _rate_limit_exception_handler(request: Request, exc: Exception) -> Response:
     if not isinstance(exc, RateLimitExceeded):
         raise exc
