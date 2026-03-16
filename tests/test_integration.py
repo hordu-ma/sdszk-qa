@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from types import TracebackType
+from typing import Any
 from uuid import uuid4
 
 import bcrypt
@@ -25,7 +27,12 @@ class _FakeStreamResponse:
     async def __aenter__(self) -> _FakeStreamResponse:
         return self
 
-    async def __aexit__(self, exc_type, exc, tb) -> bool:  # type: ignore[override]
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> bool:
         return False
 
     async def aiter_lines(self) -> AsyncGenerator[str, None]:
@@ -37,16 +44,21 @@ class _FakeStreamResponse:
 
 
 class _FakeAsyncClient:
-    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN001, ANN002
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
     async def __aenter__(self) -> _FakeAsyncClient:
         return self
 
-    async def __aexit__(self, exc_type, exc, tb) -> bool:  # type: ignore[override]
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> bool:
         return False
 
-    def stream(self, method: str, url: str, json: dict) -> _FakeStreamResponse:
+    def stream(self, method: str, url: str, json: dict[str, Any]) -> _FakeStreamResponse:
         return _FakeStreamResponse()
 
 

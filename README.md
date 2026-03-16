@@ -34,19 +34,22 @@
 ## 开发与部署
 
 - 开发规范：见 [AGENTS.md](AGENTS.md)
+- Codex 快速上手：见 [src/docs/codex-onboarding.md](src/docs/codex-onboarding.md)
 - GitHub Copilot 原生协作：见 `.github/instructions/`、`.github/agents/`、`.github/skills/`
 - 本地启动：见 `src/docs/本地开发启动指南.md`（含测试账号，不入版本控制；首次使用需从运维获取或参照 `.env.example` 自行创建）
 - 架构说明：见 [ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
 - 基础设施：见 [src/infra/README.md](src/infra/README.md)
 - 技能目录主入口：见 `.github/skills/`
+- 统一任务入口：优先使用根目录 `Makefile`
 
 ## 测试
 
 ```bash
-pytest
-pytest --cov=src/apps/api --cov-report=term-missing
-ruff check .
-basedpyright
+make lint
+make typecheck
+make test
+make test-cov
+make web-build
 ```
 
 ## 可审计数据

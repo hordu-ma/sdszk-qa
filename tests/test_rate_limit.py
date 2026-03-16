@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi import Request, Response
+from starlette.types import Receive, Scope, Send
 
 from src.apps.api.middleware import AuthContextMiddleware
 from src.apps.api.rate_limit import get_user_identifier
@@ -42,9 +43,14 @@ def test_get_user_identifier_falls_back_to_ip() -> None:
 async def test_auth_context_middleware_sets_user_id_from_jwt() -> None:
     token = create_access_token({"sub": "123"})
     request = _build_request(
-        headers=[(b"authorization", f"Bearer {token}".encode("utf-8"))],
+        headers=[(b"authorization", f"Bearer {token}".encode())],
     )
-    async def _dummy_app(scope, receive, send) -> None:  # type: ignore[no-untyped-def]
+
+    async def _dummy_app(
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+    ) -> None:
         return None
 
     middleware = AuthContextMiddleware(app=_dummy_app)
