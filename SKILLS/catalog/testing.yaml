@@ -1,7 +1,0 @@
-items:
-  - id: test-gate
-    title: "测试与质量门禁"
-    entry: "SKILLS/skills/test-gate/SKILL.md"
-  - id: security-check
-    title: "安全检查门禁"
-    entry: "SKILLS/skills/security-check/SKILL.md"

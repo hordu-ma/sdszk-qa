@@ -1,3 +1,0 @@
-interface:
-  display_name: "Add API Endpoint"
-  short_description: "Build and update FastAPI endpoints safely"

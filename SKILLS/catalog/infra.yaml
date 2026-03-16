@@ -1,7 +1,0 @@
-items:
-  - id: production-deploy
-    title: "生产部署流程"
-    entry: "SKILLS/skills/production-deploy/SKILL.md"
-  - id: dev-startup
-    title: "本地开发启动"
-    entry: "SKILLS/skills/dev-startup/SKILL.md"

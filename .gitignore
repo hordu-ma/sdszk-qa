@@ -16,9 +16,6 @@ prod.env
 
 # Tests
 
-# MCP server files
-.serena
-
 # 归档目录（不跟踪）
 archive/
 

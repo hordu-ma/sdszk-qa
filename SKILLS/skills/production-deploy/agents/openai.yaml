@@ -1,3 +1,0 @@
-interface:
-  display_name: "Production Deploy"
-  short_description: "Run safe A/B production deployment workflow"

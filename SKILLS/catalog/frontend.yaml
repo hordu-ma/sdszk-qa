@@ -1,7 +1,0 @@
-items:
-  - id: api-alignment
-    title: "前后端 API 对齐"
-    entry: "SKILLS/skills/api-alignment/SKILL.md"
-  - id: frontend-flow
-    title: "前端入口与页面流程"
-    entry: "SKILLS/skills/frontend-flow/SKILL.md"

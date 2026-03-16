@@ -1,3 +1,0 @@
-interface:
-  display_name: "Change DB Model"
-  short_description: "Manage model and migration changes safely"
