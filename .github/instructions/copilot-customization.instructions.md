@@ -1,8 +1,6 @@
 ---
 description: "Use when creating or refactoring GitHub Copilot customization files such as AGENTS.md, .instructions.md, .agent.md, or project skills under .github/skills."
-applyTo:
-  - "AGENTS.md"
-  - ".github/**/*.md"
+applyTo: "AGENTS.md, .github/**/*.md"
 ---
 # Copilot Customization Guidelines
 

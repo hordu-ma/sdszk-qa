@@ -1,10 +1,6 @@
 ---
 description: "Use when changing Vue 3, Vite, Vant, or frontend state and API flow under src/apps/web. Covers views, api clients, routing, and UI consistency."
-applyTo:
-  - "src/apps/web/src/**/*.vue"
-  - "src/apps/web/src/**/*.ts"
-  - "src/apps/web/src/**/*.tsx"
-  - "src/apps/web/src/**/*.js"
+applyTo: "src/apps/web/src/**/*.vue, src/apps/web/src/**/*.ts, src/apps/web/src/**/*.tsx, src/apps/web/src/**/*.js"
 ---
 # Frontend Guidelines
 

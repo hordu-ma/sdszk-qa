@@ -1,10 +1,6 @@
 ---
 description: "Use when editing Dockerfiles, docker compose files, shell startup scripts, or deployment-related configuration under src/infra and src/scripts."
-applyTo:
-  - "src/infra/**/*.yml"
-  - "src/infra/**/*.yaml"
-  - "src/apps/api/Dockerfile"
-  - "src/scripts/**/*.sh"
+applyTo: "src/infra/**/*.yml, src/infra/**/*.yaml, src/apps/api/Dockerfile, src/scripts/**/*.sh"
 ---
 # Infra Guidelines
 
