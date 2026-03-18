@@ -33,3 +33,4 @@ src/apps/web/dist/
 
 # others
 .DS_Store
+.nvimlog
