@@ -1,10 +1,34 @@
 # Project Guidelines
 
+## Communication
+
+- Default to Chinese for user-visible plans, progress updates, explanations, and final handoff.
+- Lead with the conclusion, then the key details.
+- Mark uncertain information explicitly as `假设/待确认`.
+
+## Instruction Loading Order
+
+Before making changes, load instructions in this order:
+
+1. System/workspace `rules`
+2. `AGENTS.md`
+3. `.github/INDEX.md`
+4. Only the specific `.github` documents referenced by the index that are relevant to the current task
+
+Instruction precedence follows the same order. Do not scan the entire `.github` directory by default; use `.github/INDEX.md` as the entrypoint for on-demand reading.
+
 ## Scope
 
 - This file is the always-on workspace guidance. Keep it short and move domain-specific rules into `.github/instructions/`.
 - Use `.github/skills/` as the GitHub Copilot skill entrypoint.
 - For large or cross-cutting work, prefer the closest matching skill or agent before editing code.
+
+## Delivery Baseline
+
+- Prefer the smallest viable change and keep the existing code style and structure unless the task explicitly asks for a broader refactor.
+- If config, interface, or workflow behavior changes, explain the affected scope and the rollback path in the handoff.
+- Run the smallest relevant validation you can for the changed area. If validation cannot run, state why and call out the remaining risk.
+- Ask before destructive or high-risk operations that are not already explicitly requested.
 
 ## Architecture
 
