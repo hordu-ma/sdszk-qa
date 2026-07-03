@@ -4,8 +4,9 @@ Read this file before opening any other file in `.github/`.
 
 ## Purpose
 
-This index is the entrypoint for repository customization, agent workflow, and task-specific guidance under `.github`.
-Use it to find the minimum relevant documentation for the current task instead of reading the entire `.github` directory.
+`.github` is retained for GitHub Actions plus Codex-readable scoped guidance, skills, hooks, and agent playbooks.
+It is not the primary Codex entrypoint; start from `AGENTS.md` and `src/docs/codex-harness.md`, then use this index to find the minimum relevant `.github` document for the current task.
+Use this file instead of scanning the entire `.github` directory.
 
 ## Reading Order
 
@@ -39,8 +40,8 @@ Use these for scoped, file-pattern-based guidance.
 - `.github/instructions/codex.instructions.md`
   - Read when the task spans multiple areas, changes repository workflow/docs, or needs default execution, confirmation, validation, and handoff guidance.
 
-- `.github/instructions/copilot-customization.instructions.md`
-  - Read when editing `AGENTS.md`, `.instructions.md`, `.agent.md`, or files under `.github/skills`.
+- `.github/instructions/codex-customization.instructions.md`
+  - Read when editing `AGENTS.md`, `.instructions.md`, `.agent.md`, files under `.github/skills`, or Codex harness docs.
 
 ### Agents
 
@@ -52,8 +53,8 @@ Use these when delegating or framing a task around a single responsibility.
 - `.github/agents/frontend-delivery.agent.md`
   - Frontend implementation, UI behavior, and web build validation.
 
-- `.github/agents/copilot-workflow.agent.md`
-  - Repository customization work for instructions, skills, and agent workflow files.
+- `.github/agents/codex-workflow.agent.md`
+  - Repository customization work for instructions, skills, agent workflow files, and Codex harness docs.
 
 ### Hooks
 
@@ -93,22 +94,26 @@ Use skills as workflow playbooks for recurring task types.
 Open these only through the relevant skill unless the task specifically asks for them.
 
 ### API / Backend
+
 - `.github/skills/add-api-endpoint/references/workflow.md`
 - `.github/skills/add-api-endpoint/references/api-surface.md`
 - `.github/skills/change-db-model/references/migration-workflow.md`
 - `.github/skills/change-db-model/references/model-inventory.md`
 
 ### Frontend / Contract Alignment
+
 - `.github/skills/api-alignment/references/alignment-workflow.md`
 - `.github/skills/api-alignment/references/api-map.md`
 - `.github/skills/frontend-flow/references/flow-map.md`
 
 ### Delivery / Startup / Deployment
+
 - `.github/skills/dev-startup/references/startup-commands.md`
 - `.github/skills/production-deploy/references/deploy-checklist.md`
 - `.github/skills/production-deploy/references/runtime-files.md`
 
 ### Placeholder / Future Work
+
 - `.github/skills/extend-scoring/references/scoring-rules.md`
 - `.github/skills/extend-scoring/references/scoring-touchpoints.md`
 
@@ -144,10 +149,10 @@ Use the following shortcuts to decide what to read next.
   1. `.github/instructions/infra.instructions.md`
   2. `.github/skills/production-deploy/SKILL.md`
 
-- Repository instruction or agent customization
-  1. `.github/instructions/copilot-customization.instructions.md`
+- Repository instruction, agent customization, or Codex harness changes
+  1. `.github/instructions/codex-customization.instructions.md`
   2. `.github/instructions/codex.instructions.md`
-  3. `.github/agents/copilot-workflow.agent.md`
+  3. `.github/agents/codex-workflow.agent.md`
 
 - Cross-cutting implementation across multiple areas
   1. `.github/instructions/codex.instructions.md`

@@ -1,31 +1,45 @@
-PYTHON ?= uv run
+PYTHON ?= uv run --frozen --extra dev
 WEB_DIR := src/apps/web
 COMPOSE_DEV := src/infra/compose/dev.yml
 
-.PHONY: setup setup-backend setup-frontend lint typecheck test test-api test-cov web-build dev-up dev-down doctor
+.PHONY: setup setup-backend setup-frontend lint typecheck test test-unit test-integration test-api test-cov web-build harness-bootstrap harness-backend harness-quick harness-full dev-up dev-down doctor
 
 setup: setup-backend setup-frontend
 
+harness-bootstrap: doctor setup
+
+harness-backend: lint typecheck test-unit
+
+harness-quick: harness-backend web-build
+
+harness-full: lint typecheck test web-build
+
 setup-backend:
-	uv sync --extra dev
+	uv sync --frozen --extra dev
 
 setup-frontend:
 	npm --prefix $(WEB_DIR) install
 
 lint:
-	uv run ruff check .
+	$(PYTHON) ruff check .
 
 typecheck:
-	uv run basedpyright
+	$(PYTHON) basedpyright
 
 test:
-	uv run pytest
+	$(PYTHON) pytest
+
+test-unit:
+	$(PYTHON) pytest -m "not integration"
+
+test-integration:
+	$(PYTHON) pytest -m integration
 
 test-api:
-	uv run pytest tests/test_config.py tests/test_rate_limit.py tests/test_prompt_builder.py tests/test_integration.py
+	$(PYTHON) pytest tests/test_config.py tests/test_rate_limit.py tests/test_prompt_builder.py
 
 test-cov:
-	uv run pytest --cov=src/apps/api --cov-report=term-missing
+	$(PYTHON) pytest --cov=src/apps/api --cov-report=term-missing
 
 web-build:
 	npm --prefix $(WEB_DIR) run build

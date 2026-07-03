@@ -53,3 +53,6 @@ python_classes = "Test*"
 python_files = "test_*.py"
 python_functions = "test_*"
 testpaths = ["tests"]
+markers = [
+  "integration: requires external services such as PostgreSQL; excluded from test-unit",
+]

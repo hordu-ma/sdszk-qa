@@ -19,8 +19,9 @@ Instruction precedence follows the same order. Do not scan the entire `.github` 
 
 ## Scope
 
-- This file is the always-on workspace guidance. Keep it short and move domain-specific rules into `.github/instructions/`.
-- Use `.github/skills/` as the GitHub Copilot skill entrypoint.
+- This file is the always-on workspace guidance. Keep it short and move domain-specific rules into scoped docs.
+- Use `src/docs/codex-harness.md` as the Codex validation harness entrypoint.
+- Keep `.github` for GitHub Actions plus Codex-readable auxiliary instructions, skills, hooks, and agent playbooks; use `.github/INDEX.md` before opening other `.github` files.
 - For large or cross-cutting work, prefer the closest matching skill or agent before editing code.
 
 ## Delivery Baseline
@@ -40,11 +41,12 @@ Instruction precedence follows the same order. Do not scan the entire `.github` 
 
 ## Build And Test
 
-- Backend deps: `uv sync --extra dev`
+- Backend deps: `uv sync --frozen --extra dev`
 - Frontend deps: `cd src/apps/web && npm install`
-- Backend tests: `pytest`
+- Backend unit tests: `pytest -m "not integration"`
+- Backend integration tests: `pytest -m integration` after PostgreSQL is available
 - Coverage: `pytest --cov=src/apps/api --cov-report=term-missing`
-- Lint and typing: `ruff check .` and `mypy src`
+- Lint and typing: `ruff check .` and `basedpyright`
 - Frontend build: `cd src/apps/web && npm run build`
 
 ## Conventions
@@ -52,4 +54,4 @@ Instruction precedence follows the same order. Do not scan the entire `.github` 
 - Python uses 4 spaces, type hints on new or changed code, and thin FastAPI routes with business logic in `services`.
 - Vue files stay under `src/apps/web/src`; views use PascalCase filenames and shared API callers live in `src/api`.
 - Mock external LLM calls in tests. Do not depend on real model endpoints during CI or routine validation.
-- When updating Copilot customization, keep `AGENTS.md` minimal, keep `.instructions.md` files focused, and keep skills self-contained under `.github/skills/<name>`.
+- When updating Codex workflow customization, keep `AGENTS.md` minimal, keep `.instructions.md` files focused, and keep harness docs concise.

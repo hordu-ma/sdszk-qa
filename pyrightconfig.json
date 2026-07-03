@@ -1,14 +1,9 @@
 {
   "include": ["src", "tests", "main.py"],
-  "exclude": [
-    "**/__pycache__",
-    "**/.pytest_cache",
-    "**/.ruff_cache",
-    "**/.venv",
-    "archive",
-  ],
+  "exclude": ["**/__pycache__", "**/.pytest_cache", "**/.ruff_cache", "**/.venv", "archive"],
   "venvPath": ".",
   "venv": ".venv",
+  "extraPaths": [".venv/lib/python3.11/site-packages"],
   "pythonVersion": "3.11",
   "typeCheckingMode": "basic",
   "reportMissingTypeStubs": "none",

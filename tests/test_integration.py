@@ -122,6 +122,7 @@ async def _cleanup(user_id: int, case_id: int) -> None:
         await db.commit()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_e2e_flow(monkeypatch: pytest.MonkeyPatch) -> None:
     await _ensure_tables()

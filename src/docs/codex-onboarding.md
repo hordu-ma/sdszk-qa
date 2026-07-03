@@ -23,25 +23,28 @@
 优先使用根目录 `Makefile`：
 
 ```bash
-make setup
-make lint
-make typecheck
-make test
-make test-api
-make web-build
+make harness-bootstrap
+make harness-quick
+make harness-backend
+make test-unit
+make test-integration
+make harness-full
 make dev-up
 make dev-down
 make doctor
 ```
 
+Codex harness 说明见 `src/docs/codex-harness.md`。
+
 等价原生命令：
 
 ```bash
-uv sync --extra dev
+uv sync --frozen --extra dev
 npm --prefix src/apps/web install
-uv run ruff check .
-uv run basedpyright
-uv run pytest
+uv run --frozen --extra dev ruff check .
+uv run --frozen --extra dev basedpyright
+uv run --frozen --extra dev pytest -m "not integration"
+uv run --frozen --extra dev pytest -m integration
 npm --prefix src/apps/web run build
 docker compose -f src/infra/compose/dev.yml up -d
 ```

@@ -35,21 +35,21 @@
 
 - 开发规范：见 [AGENTS.md](AGENTS.md)
 - Codex 快速上手：见 [src/docs/codex-onboarding.md](src/docs/codex-onboarding.md)
-- GitHub Copilot 原生协作：见 `.github/instructions/`、`.github/agents/`、`.github/skills/`
+- Codex harness：见 [src/docs/codex-harness.md](src/docs/codex-harness.md)
+- Codex 辅助规则索引：见 [.github/INDEX.md](.github/INDEX.md)（`.github` 同时承载 GitHub Actions）
 - 本地启动：见 `src/docs/本地开发启动指南.md`（含测试账号，不入版本控制；首次使用需从运维获取或参照 `.env.example` 自行创建）
 - 架构说明：见 [ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
 - 基础设施：见 [src/infra/README.md](src/infra/README.md)
-- 技能目录主入口：见 `.github/skills/`
 - 统一任务入口：优先使用根目录 `Makefile`
 
 ## 测试
 
 ```bash
-make lint
-make typecheck
-make test
+make harness-bootstrap
+make harness-quick
+make test-integration
+make harness-full
 make test-cov
-make web-build
 ```
 
 ## 可审计数据
