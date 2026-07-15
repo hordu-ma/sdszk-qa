@@ -1,8 +1,9 @@
 # 架构概览
 
-本文档说明后端与前端的结构、各关键目录的职责，以及模块如何组合成可运行系统。
+本文档说明当前问答 MVP 的后端、前端和部署结构。教学设计、诊断、ModelGateway、多智能体、多模态及 Base-Spark 双环境属于目标架构，尚未在当前代码中实现。
 
 > 基础设施与部署请参考：`src/infra/README.md`。
+> 目标范围、阶段和验收请参考：`src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`。
 
 ## 仓库结构
 
@@ -134,7 +135,7 @@ flowchart TD
 
 ## 部署架构图
 
-描述运行时组件及其网络连接关系（A/B 双机部署）。
+描述当前生产编排基线及其网络连接关系（A/B 双机部署）。
 
 ```mermaid
 flowchart LR
@@ -160,6 +161,41 @@ flowchart LR
   API --> LLM
 ```
 
+## 目标模型服务架构
+
+当前 API 直接使用 `LLM_BASE_URL` 和 `LLM_MODEL` 请求 OpenAI 兼容接口。阶段 1 将引入 ModelGateway，使教学业务只使用逻辑模型名，不感知 vLLM 模型目录或 Ollama tag。
+
+```mermaid
+flowchart LR
+  业务[教学业务与受控工作流] --> 网关[ModelGateway]
+  网关 -->|正式/稳定演示默认| VLLM[vLLM Provider]
+  网关 -.->|前期开发/明示降级| OLLAMA[Ollama Provider]
+  网关 --> 版本[模型资产与调用版本登记]
+  日常[日常 OpenClaw：与鲁韵链路隔离]
+```
+
+- 正式环境、`base-spark` 稳定演示环境和最终验收默认使用 vLLM。
+- Ollama 仅用于前期开发、vLLM 兼容性验证期间的过渡和明确标注的备用 Provider。
+- 标准模型资产登记来源版本、权重哈希、Tokenizer、Chat Template、许可证、量化和 Provider 模型 ID；Ollama tag 不是唯一资产来源。
+- vLLM/Ollama Provider 切换不得改变教学成果 Schema、规则、任务状态和审计链路。
+
+## Base-Spark 目标部署与晋级
+
+`base-spark` 计划保留两套相互隔离的应用环境，共享经过配额和版本控制的模型服务：
+
+```text
+合并并通过自动测试
+  → 部署 luyun-int
+  → virtus 经 Tailscale 端到端验证
+  → 专业、安全、迁移和回滚门禁
+  → 同一镜像摘要晋级 luyun-demo
+```
+
+- `luyun-int` 高频接收可运行增量，用于联调、迁移、Provider 切换和故障测试。
+- `luyun-demo` 只接收通过门禁的不可变镜像，始终保留上一稳定版本和数据快照，禁止日常开发直接覆盖。
+- 每个可验收开发节点都必须完成部署与 `virtus` 验证；G1–G4 分别保留可回滚演示版本。
+- 该双环境尚未落地，现有 `dev.yml` 和 `prod-b.yml` 仍是当前基线，不代表 Base-Spark 目标编排已经完成。
+
 ## 一句话总结
 
-`main.py` 串联配置、中间件、异常与路由；路由调用服务完成思政问答编排；前端消费 API 并以 SSE 流式呈现回答。
+当前由 `main.py` 串联配置、中间件、异常与路由，前端消费问答 API 并以 SSE 流式呈现；后续按开发计划逐步加入领域工作流、ModelGateway 和双环境持续部署。

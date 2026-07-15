@@ -3,6 +3,7 @@
 本文档说明 `src/infra` 目录中各个配置文件的作用及其适用场景。
 
 > 本地开发启动请参考：`src/docs/本地开发启动指南.md`。
+> 当前 Compose 文件是问答 MVP 的开发/生产基线；Base-Spark 双环境、ModelGateway 和 Ollama 备用 Provider 尚未实现，目标口径以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` 为准。
 
 ## 目录结构
 
@@ -70,6 +71,8 @@ docker compose -f src/infra/compose/dev.yml up -d
 - ✅ 使用默认凭证（`JWT_SECRET=dev-change-me`）
 - ✅ LLM 服务指向本地外部 vLLM（`host.docker.internal:8001`）
 
+开发期如需临时使用 Ollama，可将 `LLM_BASE_URL` 和 `LLM_MODEL` 指向其 OpenAI 兼容端点做当前问答链路验证；这不代表 vLLM/Ollama 已完成统一，也不得作为正式生产配置。阶段 1 将通过 ModelGateway 和 Provider Adapter 统一接入。
+
 **环境变量示例**：
 
 ```env
@@ -133,6 +136,13 @@ ENV=dev
 - 高并发推理需求
 - 需要 GPU 加速
 - 独立的推理服务器
+
+**目标口径**：
+
+- 正式校内部署、稳定演示和最终验收默认使用 vLLM。
+- Ollama 仅用于前期开发、vLLM 兼容性验证期间的过渡和明确标注的备用 Provider。
+- 当前 `prod-b.yml` 使用 `vllm/vllm-openai:latest`，只代表现有基线；进入演示冻结或生产发布前必须改为经验证的固定版本，并登记镜像摘要、模型权重、Tokenizer、Chat Template 和推理参数。
+- 应用最终通过 ModelGateway 使用逻辑模型名；在网关落地前，`LLM_MODEL` 仍必须与当前 Provider 的 `/v1/models` 返回 ID 一致。
 
 ---
 
@@ -198,6 +208,24 @@ ENV=dev
 └────────────────────────────────────────┘
 ```
 
+## Base-Spark 计划部署方式
+
+Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。计划新增两套相互隔离的 Compose/Profile：
+
+| 环境 | 用途 | 更新规则 | 模型服务 |
+| --- | --- | --- | --- |
+| `luyun-int` | 开发联调、迁移、Provider 切换和故障测试 | 每个可运行增量或至少每周部署 | 候选 vLLM；允许测试 Ollama |
+| `luyun-demo` | 随时演示和投标彩排 | 只接收通过门禁的同一不可变镜像 | 固定版本 vLLM 默认，Ollama 明示降级 |
+
+目标发布链路：
+
+```text
+自动测试 → luyun-int → virtus/Tailscale 验证 → 专业与安全门禁
+         → 同一镜像摘要晋级 luyun-demo → 保留上一稳定版本
+```
+
+两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。具体 Compose 和 Serve 配置将在 D0–D2 开发，本文件不把计划描述成当前已完成状态。
+
 ---
 
 ## 环境变量配置
@@ -248,7 +276,7 @@ docker compose -f src/infra/compose/dev.yml logs -f
 docker compose -f src/infra/compose/dev.yml down
 ```
 
-> 提示：若 API 调用 vLLM 出现 `404/502`，先检查 `.env` 中 `LLM_MODEL` 是否与 `curl http://localhost:8001/v1/models` 返回的 `id` 完全一致。
+> 提示：若 API 调用 vLLM 出现 `404/502`，先检查 `.env` 中 `LLM_MODEL` 是否与 `curl http://localhost:8001/v1/models` 返回的 `id` 完全一致。Ollama 临时接入也必须使用其实际模型 ID；不能假设两个 Provider 的模型名称相同。
 
 ### 生产部署（两服务器）
 

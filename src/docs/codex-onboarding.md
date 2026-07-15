@@ -4,7 +4,8 @@
 
 ## 项目目标
 
-- 面向思政教学场景的问答支持系统
+- 当前代码基线是面向思政教学场景的问答支持系统；目标产品按 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` 分阶段升级，不能把目标能力当作已实现能力
+- 正式模型服务和最终验收默认 vLLM，Ollama 仅作开发/过渡/明示备用；目标 ModelGateway 与 Base-Spark 双环境尚未实现
 - 后端位于 `src/apps/api`
 - 前端位于 `src/apps/web`
 - 基础设施与 compose 位于 `src/infra/compose`

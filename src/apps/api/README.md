@@ -74,6 +74,13 @@ api/
 3. 调用服务层组织问答上下文并请求 LLM。
 4. 通过 SSE 返回内容并写入消息审计数据。
 
+## 模型服务边界
+
+- 当前实现由 `routes/chat.py` 使用 `LLM_BASE_URL` 和 `LLM_MODEL` 直接调用 OpenAI 兼容的 `/v1/chat/completions`，尚未实现 ModelGateway。
+- 目标架构由 ModelGateway 使用逻辑模型名和 Provider Adapter 统一调用；正式环境、稳定演示和最终验收默认采用 vLLM，Ollama 仅用于前期开发、兼容性验证和明确标注的降级。
+- vLLM 与 Ollama 的模型 ID、Tokenizer、Chat Template、量化和输出行为必须分别登记并通过同一套回归，不能仅通过修改 URL 就视为等价。
+- 模型接入升级以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` 为准；本说明不表示目标网关已经实现。
+
 ## 运行与验证
 
 ```bash
