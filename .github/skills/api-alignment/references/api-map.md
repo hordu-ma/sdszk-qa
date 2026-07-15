@@ -5,9 +5,9 @@
 Core groups:
 
 - auth: `/api/auth/*`
-- cases: `/api/cases/*`
+- topics (implemented in `routes/cases.py`): `/api/topics/*`
 - sessions: `/api/sessions/*`
-- chat: `/api/chat/`
+- chat: `/api/chat`
 
 Backend implementation roots:
 

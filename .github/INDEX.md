@@ -21,6 +21,8 @@ If instructions conflict, higher items in the list take precedence.
 
 ## Core Documents
 
+Product scope is governed by `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`. The customer-facing source `src/docs/2026-luyun-external-solution-v1.0.md` is a non-authoritative rendering and must not expand that scope.
+
 ### Instructions
 
 Use these for scoped, file-pattern-based guidance.
@@ -92,11 +94,6 @@ Use skills as workflow playbooks for recurring task types.
 - `.github/skills/security-check/SKILL.md`
   - Security hygiene review for auth, config, deploy, and integrations.
 
-- `.github/skills/random-case-mode/SKILL.md`
-  - Random/custom case mode workflows when that product surface is in scope.
-
-- `.github/skills/extend-scoring/SKILL.md`
-  - **Deprecated placeholder.** Product policy forbids teacher/student total scoring and ranking. Do **not** use this skill to implement scoring. Prefer diagnosis/rubric work under the development plan.
 
 ## Product plan (not under .github, but authoritative)
 
@@ -133,13 +130,6 @@ Open these only through the relevant skill unless the task specifically asks for
 - `.github/skills/test-gate/references/change-review-checklist.md`
 - `.github/skills/test-gate/references/api-release-checklist.md`
 - `.github/skills/security-check/references/security-checklist.md`
-- `.github/skills/random-case-mode/references/random-case-flow.md`
-- `.github/skills/random-case-mode/references/payload-contract.md`
-
-### Deprecated placeholder (do not implement scoring)
-
-- `.github/skills/extend-scoring/references/scoring-rules.md`
-- `.github/skills/extend-scoring/references/scoring-touchpoints.md`
 
 ## Task Routing Guide
 

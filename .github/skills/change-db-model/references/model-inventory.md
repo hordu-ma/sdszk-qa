@@ -8,9 +8,9 @@ Core models:
 - `cases`
 - `sessions`
 - `messages`
-- `test_requests`
-- `scores`
 - `audit_logs`
+
+Historical migrations may mention removed medical-domain tables and fields. Treat the latest migration state and current ORM models as authoritative; do not recreate `scores`, `test_requests`, or medical case fields.
 
 Location: `src/apps/api/models`
 Migration location: `src/apps/api/migrations/versions`

@@ -4,10 +4,10 @@
 
 ## 项目目标
 
-- 当前代码基线是面向思政教学场景的问答支持系统；目标产品按 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v0.4+）分阶段升级，不能把目标能力当作已实现能力
+- 当前代码基线是面向思政教学场景的问答支持系统；目标产品按 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）分阶段升级，不能把目标能力当作已实现能力
 - 目标包含：教学成果对象、产品 Skills、核心用户 Memory、RAG、诊断闭环、门禁化多智能体/多模态/微调等——**均未实现则不得在代码注释或 PR 中写成已完成**
 - 正式模型服务和最终验收默认 vLLM，Ollama 仅作开发/过渡/明示备用；目标 ModelGateway 与 Base-Spark 双环境尚未实现
-- 文档权威：产品范围/阶段/验收以开发计划为准（v0.5+）；`2026-product-extension-*.md` 非排期
+- 文档权威：产品范围/阶段/验收以开发计划 v1.0 为准；`2026-product-extension-*.md` 非排期
 - 用户注册/认证（registered vs verified）在思政课平台用户管理实现；本仓禁止新增注册/短信/KYC，只消费平台 token/claims（计划 §2.6）
 - 后端位于 `src/apps/api`
 - 前端位于 `src/apps/web`

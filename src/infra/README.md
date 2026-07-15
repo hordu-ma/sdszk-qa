@@ -4,7 +4,7 @@
 
 > 本地开发启动请参考：`src/docs/本地开发启动指南.md`。
 > 当前 Compose 文件是问答 MVP 的开发/生产基线；Base-Spark 双环境、ModelGateway、产品 Skills/Memory 运行时尚未实现。  
-> 目标口径与阶段顺序以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v0.4+）为准；演示环境不得抢跑未实现教学能力。
+> 目标口径与阶段顺序以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）为准；演示环境不得抢跑未实现教学能力。
 
 ## 目录结构
 

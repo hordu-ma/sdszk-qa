@@ -3,7 +3,7 @@
 本文档说明**当前问答 MVP** 的后端、前端和部署结构，并摘要**目标架构**中与开发计划一致的关键点。
 
 > 范围、阶段、验收、产品 Skills、核心用户 Memory、用户注册/认证分级与工程顺序以  
-> `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v0.5+）为唯一主依据。  
+> `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）为唯一主依据。
 > 教学设计、诊断、Skills 运行时、Memory、ModelGateway、多智能体、多模态及 Base-Spark 双环境属于目标架构，**尚未在当前代码中实现**。  
 > **用户注册与认证升级在思政课平台用户管理实现，不在本仓库。**  
 > 基础设施与部署请参考：`src/infra/README.md`。

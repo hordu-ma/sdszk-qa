@@ -20,7 +20,7 @@ Instruction precedence follows the same order. Do not scan the entire `.github` 
 ## Scope
 
 - This file is the always-on workspace guidance. Keep it short and move domain-specific rules into scoped docs.
-- Product range, phases, acceptance, product Skills, and user Memory: `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` (v0.5+) is the single source of truth. Do not treat `2026-product-extension-*.md` as schedule.
+- Product range, phases, acceptance, product Skills, and user Memory: `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` (v1.0) is the single source of truth. Do not treat `2026-product-extension-*.md` as schedule.
 - User registration and identity upgrade (registered vs verified) are specified in plan §2.6 and **must be implemented in the 思政课平台 user-management system**, not in this repo. Do not add phone signup, SMS, or KYC flows here; only consume platform tokens/claims when integrating.
 - Use `src/docs/codex-harness.md` as the Codex validation harness entrypoint.
 - Keep `.github` for GitHub Actions plus Codex-readable auxiliary instructions, skills, hooks, and agent playbooks; use `.github/INDEX.md` before opening other `.github` files.

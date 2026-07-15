@@ -2,7 +2,7 @@
 
 面向山东省大中小学思政课一体化建设指导中心的教学智能支持平台。当前仓库实现仍是问答 MVP；目标产品将按阶段 0–4 升级为教学设计生产、证据化诊断、产品 Skills、核心用户 Memory、四学段一体化、受控多智能体和多模态教学证据平台。
 
-> **文档权威：** 范围、阶段、验收、Skills/Memory 与工程顺序以 [教学与课程论驱动的分阶段开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md)（v0.4+）为唯一主依据。  
+> **文档权威：** 范围、阶段、验收、Skills/Memory 与工程顺序以 [教学与课程论驱动的分阶段开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0）为唯一主依据。
 > 目标能力不得被描述为当前已经实现。`2026-product-extension-*.md` 仅为能力图/方向稿，**不是排期依据**。
 
 ## 当前实现基线
@@ -35,10 +35,10 @@
 
 | 阶段 | 目标 |
 | --- | --- |
-| 0 | 领域模型、量规、Skills 目录、Memory 边界、评测与硬件基线 |
-| 1 | 纵向样板 + RAG + 异步任务 + Skills 运行时 + Memory 最小集 + 轻量诊断/导出 |
+| 0 | 领域模型、量规、Skills/Memory、合规、评测四库、红队与硬件基线 |
+| 1 | 1A 可信平台骨架 + 1B 纵向样板、RAG、Skills/Memory、轻量诊断与导出 |
 | 2 | 完整生成—诊断—采纳—导出闭环与试点 |
-| 3 | 四学段、一体化、运营与权限；小程序按数据决策 |
+| 3 | 四学段、一体化、运营与权限；小程序轻量端硬交付 |
 | 4 | 门禁化多智能体（复用 Skills）、多模态、微调评估 A/B |
 
 ## 系统组件
@@ -68,10 +68,12 @@
 
 - 开发规范：见 [AGENTS.md](AGENTS.md)
 - 主开发计划：见 [src/docs/2026-luyun-curriculum-pedagogy-development-plan.md](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md)
+- 对外方案源稿：见 [src/docs/2026-luyun-external-solution-v1.0.md](src/docs/2026-luyun-external-solution-v1.0.md)
+- 对外 Word 发布件：见 [鲁韵思政大模型建设方案_v1.0_对外版.docx](鲁韵思政大模型建设方案_v1.0_对外版.docx)
 - Codex 快速上手：见 [src/docs/codex-onboarding.md](src/docs/codex-onboarding.md)
 - Codex harness：见 [src/docs/codex-harness.md](src/docs/codex-harness.md)
 - Codex 辅助规则索引：见 [.github/INDEX.md](.github/INDEX.md)（`.github` 同时承载 GitHub Actions）
-- 本地启动：见 `src/docs/本地开发启动指南.md`（含测试账号，不入版本控制；首次使用需从运维获取或参照 `.env.example` 自行创建）
+- 本地启动：见 [Codex Onboarding](src/docs/codex-onboarding.md) 与 [基础设施说明](src/infra/README.md)；测试账号和环境 Secret 由运维通过非版本控制渠道提供
 - 架构说明：见 [ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
 - 基础设施：见 [src/infra/README.md](src/infra/README.md)
 - 统一任务入口：优先使用根目录 `Makefile`

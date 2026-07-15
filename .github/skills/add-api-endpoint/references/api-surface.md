@@ -5,7 +5,7 @@
 Project route groups:
 
 - `/api/auth`
-- `/api/cases`
+- `/api/topics`
 - `/api/sessions`
 - `/api/chat`
 
