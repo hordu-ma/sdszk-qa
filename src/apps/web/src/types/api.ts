@@ -88,3 +88,66 @@ export interface SessionDetail {
   ended_at: string | null;
   messages: MessageItem[];
 }
+
+// ==================== Stage 1A Workbench ====================
+export interface TeachingProject {
+  id: number;
+  title: string;
+  stage: string;
+  course_type: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeDocument {
+  id: number;
+  project_id: number;
+  filename: string;
+  content_type: string;
+  checksum_sha256: string;
+  status: "processing" | "ready" | "failed";
+  review_status: string;
+  version_number: number;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface TaskRun {
+  id: number;
+  project_id: number | null;
+  task_type: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  progress: number;
+  attempt: number;
+  input_payload: Record<string, unknown>;
+  output_payload: Record<string, unknown> | null;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+}
+
+export interface BasisCitation {
+  document_id: number;
+  filename: string;
+  chunk_id: number;
+  location_label: string;
+  content: string;
+  relevance: number;
+}
+
+export interface RetrieveBasisResponse {
+  skill_run_id: number;
+  skill_id: string;
+  skill_version: string;
+  insufficient_basis: boolean;
+  citations: BasisCitation[];
+}
+
+export interface ModelStatus {
+  logical_model: string;
+  provider: string;
+  provider_model: string;
+  degraded: boolean;
+}

@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres@sha256:538bdb8c6b278f2f09070a4d79f04a83363a795ed23ec0d92d6b70cabc398eae
+    restart: unless-stopped
+    network_mode: host
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1", "-p", "25432"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-luyun}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-luyun_sizheng}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 25432 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    restart: unless-stopped
+    network_mode: host
+    command: server /data --address "127.0.0.1:29000" --console-address "127.0.0.1:29001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-luyun}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    image: luyun-sizheng-api:${RELEASE_TAG:-stage1a}
+    build:
+      context: ../../..
+      dockerfile: src/apps/api/Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    command: ["uv", "run", "uvicorn", "src.apps.api.main:app", "--host", "127.0.0.1", "--port", "28000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-luyun}:${POSTGRES_PASSWORD}@127.0.0.1:25432/${POSTGRES_DB:-luyun_sizheng}
+      MINIO_ENDPOINT: 127.0.0.1:29000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-luyun}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-luyun-sizheng-int}
+      LLM_BASE_URL: http://127.0.0.1:11434
+      LLM_MODEL: ${LLM_MODEL:-qwen3.5:27b}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_LOGICAL_MODEL: ${LLM_LOGICAL_MODEL:-teaching-chat}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-180}
+      LLM_MAX_CONTEXT_LEN: ${LLM_MAX_CONTEXT_LEN:-8192}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-1000}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      DEMO_USERNAME: ${DEMO_USERNAME:-demo_teacher}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:?DEMO_PASSWORD is required}
+      DEMO_FULL_NAME: ${DEMO_FULL_NAME:-鲁韵验证教师}
+      ENV: production
+      DEBUG: "false"
+      CORS_ORIGINS: '["https://base-spark.tail84088a.ts.net"]'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:28000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  web:
+    image: luyun-sizheng-web:${RELEASE_TAG:-stage1a}
+    build:
+      context: ../../..
+      dockerfile: src/apps/web/Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:

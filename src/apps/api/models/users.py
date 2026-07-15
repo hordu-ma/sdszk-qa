@@ -10,6 +10,7 @@ from .base import Base, TimestampMixin
 if TYPE_CHECKING:
     from .audit_logs import AuditLog
     from .sessions import Session
+    from .workbench import TeachingProject
 
 
 class User(Base, TimestampMixin):
@@ -37,6 +38,9 @@ class User(Base, TimestampMixin):
     )
     audit_logs: Mapped[list["AuditLog"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+    teaching_projects: Mapped[list["TeachingProject"]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

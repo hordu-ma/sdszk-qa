@@ -1,6 +1,6 @@
 # 鲁韵思政大模型
 
-面向山东省大中小学思政课一体化建设指导中心的教学智能支持平台。当前仓库实现仍是问答 MVP；目标产品将按阶段 0–4 升级为教学设计生产、证据化诊断、产品 Skills、核心用户 Memory、四学段一体化、受控多智能体和多模态教学证据平台。
+面向山东省大中小学思政课一体化建设指导中心的教学智能支持平台。当前已交付“问答 MVP + 阶段 1A 首个可部署增量”；目标产品继续按阶段 0–4 升级为教学设计生产、证据化诊断、产品 Skills、核心用户 Memory、四学段一体化、受控多智能体和多模态教学证据平台。
 
 > **文档权威：** 范围、阶段、验收、Skills/Memory 与工程顺序以 [教学与课程论驱动的分阶段开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0）为唯一主依据。
 > 目标能力不得被描述为当前已经实现。`2026-product-extension-*.md` 仅为能力图/方向稿，**不是排期依据**。
@@ -12,9 +12,25 @@
 - 会话创建与历史查询
 - SSE 流式问答
 - 问答消息全链路可审计
+- Teaching Project / Version、知识资料、任务运行、SkillRun 和模型调用审计基础对象
+- 问答编排服务层与最小 ModelClient（逻辑模型名、Provider 标识、超时和调用审计）
+- 资料上传、后台解析、审核门禁和 `retrieve_basis` 可追溯检索基线
+- 桌面优先工作台基础页（项目、版本、资料、任务与依据检索）
+- `base-spark` 的 `luyun-int` 集成栈及 Virtus/Tailscale HTTPS 验证链路
 
-> 当前代码只提供问答支持，**不包含评分/排名模块**；目标产品的教学诊断同样不以教师总分或排名为默认输出。  
-> 产品 Skills 运行时、核心用户 Memory、教学成果对象、RAG、ModelGateway 等均属目标能力，尚未实现。
+> 当前代码**不包含评分/排名模块**；目标产品的教学诊断同样不以教师总分或排名为默认输出。
+> 当前只完成阶段 1A 的首个可部署增量，并不等于阶段 1 或 G1 完成。完整 Skills 注册/权限运行时、Memory、混合向量检索与 Reranker、纵向样板、Word 导出、固定版本 vLLM 和 `luyun-demo` 晋级仍未完成。
+
+### 当前阶段状态（2026-07-15）
+
+| 范围 | 状态 | 说明 |
+| --- | --- | --- |
+| 问答 MVP | 已保留并验证 | 登录、主题、会话、历史、Ollama SSE 问答可用 |
+| 阶段 1A | 进行中 | 首个可部署增量已进入 `luyun-int` 并由 Virtus 验证；尚未满足 1A 全部门槛 |
+| 阶段 1B / G1 | 未开始验收 | Skills/Memory、完整样板、导出、专家评测与稳定环境晋级未完成 |
+| Base-Spark D2 接入子项 | 技术链路已完成 | Tailnet HTTPS 已启用；ACL/Grant 范围仍由 Tailnet 管理侧负责 |
+
+本项目不启用 `tasks.md` 作为第二套排期。阶段范围与状态统一维护在主开发计划，具体启动/停用和验证步骤维护在 `src/infra/README.md`。
 
 ### 用户注册 / 认证（不在本仓开发）
 
@@ -29,7 +45,7 @@
 - 本仓目标态只校验平台签发的会话/claims（含 `account_level=registered|verified`）。
 - 默认不采集未核验身份证号；不得将自填证号宣称为实名认证。
 
-## 目标能力摘要（未实现）
+## 目标能力摘要（按阶段继续实现）
 
 按开发计划阶段交付，摘要如下：
 
@@ -45,13 +61,14 @@
 
 - 前端：Vue 3 + Vant（当前为轻交互问答；目标为桌面优先教学工作台）
 - 后端：FastAPI + SQLAlchemy（异步）
-- 模型：当前 API 使用 OpenAI 兼容接口，现有生产编排以 vLLM 为基线
+- 模型：当前最小 ModelClient 支持 Ollama 原生流式接口与 OpenAI 兼容接口；正式生产基线仍为 vLLM
 - 存储：PostgreSQL（业务数据）、MinIO（对象存储）
 - 代理：Nginx（HTTPS 与 SSE 反代）
 
 ## 核心流程（当前）
 
-登录 -> 选择主题 -> 创建会话 -> 流式问答 -> 查看历史会话
+- 问答兼容路径：登录 -> 选择主题 -> 创建会话 -> 流式问答 -> 查看历史会话
+- 阶段 1A 路径：登录 -> 工作台 -> 创建项目/版本 -> 上传资料 -> 审核 -> 检索依据 -> 查看任务留痕
 
 ## 目标核心流程（计划）
 
@@ -63,6 +80,9 @@
 - 主题：`GET /api/topics`、`GET /api/topics/{id}`
 - 会话：`POST /api/sessions`、`GET /api/sessions`、`GET /api/sessions/{session_id}`
 - 对话：`POST /api/chat`（SSE）
+- 工作台：`/api/workbench/projects`、`/api/workbench/tasks`
+- 知识资料：`/api/workbench/projects/{project_id}/documents`、`/api/workbench/documents/{document_id}/review`
+- 依据检索：`POST /api/workbench/skills/retrieve-basis`
 
 ## 开发与部署
 
@@ -73,18 +93,28 @@
 - Codex 快速上手：见 [src/docs/codex-onboarding.md](src/docs/codex-onboarding.md)
 - Codex harness：见 [src/docs/codex-harness.md](src/docs/codex-harness.md)
 - Codex 辅助规则索引：见 [.github/INDEX.md](.github/INDEX.md)（`.github` 同时承载 GitHub Actions）
-- 本地启动：见 [Codex Onboarding](src/docs/codex-onboarding.md) 与 [基础设施说明](src/infra/README.md)；测试账号和环境 Secret 由运维通过非版本控制渠道提供
+- 本地启动：见 [Codex Onboarding](src/docs/codex-onboarding.md) 与 [基础设施说明](src/infra/README.md)
 - 架构说明：见 [ARCHITECTURE.md](src/docs/ARCHITECTURE.md)
 - 基础设施：见 [src/infra/README.md](src/infra/README.md)
 - 统一任务入口：优先使用根目录 `Makefile`
 
-### 目标模型服务与持续部署原则
+### Base-Spark 当前验证入口
+
+- 地址：<https://base-spark.tail84088a.ts.net/>
+- 测试用户：`demo_teacher`
+- 测试密码：`Luyun-Stage1A-0715!`
+- 访问条件：Virtus 已登录同一 Tailnet；该地址不对公网开放。
+- 完整启用、停用、状态检查、故障处理和 SSH 降级步骤见 [src/infra/README.md](src/infra/README.md#tailscale-serve-启用停用与验证)。
+
+> 该账号仅用于合成数据和阶段 1A 内部验证，当前具有审核演示权限；不得复用于客户生产环境，正式部署前必须删除或轮换。
+
+### 模型服务与持续部署原则
 
 - 正式环境、稳定演示环境和最终验收默认使用 vLLM；Ollama 只作为前期开发、兼容性验证和明确标注的备用 Provider。
-- 目标架构通过 ModelGateway、逻辑模型名和 Provider Adapter 隔离 vLLM/Ollama；当前代码尚未实现该网关，仍直接调用 `LLM_BASE_URL`。
-- `base-spark` 计划建设 `luyun-int` 集成环境和 `luyun-demo` 稳定演示环境。每个可验收开发节点先部署集成环境并从 `virtus` 验证，通过门禁后以同一镜像晋级稳定演示环境。
+- 当前已实现最小 ModelClient，以逻辑模型名和 Provider 标识隔离问答业务；完整 ModelGateway 注册、路由、能力发现和 Provider 一致性回归仍待实现。
+- `base-spark` 已建设 `luyun-int` 集成环境并通过 `virtus` 验证；`luyun-demo` 稳定演示环境及同镜像晋级门禁仍待建设。
 - 演示不得用原型冒充已实现 Skills/Memory/增强能力。
-- 上述演示环境和流水线属于待开发目标，当前 Compose 文件不能直接视为已经完成的 Base-Spark 部署方案。
+- 当前 `src/infra/compose/base-spark.yml` 是阶段 1A 集成环境基线，不是客户正式生产方案。
 
 ## 测试
 
@@ -101,9 +131,12 @@ make test-cov
 - messages（问答内容、token、延迟）
 - sessions（会话状态、起止时间）
 - audit_logs（用户行为）
+- teaching_projects / project_versions（项目和版本）
+- knowledge_documents / knowledge_chunks（资料、审核状态和检索片段）
+- task_runs / skill_runs / model_call_audits（任务、Skill 和模型调用）
 
 ## 目标可审计数据（计划）
 
-- SkillRun（技能版本、输入输出摘要、模型/规则/知识版本、memory_refs）
+- 完整 SkillDefinition 与 SkillRun 权限/配额/失败策略（当前仅有 `retrieve_basis` 运行留痕）
 - Memory 注入与清除审计
 - 教学成果版本与引用链

@@ -3,7 +3,7 @@
 本文档说明 `src/infra` 目录中各个配置文件的作用及其适用场景。
 
 > 本地开发启动请参考：`src/docs/本地开发启动指南.md`。
-> 当前 Compose 文件是问答 MVP 的开发/生产基线；Base-Spark 双环境、ModelGateway、产品 Skills/Memory 运行时尚未实现。  
+> 当前已新增 `base-spark.yml` 作为阶段 1A 集成环境基线；正式 A/B 生产文件仍是问答 MVP 基线。
 > 目标口径与阶段顺序以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）为准；演示环境不得抢跑未实现教学能力。
 
 ## 目录结构
@@ -72,7 +72,7 @@ docker compose -f src/infra/compose/dev.yml up -d
 - ✅ 使用默认凭证（`JWT_SECRET=dev-change-me`）
 - ✅ LLM 服务指向本地外部 vLLM（`host.docker.internal:8001`）
 
-开发期如需临时使用 Ollama，可将 `LLM_BASE_URL` 和 `LLM_MODEL` 指向其 OpenAI 兼容端点做当前问答链路验证；这不代表 vLLM/Ollama 已完成统一，也不得作为正式生产配置。阶段 1 将通过 ModelGateway 和 Provider Adapter 统一接入。
+开发期如需临时使用 Ollama，可通过当前最小 ModelClient 指定 `LLM_PROVIDER`、`LLM_BASE_URL` 和 `LLM_MODEL` 做问答链路验证；这不代表 vLLM/Ollama 已完成统一，也不得作为正式生产配置。完整统一仍须由 ModelGateway 和 Provider Adapter 完成。
 
 **环境变量示例**：
 
@@ -209,23 +209,132 @@ ENV=dev
 └────────────────────────────────────────┘
 ```
 
-## Base-Spark 计划部署方式
+## Base-Spark 集成环境与目标晋级
 
-Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。计划新增两套相互隔离的 Compose/Profile：
+Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当前已落地 `luyun-int`，目标仍是两套相互隔离的 Compose/Profile：
 
 | 环境 | 用途 | 更新规则 | 模型服务 |
 | --- | --- | --- | --- |
 | `luyun-int` | 开发联调、迁移、Provider 切换和故障测试 | 每个可运行增量或至少每周部署 | 候选 vLLM；允许测试 Ollama |
 | `luyun-demo` | 随时演示和投标彩排 | 只接收通过门禁的同一不可变镜像 | 固定版本 vLLM 默认，Ollama 明示降级 |
 
-目标发布链路：
+发布链路：
 
 ```text
 自动测试 → luyun-int → virtus/Tailscale 验证 → 专业与安全门禁
          → 同一镜像摘要晋级 luyun-demo → 保留上一稳定版本
 ```
 
-两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。具体 Compose 和 Serve 配置将在 D0–D2 开发，本文件不把计划描述成当前已完成状态。
+两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。
+
+阶段 1A 已实现 `luyun-int` Compose、loopback Web 入口、ModelClient/Provider 标识、项目/资料/任务和 `retrieve_basis`。2026-07-15 已从 Virtus 经 Tailscale HTTPS 验证登录和 SSE 问答。`luyun-demo` 晋级、固定版本 vLLM、Memory 和完整纵向样板仍未完成，不得对外宣称完成。
+
+### Base-Spark 阶段 1A 集成环境
+
+敏感变量必须保存在仓库外，例如 `/home/pgx/.config/luyun-sizheng/int.env`。该文件是**重新构建或重新创建容器**的前置条件，不要提交到 Git。首次部署或发布新镜像的顺序：
+
+```bash
+docker compose --project-name luyun-int --env-file /home/pgx/.config/luyun-sizheng/int.env -f src/infra/compose/base-spark.yml build
+docker compose --project-name luyun-int --env-file /home/pgx/.config/luyun-sizheng/int.env -f src/infra/compose/base-spark.yml run --rm api uv run alembic -c src/apps/api/alembic.ini upgrade head
+docker compose --project-name luyun-int --env-file /home/pgx/.config/luyun-sizheng/int.env -f src/infra/compose/base-spark.yml up -d
+docker compose --project-name luyun-int --env-file /home/pgx/.config/luyun-sizheng/int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
+```
+
+当前已有容器的日常启用不需要重建，也不需要再次执行 seed：
+
+```bash
+docker start luyun-int-postgres-1 luyun-int-minio-1
+docker start luyun-int-api-1
+docker start luyun-int-web-1
+docker ps --filter name=luyun-int --format 'table {{.Names}}\t{{.Status}}'
+curl -fsS http://127.0.0.1:8088/healthz
+```
+
+日常停用应用容器使用以下顺序。维护期间建议先停 Serve，避免访问者收到代理错误：
+
+```bash
+tailscale serve --https=443 off
+docker stop luyun-int-web-1 luyun-int-api-1
+docker stop luyun-int-minio-1 luyun-int-postgres-1
+```
+
+不要使用 `docker compose down -v` 或删除命名卷进行普通停用；`-v` 会删除数据库和对象存储数据。容器设置为 `restart: unless-stopped`，宿主重启后会自动恢复；如果曾手动 `docker stop`，需按上面的日常启用步骤重新启动。
+
+Base-Spark 当前防火墙不允许新建 Docker bridge 从宿主转发，因此阶段 1A Compose 使用 host network，但所有服务分别固定绑定独立 loopback 端口：Web `8088`、API `28000`、PostgreSQL `25432`、MinIO `29000/29001`。它们不会直接暴露给局域网或 Tailnet。
+
+### Tailscale Serve 启用、停用与验证
+
+当前映射：
+
+```text
+https://base-spark.tail84088a.ts.net/ -> http://127.0.0.1:8088
+```
+
+Serve 只向同一 Tailnet 提供 HTTPS，不启用 Funnel，也不直接暴露 API、数据库、MinIO 或模型端口。`--bg` 写入 `tailscaled` 的 Serve 配置，命令退出后映射仍保持；宿主重启后仍应复核状态。
+
+#### 每次启用
+
+1. 先启动并检查 `luyun-int` 应用：
+
+   ```bash
+   docker start luyun-int-postgres-1 luyun-int-minio-1
+   docker start luyun-int-api-1
+   docker start luyun-int-web-1
+   curl -fsS http://127.0.0.1:8088/healthz
+   ```
+
+2. 启用 Serve 并核对映射：
+
+   ```bash
+   tailscale serve --bg http://127.0.0.1:8088
+   tailscale serve status
+   ```
+
+3. 从 `base-spark` 验证 Tailnet HTTPS：
+
+   ```bash
+   curl -fsS https://base-spark.tail84088a.ts.net/healthz
+   ```
+
+4. 在已登录同一 Tailnet 的 Virtus 浏览器访问 <https://base-spark.tail84088a.ts.net/>，完成登录、工作台和 SSE 问答冒烟。
+
+#### 每次停用
+
+仅停用 Tailnet HTTPS 入口、保留应用运行：
+
+```bash
+tailscale serve --https=443 off
+tailscale serve status
+```
+
+如需完整停机，再按上一节顺序停止 4 个 `luyun-int` 容器。不要用 `tailscale serve reset` 代替普通停用；`reset` 会清空该节点全部 Serve 配置，只有确认不存在其他处理器时才可使用。
+
+#### 测试账号
+
+| 项目 | 值 |
+| --- | --- |
+| URL | `https://base-spark.tail84088a.ts.net/` |
+| 用户名 | `demo_teacher` |
+| 密码 | `Luyun-Stage1A-0715!` |
+| 当前角色 | `admin`（用于资料审核门禁演示） |
+
+该账号只用于阶段 1A 合成数据验证。正式客户部署、公开演示或 Tailnet 访问范围扩大前，必须删除或轮换该账号和密码；不得复用当前数据库、JWT、MinIO 等环境 Secret。
+
+#### 常见故障
+
+- 首次提示 `Serve is not enabled on your tailnet`：按命令输出的管理员链接启用 Serve，返回终端后重新执行启用命令。
+- 出现 `Preconditions failed: etag mismatch`：说明另一个客户端刚修改 Serve 配置；先运行 `tailscale serve status`，再重试同一启用命令。2026-07-15 首次启用曾出现该竞争，重试后成功。
+- HTTPS 返回 `502`：先检查 `docker ps --filter name=luyun-int` 和 `curl http://127.0.0.1:8088/healthz`；本地入口不健康时不要反复重配 Serve。
+- Virtus 无法访问：确认 Virtus 已登录同一 Tailnet、MagicDNS 可解析该主机，并由 Tailnet 管理员核对 ACL/Grant；不要为排障启用 Funnel 或把服务绑定到 `0.0.0.0`。
+- 宿主重启后：先运行 `systemctl is-active tailscaled snap.docker.dockerd.service`，再依次检查 `docker ps`、loopback `/healthz`、`tailscale serve status` 和 Tailnet HTTPS `/healthz`，任一层失败就从该层修复。
+
+若 Serve 临时不可用，在 `virtus` 上使用计划允许的 SSH 转发降级路径：
+
+```bash
+ssh -N -L 18088:127.0.0.1:8088 pgx@base-spark
+```
+
+保持终端运行，并在 `virtus` 浏览器访问 `http://127.0.0.1:18088`。当前如使用 Ollama，页面会明确显示过渡 Provider。
 
 ---
 

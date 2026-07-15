@@ -4,9 +4,9 @@
 
 ## 项目目标
 
-- 当前代码基线是面向思政教学场景的问答支持系统；目标产品按 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）分阶段升级，不能把目标能力当作已实现能力
-- 目标包含：教学成果对象、产品 Skills、核心用户 Memory、RAG、诊断闭环、门禁化多智能体/多模态/微调等——**均未实现则不得在代码注释或 PR 中写成已完成**
-- 正式模型服务和最终验收默认 vLLM，Ollama 仅作开发/过渡/明示备用；目标 ModelGateway 与 Base-Spark 双环境尚未实现
+- 当前代码基线是“问答 MVP + 阶段 1A 首个可部署增量”：已含 Teaching Project/Version、资料/任务、审核门禁、`retrieve_basis`、最小 ModelClient、工作台基础页和 `base-spark/luyun-int`
+- 完整产品 Skills、核心用户 Memory、混合 RAG、诊断/导出纵向样板、完整 ModelGateway、门禁化多智能体/多模态/微调等仍未实现；不得在代码注释或 PR 中写成已完成
+- 正式模型服务和最终验收默认 vLLM；当前 `luyun-int` 使用 Ollama `qwen3.5:27b` 作为明示过渡 Provider，vLLM D0 和 `luyun-demo` 尚未完成
 - 文档权威：产品范围/阶段/验收以开发计划 v1.0 为准；`2026-product-extension-*.md` 非排期
 - 用户注册/认证（registered vs verified）在思政课平台用户管理实现；本仓禁止新增注册/短信/KYC，只消费平台 token/claims（计划 §2.6）
 - 后端位于 `src/apps/api`
@@ -18,11 +18,12 @@
 
 1. 先读根目录 `AGENTS.md`；涉及产品范围时读开发计划相关章节；再经 `.github/INDEX.md` 打开最小指令/skill
 2. 保持最小可行改动，不做无关重构；优先服务当前纵向样板，不并行铺模块
-3. 后端保持薄路由，业务逻辑放入 `services`（现状 `chat` 编排在路由，阶段 1 应抽离）
+3. 后端保持薄路由，业务逻辑放入 `services`；问答编排已抽离，后续工作继续沿用该边界
 4. 外部 LLM 调用在测试中必须 mock，不依赖真实模型服务
 5. 改配置或接口时，说明影响范围与回滚方式
 6. 不实现教师/学生总分排名或 scoring 模块；诊断为非评分
 7. 不把隐式会话历史当作用户 Memory；Memory/Skills 按开发计划对象设计
+8. 不创建 `tasks.md` 维护产品阶段或排期；开发计划是唯一真源，日期化实施状态直接更新计划，避免双轨漂移
 
 ## 常用命令
 

@@ -1,6 +1,6 @@
 # API 模块说明（鲁韵思政）
 
-本目录包含鲁韵思政问答系统的后端 API，基于 FastAPI + SQLAlchemy（异步）构建，提供认证、主题管理、会话管理与 SSE 流式问答能力。
+本目录包含鲁韵思政后端 API，基于 FastAPI + SQLAlchemy（异步）构建，当前提供认证、主题/会话、SSE 流式问答，以及阶段 1A 项目、版本、知识资料、任务和依据检索基础能力。
 
 > 基础设施与部署请参考：`src/infra/README.md`。
 
@@ -49,11 +49,16 @@ api/
   - 会话创建、会话列表、会话详情
 - `routes/chat.py`
   - SSE 流式问答（核心链路，`POST /api/chat`）
+- `routes/workbench.py`
+  - 教学项目/版本、资料上传与审核、任务列表和 `retrieve_basis`
 
 ## 服务层（services）
 
-- 目标：问答编排、提示词构建、（阶段 1+）产品 Skills、Memory、RAG、任务编排等业务逻辑。
-- **现状：** 几乎仅有 `audit.py`；核心 LLM/SSE 编排仍在 `routes/chat.py`。开发计划要求阶段 1 抽离到 `services/` 并引入 Skills/Memory，当前均未实现。
+- `chat_orchestration.py`：提示词、会话上下文和 token 估算。
+- `model_gateway.py`：最小 ModelClient、Ollama/OpenAI 兼容调用、统一错误和调用审计。
+- `project_service.py`：教学项目和版本操作。
+- `knowledge_service.py`：资料解析、任务恢复、审核过滤和依据检索。
+- **边界：** 当前不是完整 Skills/Memory/ModelGateway 运行时；`retrieve_basis` 是阶段 1A 的单 Skill 基线，检索仍为可审计词项匹配，尚未完成向量 + Reranker 混合检索。
 - **禁止：** 实现教师/学生总分评分排名模块（与产品“诊断非评分”原则冲突）。
 
 ## 工具层（utils）
@@ -68,6 +73,9 @@ api/
 - `messages`：对话消息与统计信息
 - `cases`：主题模板/场景配置
 - `audit_logs`：审计记录
+- `teaching_projects` / `project_versions`：项目与版本
+- `knowledge_documents` / `knowledge_chunks`：资料与片段
+- `task_runs` / `skill_runs` / `model_call_audits`：任务、Skill 与模型调用留痕
 
 ## 调用链路
 
@@ -78,8 +86,8 @@ api/
 
 ## 模型服务边界
 
-- 当前实现由 `routes/chat.py` 使用 `LLM_BASE_URL` 和 `LLM_MODEL` 直接调用 OpenAI 兼容的 `/v1/chat/completions`，尚未实现 ModelGateway / 产品 Skills 运行时。
-- 目标架构由 ModelGateway 使用逻辑模型名和 Provider Adapter 统一调用；教学任务经产品 Skills 编排；正式环境、稳定演示和最终验收默认采用 vLLM，Ollama 仅用于前期开发、兼容性验证和明确标注的降级。
+- 当前问答通过最小 ModelClient 使用 `LLM_LOGICAL_MODEL`、`LLM_PROVIDER` 和 Provider 模型 ID，支持 Ollama 原生流式接口或 OpenAI 兼容接口，并记录模型调用审计。
+- 完整目标仍是 ModelGateway 的模型注册、任务路由、能力发现和 Provider Adapter 一致性回归；正式环境、稳定演示和最终验收默认采用 vLLM，Ollama 仅用于前期开发、兼容性验证和明确标注的降级。
 - vLLM 与 Ollama 的模型 ID、Tokenizer、Chat Template、量化和输出行为必须分别登记并通过同一套回归，不能仅通过修改 URL 就视为等价。
 - 模型接入、Skills、Memory 升级以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）为准；本说明不表示目标能力已经实现。
 - 用户注册与认证分级在**思政课平台用户管理**实现；本 API 目标态校验平台身份 claims，**不实现**手机注册/KYC（见计划 §2.6）。当前仍为本地 JWT 登录 MVP。

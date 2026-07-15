@@ -9,6 +9,15 @@ from .cases import Case
 from .messages import Message
 from .sessions import Session
 from .users import User
+from .workbench import (
+    KnowledgeChunk,
+    KnowledgeDocument,
+    ModelCallAudit,
+    ProjectVersion,
+    SkillRun,
+    TaskRun,
+    TeachingProject,
+)
 
 __all__ = [
     "Base",
@@ -19,4 +28,11 @@ __all__ = [
     "Session",
     "Message",
     "AuditLog",
+    "TeachingProject",
+    "ProjectVersion",
+    "KnowledgeDocument",
+    "KnowledgeChunk",
+    "TaskRun",
+    "SkillRun",
+    "ModelCallAudit",
 ]

@@ -29,11 +29,18 @@ class Settings(BaseSettings):
     # LLM 配置
     LLM_BASE_URL: str = Field(..., min_length=1)
     LLM_MODEL: str = Field(..., min_length=1)
+    LLM_PROVIDER: str = "vllm"
+    LLM_LOGICAL_MODEL: str = "teaching-chat"
     LLM_TIMEOUT: int = 60  # 请求超时时间（秒）
     LLM_MAX_TOKENS: int = 500  # 最大生成 token 数
     LLM_TEMPERATURE: float = 0.7
     # 模型最大上下文长度（需要与 vLLM 启动参数 --max-model-len 一致）
     LLM_MAX_CONTEXT_LEN: int = 1024
+
+    # 阶段 1A 资料处理
+    KNOWLEDGE_CHUNK_SIZE: int = 800
+    KNOWLEDGE_CHUNK_OVERLAP: int = 100
+    MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024
 
     # JWT 配置
     JWT_SECRET: str = Field(..., min_length=1)

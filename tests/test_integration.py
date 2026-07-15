@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from types import TracebackType
-from typing import Any
 from uuid import uuid4
 
 import bcrypt
@@ -20,46 +18,9 @@ from src.apps.api.models import (
 )
 
 
-class _FakeStreamResponse:
-    def __init__(self) -> None:
-        self.status_code = 200
-
-    async def __aenter__(self) -> _FakeStreamResponse:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> bool:
-        return False
-
-    async def aiter_lines(self) -> AsyncGenerator[str, None]:
-        yield 'data: {"choices":[{"delta":{"content":"你好"}}]}'
-        yield "data: [DONE]"
-
-    async def aread(self) -> bytes:
-        return b""
-
-
-class _FakeAsyncClient:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        pass
-
-    async def __aenter__(self) -> _FakeAsyncClient:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> bool:
-        return False
-
-    def stream(self, method: str, url: str, json: dict[str, Any]) -> _FakeStreamResponse:
-        return _FakeStreamResponse()
+async def _fake_stream_chat(*args: object, **kwargs: object) -> AsyncGenerator[str, None]:
+    del args, kwargs
+    yield "你好"
 
 
 async def _ensure_tables() -> None:
@@ -123,13 +84,16 @@ async def _cleanup(user_id: int, case_id: int) -> None:
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_e2e_flow(monkeypatch: pytest.MonkeyPatch) -> None:
     await _ensure_tables()
     user_id, case_id, username, password = await _create_user_and_case()
 
     real_async_client = httpx.AsyncClient
-    monkeypatch.setattr("src.apps.api.routes.chat.httpx.AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(
+        "src.apps.api.routes.chat.model_client.stream_chat",
+        _fake_stream_chat,
+    )
 
     try:
         transport = httpx.ASGITransport(app=app)

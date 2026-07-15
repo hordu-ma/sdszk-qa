@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+.pytest_cache
+.ruff_cache
+.basedpyright
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/dist
+.env
+.env.*
+coverage.xml
+htmlcov

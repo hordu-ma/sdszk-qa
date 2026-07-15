@@ -3,6 +3,9 @@
 提供核心 API 路由和中间件配置。
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
@@ -31,6 +34,15 @@ async def _rate_limit_exception_handler(request: Request, exc: Exception) -> Res
 # 初始化日志系统
 setup_logging()
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """恢复应用重启前未完成的阶段 1A 任务。"""
+    from .services.knowledge_service import recover_document_tasks
+
+    await recover_document_tasks()
+    yield
+
+
 # 创建 FastAPI 应用
 app = FastAPI(
     title="LuYun SiZheng API",
@@ -38,6 +50,7 @@ app = FastAPI(
     description="鲁韵思政问答系统 API",
     docs_url="/docs" if settings.ENV == "dev" else None,  # 生产环境禁用文档
     redoc_url="/redoc" if settings.ENV == "dev" else None,  # redoc 提升文档可读性
+    lifespan=lifespan,
 )
 
 # 配置限流器
@@ -94,9 +107,10 @@ async def root() -> dict[str, str]:
 
 
 # 注册路由
-from .routes import auth, cases, chat, sessions  # noqa: E402
+from .routes import auth, cases, chat, sessions, workbench  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(cases.router, prefix="/api/topics", tags=["topics"])
 app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(workbench.router, prefix="/api/workbench", tags=["workbench"])

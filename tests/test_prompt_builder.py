@@ -1,5 +1,5 @@
 from src.apps.api.models import Case, Message
-from src.apps.api.routes.chat import (
+from src.apps.api.services.chat_orchestration import (
     SYSTEM_PROMPT,
     build_developer_prompt,
     build_messages,

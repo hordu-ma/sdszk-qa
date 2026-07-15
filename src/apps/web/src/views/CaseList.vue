@@ -82,6 +82,11 @@ const onCreateCustomTopic = async () => {
       @click-right="$router.push('/sessions')"
     />
 
+    <div class="workbench-entry" @click="$router.push('/workbench')">
+      <div><strong>教学工作台</strong><span>项目 · 可信资料 · 引用检索 · 任务追溯</span></div>
+      <span>进入 →</span>
+    </div>
+
     <van-list
       v-model:loading="loading"
       :finished="finished"
@@ -132,6 +137,21 @@ const onCreateCustomTopic = async () => {
   background: #ecfdf5;
   min-height: 100vh;
 }
+
+.workbench-entry {
+  margin: 14px 15px 6px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: #173f35;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.workbench-entry div { display: grid; gap: 4px; }
+.workbench-entry span { color: #cce0d7; font-size: 12px; }
 
 .topic-card {
   background: #fefefe;

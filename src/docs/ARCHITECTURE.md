@@ -1,10 +1,10 @@
 # 架构概览
 
-本文档说明**当前问答 MVP** 的后端、前端和部署结构，并摘要**目标架构**中与开发计划一致的关键点。
+本文档说明**问答 MVP + 阶段 1A 首个可部署增量**的后端、前端和部署结构，并摘要**目标架构**中与开发计划一致的关键点。
 
 > 范围、阶段、验收、产品 Skills、核心用户 Memory、用户注册/认证分级与工程顺序以  
 > `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）为唯一主依据。
-> 教学设计、诊断、Skills 运行时、Memory、ModelGateway、多智能体、多模态及 Base-Spark 双环境属于目标架构，**尚未在当前代码中实现**。  
+> 当前已实现项目/版本、资料/任务、`retrieve_basis` 基线、最小 ModelClient、工作台基础页和 `luyun-int`；完整教学设计/诊断、Skills 运行时、Memory、完整 ModelGateway、多智能体、多模态及 `luyun-demo` 仍属目标能力。
 > **用户注册与认证升级在思政课平台用户管理实现，不在本仓库。**  
 > 基础设施与部署请参考：`src/infra/README.md`。
 
@@ -34,8 +34,8 @@
 
 ### 分层模块
 
-- `src/apps/api/routes/*`：HTTP API（auth/cases/sessions/chat）
-- `src/apps/api/services/*`：当前几乎仅有审计；**核心问答编排仍在 `routes/chat.py`**（阶段 1 将抽离）
+- `src/apps/api/routes/*`：HTTP API（auth/cases/sessions/chat/workbench）
+- `src/apps/api/services/*`：审计、问答编排、最小 ModelClient、教学项目和知识处理；HTTP 路由保持输入/权限/响应编排薄层
 - `src/apps/api/schemas/*`：Pydantic 模型
 - `src/apps/api/models/*`：SQLAlchemy ORM
 
@@ -43,7 +43,7 @@
 
 1. 客户端向 `routes/*` 发起 HTTP 请求。
 2. 路由使用 `schemas/*` 校验输入，并从 `dependencies.py` 注入依赖。
-3. 路由（现阶段）直接编排业务或调用少量 `services/*`。
+3. 路由调用 `services/*` 完成问答、项目和知识处理；后台资料任务由应用进程恢复并执行。
 4. 使用 `models/*` 与异步 DB 会话。
 5. `exceptions.py` 统一错误；日志含 trace ID。
 
@@ -53,7 +53,7 @@
 - 路由：`src/apps/web/src/router/*`
 - 状态：`src/apps/web/src/stores/*`
 - API：`src/apps/web/src/api/*`
-- 页面：登录 / 主题列表 / 问答 / 历史会话（Vant 轻交互）
+- 页面：登录 / 主题列表 / 问答 / 历史会话（兼容入口）+ 工作台（项目、版本、资料、任务、依据检索）
 
 > 目标前端为**桌面优先教学工作台**（成果编辑、诊断对照、版本 diff、Memory 管理）。Vant 手机组件叙事不作为备课主路径的长期形态。
 
@@ -71,8 +71,7 @@ sequenceDiagram
 
   用户->>前端: 发起提问
   前端->>路由: 发起API请求（会话/聊天）
-  路由->>服务: 调用问答编排逻辑（目标态）
-  Note over 路由,服务: 当前实现下编排多在 routes/chat.py
+  路由->>服务: 调用问答编排逻辑
   服务->>模型: 读写数据
   模型->>数据库: 执行SQL
   数据库-->>模型: 返回结果
@@ -162,9 +161,9 @@ flowchart LR
   API --> LLM
 ```
 
-## 目标模型服务架构
+## 当前最小模型客户端与目标网关
 
-当前 API 直接使用 `LLM_BASE_URL` 和 `LLM_MODEL` 请求 OpenAI 兼容接口。阶段 1 将引入 ModelGateway / ModelClient，使教学业务与产品 Skills 只使用逻辑模型名。
+当前 API 已通过最小 ModelClient 读取逻辑模型名、Provider 和 Provider 模型 ID，兼容 Ollama 原生流式接口与 OpenAI 兼容接口，并记录延迟、token 估算、状态和错误码。完整 ModelGateway 的模型注册、能力发现、任务路由和 Provider 一致性回归仍待建设。
 
 ```mermaid
 flowchart LR
@@ -225,7 +224,7 @@ flowchart LR
 9. 桌面优先工作台  
 10. 双环境晋级  
 
-## Base-Spark 目标部署与晋级
+## Base-Spark 当前部署与目标晋级
 
 ```text
 合并并通过自动测试
@@ -235,9 +234,12 @@ flowchart LR
   → 同一镜像摘要晋级 luyun-demo
 ```
 
-- 该双环境尚未落地，现有 `dev.yml` 和 `prod-b.yml` 仍是当前基线。
-- 演示脚本只能覆盖已实现能力；Skills/Memory/Agent 未就绪时不得伪装。
+- 已落地 `luyun-int`：`base-spark.yml` 使用 host network，但 Web/API/PostgreSQL/MinIO 只绑定 `127.0.0.1` 的独立端口。
+- Tailscale Serve 将 Tailnet HTTPS `:443` 代理到 Web `127.0.0.1:8088`；2026-07-15 已从 Virtus 验证登录和 SSE 问答。
+- 当前 Provider 为 Ollama `qwen3.5:27b`，属于明示过渡状态；固定版本 vLLM D0 尚未完成。
+- `luyun-demo`、同镜像摘要晋级、独立数据快照及一键回滚尚未落地，不能将 `luyun-int` 宣称为稳定演示或客户生产环境。
+- 演示脚本只能覆盖已实现能力；完整 Skills/Memory/Agent 未就绪时不得伪装。
 
 ## 一句话总结
 
-当前由路由串联配置、中间件、异常与 SSE 问答，前端以轻交互呈现；后续按开发计划将主对象升级为教学成果，以产品 Skills 为任务入口、以受控 Memory 为显式上下文，并逐步加入 RAG、ModelGateway 与双环境持续部署。
+当前已从单一问答 MVP 前进到可部署的阶段 1A 工程骨架：问答兼容链路、Teaching Project/Version、知识审核检索基线、任务审计、最小 ModelClient 和桌面工作台共同运行在 `luyun-int`；后续继续补齐混合 RAG、Skills/Memory、纵向样板、完整 ModelGateway 和 `luyun-demo` 晋级。

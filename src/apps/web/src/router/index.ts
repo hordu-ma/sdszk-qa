@@ -3,6 +3,7 @@ import Login from "../views/Login.vue";
 import TopicList from "../views/CaseList.vue";
 import Chat from "../views/Chat.vue";
 import SessionList from "../views/SessionList.vue";
+import Workbench from "../views/Workbench.vue";
 import { useUserStore } from "../stores/user";
 import { getUserInfo } from "../api/auth";
 
@@ -51,6 +52,12 @@ const router = createRouter({
       path: "/chat/:sessionId",
       name: "chat",
       component: Chat,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/workbench",
+      name: "workbench",
+      component: Workbench,
       meta: { requiresAuth: true },
     },
     {
