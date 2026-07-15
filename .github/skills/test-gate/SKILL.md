@@ -21,7 +21,8 @@ Use this skill before finalizing non-trivial code changes.
 
 - Do not claim verification without commands and outcomes.
 - Distinguish environment failures from code regressions.
-- Require critical path tests for auth, sessions, chat, and scoring changes.
+- Require critical path tests for auth, sessions, and chat changes.
+- Do not require or introduce scoring/ranking tests; scoring is out of product scope.
 
 ## References
 

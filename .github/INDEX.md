@@ -86,8 +86,24 @@ Use skills as workflow playbooks for recurring task types.
 - `.github/skills/production-deploy/SKILL.md`
   - Production deployment and rollout verification across servers and services.
 
+- `.github/skills/test-gate/SKILL.md`
+  - Test and change-quality gate before shipping non-trivial changes.
+
+- `.github/skills/security-check/SKILL.md`
+  - Security hygiene review for auth, config, deploy, and integrations.
+
+- `.github/skills/random-case-mode/SKILL.md`
+  - Random/custom case mode workflows when that product surface is in scope.
+
 - `.github/skills/extend-scoring/SKILL.md`
-  - Reserved placeholder for future scoring-module work; do not use unless that module is introduced.
+  - **Deprecated placeholder.** Product policy forbids teacher/student total scoring and ranking. Do **not** use this skill to implement scoring. Prefer diagnosis/rubric work under the development plan.
+
+## Product plan (not under .github, but authoritative)
+
+- `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`
+  - Single source of truth for phases, Skills, Memory, acceptance, and engineering order.
+- `src/docs/2026-product-extension-feature-spec.md` / `2026-product-extension-development-suggestions.md`
+  - Capability map / direction only; **not** the schedule.
 
 ## Reference Documents
 
@@ -112,7 +128,15 @@ Open these only through the relevant skill unless the task specifically asks for
 - `.github/skills/production-deploy/references/deploy-checklist.md`
 - `.github/skills/production-deploy/references/runtime-files.md`
 
-### Placeholder / Future Work
+### Delivery quality / security
+
+- `.github/skills/test-gate/references/change-review-checklist.md`
+- `.github/skills/test-gate/references/api-release-checklist.md`
+- `.github/skills/security-check/references/security-checklist.md`
+- `.github/skills/random-case-mode/references/random-case-flow.md`
+- `.github/skills/random-case-mode/references/payload-contract.md`
+
+### Deprecated placeholder (do not implement scoring)
 
 - `.github/skills/extend-scoring/references/scoring-rules.md`
 - `.github/skills/extend-scoring/references/scoring-touchpoints.md`

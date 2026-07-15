@@ -1,83 +1,63 @@
 # 架构概览
 
-本文档说明当前问答 MVP 的后端、前端和部署结构。教学设计、诊断、ModelGateway、多智能体、多模态及 Base-Spark 双环境属于目标架构，尚未在当前代码中实现。
+本文档说明**当前问答 MVP** 的后端、前端和部署结构，并摘要**目标架构**中与开发计划一致的关键点。
 
+> 范围、阶段、验收、产品 Skills、核心用户 Memory、用户注册/认证分级与工程顺序以  
+> `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v0.5+）为唯一主依据。  
+> 教学设计、诊断、Skills 运行时、Memory、ModelGateway、多智能体、多模态及 Base-Spark 双环境属于目标架构，**尚未在当前代码中实现**。  
+> **用户注册与认证升级在思政课平台用户管理实现，不在本仓库。**  
 > 基础设施与部署请参考：`src/infra/README.md`。
-> 目标范围、阶段和验收请参考：`src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`。
 
 ## 仓库结构
 
 - 后端：`src/apps/api`（FastAPI + SQLAlchemy + Alembic）
 - 前端：`src/apps/web`（Vue 3 + TypeScript + Vite + Vant）
 - 脚本：`src/scripts`（导入/同步等工具脚本）
+- 计划与规格：`src/docs/`
 
 ## 根目录 Python 文件
 
 - `main.py` 是一个小型演示入口，不用于启动 API。
 - API 入口为 `src/apps/api/main.py`。
 
-## 后端结构
+## 后端结构（当前）
 
 ### 核心运行模块
 
-- `src/apps/api/main.py`
-  - 创建 FastAPI 应用
-  - 注册中间件、异常处理器与路由
-- `src/apps/api/config.py`
-  - 加载环境配置与设置
-- `src/apps/api/exceptions.py`
-  - 定义 `BusinessError` 与全局异常处理器
-- `src/apps/api/middleware.py`
-  - Trace ID 中间件（为每个请求生成唯一标识，用于日志追踪与错误排查）
-  - 请求日志中间件（记录请求方法、路径、状态码与耗时）
-  - 认证上下文中间件（从 JWT 提取 user_id 到 request.state，供限流 key 使用，不做鉴权判定）
-- `src/apps/api/logging_config.py`
-  - Loguru 结构化日志配置
-- `src/apps/api/dependencies.py`
-  - 数据库会话与 JWT 鉴权的依赖注入
-- `src/apps/api/rate_limit.py`
-  - SlowAPI 限流配置
+- `src/apps/api/main.py`：创建 FastAPI 应用，注册中间件、异常处理器与路由
+- `src/apps/api/config.py`：环境配置
+- `src/apps/api/exceptions.py`：`BusinessError` 与全局异常处理
+- `src/apps/api/middleware.py`：Trace ID、请求日志、认证上下文（供限流，不做鉴权判定）
+- `src/apps/api/logging_config.py`：Loguru 结构化日志
+- `src/apps/api/dependencies.py`：数据库会话与 JWT 鉴权
+- `src/apps/api/rate_limit.py`：SlowAPI 限流
 
 ### 分层模块
 
-- `src/apps/api/routes/*`
-  - HTTP API 端点（auth/cases/sessions/chat）
-  - 仅做请求校验、依赖注入与响应塑形
-- `src/apps/api/services/*`
-  - 业务逻辑与编排（例如 LLM 调用与提示词构建）
-- `src/apps/api/schemas/*`
-  - Pydantic 请求/响应模型
-- `src/apps/api/models/*`
-  - 映射到数据库表的 SQLAlchemy ORM 模型
+- `src/apps/api/routes/*`：HTTP API（auth/cases/sessions/chat）
+- `src/apps/api/services/*`：当前几乎仅有审计；**核心问答编排仍在 `routes/chat.py`**（阶段 1 将抽离）
+- `src/apps/api/schemas/*`：Pydantic 模型
+- `src/apps/api/models/*`：SQLAlchemy ORM
 
-## 后端调用链（典型请求流程）
+## 后端调用链（当前典型请求）
 
-1. 客户端向 `routes/*` 中的路由发起 HTTP 请求。
+1. 客户端向 `routes/*` 发起 HTTP 请求。
 2. 路由使用 `schemas/*` 校验输入，并从 `dependencies.py` 注入依赖。
-3. 路由调用 `services/*` 中的业务逻辑函数。
-4. 服务使用 `models/*` 与异步 DB 会话并返回 schema 数据。
-5. `exceptions.py` 统一处理错误；日志包含来自中间件的 trace ID。
+3. 路由（现阶段）直接编排业务或调用少量 `services/*`。
+4. 使用 `models/*` 与异步 DB 会话。
+5. `exceptions.py` 统一错误；日志含 trace ID。
 
-## 前端结构
+## 前端结构（当前）
 
-- 入口：`src/apps/web/src/main.ts` 挂载 Vue 应用。
-- 应用外壳：`src/apps/web/src/App.vue` 与路由驱动页面。
-- 路由：`src/apps/web/src/router/*` 定义路由与守卫。
-- 状态：`src/apps/web/src/stores/*`（Pinia store）。
-- API 层：`src/apps/web/src/api/*` 处理 HTTP 调用与鉴权。
-- 类型：`src/apps/web/src/types/*` 共享 TypeScript API 模型。
-- UI 组件：`src/apps/web/src/components/*` 以及 `src/apps/web/src/views/*` 下的页面。
+- 入口：`src/apps/web/src/main.ts`
+- 路由：`src/apps/web/src/router/*`
+- 状态：`src/apps/web/src/stores/*`
+- API：`src/apps/web/src/api/*`
+- 页面：登录 / 主题列表 / 问答 / 历史会话（Vant 轻交互）
 
-## 前端调用链（典型页面流程）
+> 目标前端为**桌面优先教学工作台**（成果编辑、诊断对照、版本 diff、Memory 管理）。Vant 手机组件叙事不作为备课主路径的长期形态。
 
-1. 用户进入 `router/*` 定义的路由。
-2. 页面组件加载并调用 `api/*` 中的 API helper。
-3. API 层返回带类型的数据（`types/*`），必要时更新 Pinia store。
-4. UI 使用组件与 Vant 组件渲染，并在出错时显示 toast/dialog。
-
-## 交互时序图
-
-描述鲁韵思政问答场景下的典型交互路径。
+## 交互时序图（当前问答）
 
 ```mermaid
 sequenceDiagram
@@ -91,7 +71,8 @@ sequenceDiagram
 
   用户->>前端: 发起提问
   前端->>路由: 发起API请求（会话/聊天）
-  路由->>服务: 调用问答编排逻辑
+  路由->>服务: 调用问答编排逻辑（目标态）
+  Note over 路由,服务: 当前实现下编排多在 routes/chat.py
   服务->>模型: 读写数据
   模型->>数据库: 执行SQL
   数据库-->>模型: 返回结果
@@ -101,9 +82,31 @@ sequenceDiagram
   前端-->>用户: 流式显示回答
 ```
 
-## 模块依赖图
+## 目标业务调用链（计划，Skills + Memory）
 
-描述后端核心模块之间的依赖与调用方向。
+```mermaid
+sequenceDiagram
+  autonumber
+  participant 教师 as 教师
+  participant UI as 教学工作台
+  participant API as FastAPI
+  participant Skill as 产品 Skills 运行时
+  participant Mem as Memory 服务
+  participant RAG as RAG/规则
+  participant GW as ModelGateway
+  participant DB as PostgreSQL/MinIO
+
+  教师->>UI: 选择任务入口
+  UI->>API: 调用 Skill（可附 memory 选择）
+  API->>Mem: 解析已确认 memory_refs
+  API->>Skill: SkillRun 开始
+  Skill->>RAG: 检索/校验
+  Skill->>GW: 逻辑模型名调用
+  Skill->>DB: 写成果版本/审计
+  Skill-->>UI: 结构化结果 + 引用
+```
+
+## 模块依赖图（当前）
 
 ```mermaid
 flowchart TD
@@ -133,9 +136,7 @@ flowchart TD
   异常 --> 日志
 ```
 
-## 部署架构图
-
-描述当前生产编排基线及其网络连接关系（A/B 双机部署）。
+## 部署架构图（当前生产基线 A/B）
 
 ```mermaid
 flowchart LR
@@ -163,11 +164,11 @@ flowchart LR
 
 ## 目标模型服务架构
 
-当前 API 直接使用 `LLM_BASE_URL` 和 `LLM_MODEL` 请求 OpenAI 兼容接口。阶段 1 将引入 ModelGateway，使教学业务只使用逻辑模型名，不感知 vLLM 模型目录或 Ollama tag。
+当前 API 直接使用 `LLM_BASE_URL` 和 `LLM_MODEL` 请求 OpenAI 兼容接口。阶段 1 将引入 ModelGateway / ModelClient，使教学业务与产品 Skills 只使用逻辑模型名。
 
 ```mermaid
 flowchart LR
-  业务[教学业务与受控工作流] --> 网关[ModelGateway]
+  业务[教学业务 / 产品 Skills] --> 网关[ModelGateway]
   网关 -->|正式/稳定演示默认| VLLM[vLLM Provider]
   网关 -.->|前期开发/明示降级| OLLAMA[Ollama Provider]
   网关 --> 版本[模型资产与调用版本登记]
@@ -176,12 +177,55 @@ flowchart LR
 
 - 正式环境、`base-spark` 稳定演示环境和最终验收默认使用 vLLM。
 - Ollama 仅用于前期开发、vLLM 兼容性验证期间的过渡和明确标注的备用 Provider。
-- 标准模型资产登记来源版本、权重哈希、Tokenizer、Chat Template、许可证、量化和 Provider 模型 ID；Ollama tag 不是唯一资产来源。
-- vLLM/Ollama Provider 切换不得改变教学成果 Schema、规则、任务状态和审计链路。
+- Provider 切换不得改变教学成果 Schema、Skill 契约、规则、任务状态和审计链路。
+
+## 目标：产品 Skills 与 Memory（计划）
+
+| 组件 | 职责 | 阶段 |
+| --- | --- | --- |
+| SkillDefinition / SkillRun | 版本化任务技能、Schema、配额、审计 | 1 必交最小集 |
+| UserPreference / ClassContextProfile | 显式工作记忆，可删可审计 | 1 最小集 |
+| MemoryInjectionAudit | 记录注入到某次 SkillRun 的记忆引用 | 1 |
+| Agent DAG | 只调用 Skills 白名单，不另开写接口 | 4 门禁交付 |
+
+禁止：教师/学生总分排名、思想侧写式长期记忆、开放插件式任意 Skill。
+
+## 目标：身份与登录边界（计划）
+
+```mermaid
+flowchart LR
+  U[教师] --> UM[思政课平台用户管理]
+  UM -->|注册用户 registered| UM
+  UM -->|认证用户 verified| UM
+  UM -->|token + claims| API[鲁韵 API 本仓]
+  API --> APP[Skills / 教学成果 / Memory]
+```
+
+| 级别 | 达成条件 | 实现系统 |
+| --- | --- | --- |
+| 注册用户 | 手机验证 + 姓名 + 工作单位（步骤 1–4） | 平台用户管理 |
+| 认证用户 | 步骤 5：SSO / 合规核身 / 邀请或通讯录等 | 平台用户管理 |
+
+- 本仓当前：本地 JWT 登录（MVP）。
+- 本仓目标：校验平台签发身份；**不实现**短信注册与 KYC。
+- 默认不采集未核验身份证号。详见开发计划 §2.6。
+
+## 阶段 1 工程落地顺序（摘要）
+
+详见开发计划 §5.4.1：
+
+1. Teaching Project / Version  
+2. 服务层抽离  
+3. ModelClient  
+4. 异步任务  
+5. RAG / `retrieve_basis`  
+6. Skills 运行时  
+7. Memory 最小集  
+8. 样板生成—诊断—导出  
+9. 桌面优先工作台  
+10. 双环境晋级  
 
 ## Base-Spark 目标部署与晋级
-
-`base-spark` 计划保留两套相互隔离的应用环境，共享经过配额和版本控制的模型服务：
 
 ```text
 合并并通过自动测试
@@ -191,11 +235,9 @@ flowchart LR
   → 同一镜像摘要晋级 luyun-demo
 ```
 
-- `luyun-int` 高频接收可运行增量，用于联调、迁移、Provider 切换和故障测试。
-- `luyun-demo` 只接收通过门禁的不可变镜像，始终保留上一稳定版本和数据快照，禁止日常开发直接覆盖。
-- 每个可验收开发节点都必须完成部署与 `virtus` 验证；G1–G4 分别保留可回滚演示版本。
-- 该双环境尚未落地，现有 `dev.yml` 和 `prod-b.yml` 仍是当前基线，不代表 Base-Spark 目标编排已经完成。
+- 该双环境尚未落地，现有 `dev.yml` 和 `prod-b.yml` 仍是当前基线。
+- 演示脚本只能覆盖已实现能力；Skills/Memory/Agent 未就绪时不得伪装。
 
 ## 一句话总结
 
-当前由 `main.py` 串联配置、中间件、异常与路由，前端消费问答 API 并以 SSE 流式呈现；后续按开发计划逐步加入领域工作流、ModelGateway 和双环境持续部署。
+当前由路由串联配置、中间件、异常与 SSE 问答，前端以轻交互呈现；后续按开发计划将主对象升级为教学成果，以产品 Skills 为任务入口、以受控 Memory 为显式上下文，并逐步加入 RAG、ModelGateway 与双环境持续部署。

@@ -43,10 +43,11 @@ postgresql+psycopg://postgres:postgres@localhost:5432/luyun_sizheng
 
 ## Codex 交付约定
 
-1. 改动前先读 `AGENTS.md` 和本文件；如需任务专项规则，再通过 `.github/INDEX.md` 打开最小相关文档。
+1. 改动前先读 `AGENTS.md` 和本文件；产品范围/阶段问题以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` 为准；再通过 `.github/INDEX.md` 打开最小相关文档。
 2. 优先选择最小可验证命令：后端改动先跑 `make harness-backend`，前端改动至少跑 `make web-build`。
 3. 涉及数据库、认证、会话或 SSE 链路时，补跑 `make test-integration`。
 4. 最终交付说明中明确列出已运行命令、未验证项和残余风险。
+5. 文档驱动：若实现偏离开发计划中的 Skills/Memory/非评分/工程顺序，须在 handoff 标明并先改计划或获确认。
 
 ## `.github` 对齐原则
 

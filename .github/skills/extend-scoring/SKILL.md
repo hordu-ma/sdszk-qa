@@ -1,33 +1,25 @@
 ---
 name: extend-scoring
-description: Extend or refactor rule-based scoring for luyun-sizheng sessions. Use when updating scoring dimensions, weighting, scoring_details output, or score-related tests while preserving traceability and backward compatibility.
-status: placeholder
+description: Deprecated. Do not implement session scoring or teacher ranking. Product diagnosis is formative and non-scoring per the development plan.
+status: deprecated
 ---
 
-> **⚠️ 预留 Skill**：当前项目不包含评分模块（见 `README.md`），`services/scoring.py` 和 `schemas/scores.py` 尚未实现。本 skill 为未来扩展评分功能时的工作流预留，暂不可执行。
+> **已废弃 / 禁止执行。**  
+> 产品原则：教学诊断**不输出教师总分或排名**，不建设 session scoring 模块。  
+> 权威依据：`src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（诊断非评分、非范围清单）。  
+> 若任务涉及“评价工具 / 量规 / 形成性评价表”，应走教学成果与诊断 Skills（`diagnose_design` 等）设计，而不是本 skill。
 
-> 基础设施与部署请参考：`src/infra/README.md`。
+# Extend Scoring（Deprecated）
 
-# Extend Scoring（预留）
+Do **not** apply this workflow.
 
-Apply this workflow for scoring logic changes.
+## Replacement
 
-## Execute Workflow
-
-1. Read `references/scoring-rules.md`.
-2. Change scoring behavior in `src/apps/api/services/scoring.py`.
-3. Keep `scoring_details` explanatory and versioned.
-4. Align response schema types in `src/apps/api/schemas/scores.py` if fields change.
-5. Verify session submit and score retrieval routes still serialize correctly.
-6. Update tests for key branches and regression cases.
+1. Read the development plan sections on non-scoring diagnosis and product Skills.
+2. For rubrics as **classroom materials**, use teaching-design generation/export Skills.
+3. For design quality feedback, use evidence-based diagnosis items (`已建立/部分建立/尚未建立/证据不足`), not total scores.
 
 ## Guardrails
 
-- Preserve deterministic output for same input.
-- Keep score dimensions and total score consistent.
-- Track rule version updates whenever semantics change.
-
-## References
-
-- Rule design and validation: `references/scoring-rules.md`
-- Touchpoints in routes/schemas: `references/scoring-touchpoints.md`
+- Never add `scoring.py`, teacher leaderboards, or student ideological scoring.
+- Never treat Memory signals as performance grades.

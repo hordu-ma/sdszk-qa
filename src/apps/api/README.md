@@ -52,7 +52,9 @@ api/
 
 ## 服务层（services）
 
-- 负责问答编排、提示词构建等业务逻辑。
+- 目标：问答编排、提示词构建、（阶段 1+）产品 Skills、Memory、RAG、任务编排等业务逻辑。
+- **现状：** 几乎仅有 `audit.py`；核心 LLM/SSE 编排仍在 `routes/chat.py`。开发计划要求阶段 1 抽离到 `services/` 并引入 Skills/Memory，当前均未实现。
+- **禁止：** 实现教师/学生总分评分排名模块（与产品“诊断非评分”原则冲突）。
 
 ## 工具层（utils）
 
@@ -76,10 +78,11 @@ api/
 
 ## 模型服务边界
 
-- 当前实现由 `routes/chat.py` 使用 `LLM_BASE_URL` 和 `LLM_MODEL` 直接调用 OpenAI 兼容的 `/v1/chat/completions`，尚未实现 ModelGateway。
-- 目标架构由 ModelGateway 使用逻辑模型名和 Provider Adapter 统一调用；正式环境、稳定演示和最终验收默认采用 vLLM，Ollama 仅用于前期开发、兼容性验证和明确标注的降级。
+- 当前实现由 `routes/chat.py` 使用 `LLM_BASE_URL` 和 `LLM_MODEL` 直接调用 OpenAI 兼容的 `/v1/chat/completions`，尚未实现 ModelGateway / 产品 Skills 运行时。
+- 目标架构由 ModelGateway 使用逻辑模型名和 Provider Adapter 统一调用；教学任务经产品 Skills 编排；正式环境、稳定演示和最终验收默认采用 vLLM，Ollama 仅用于前期开发、兼容性验证和明确标注的降级。
 - vLLM 与 Ollama 的模型 ID、Tokenizer、Chat Template、量化和输出行为必须分别登记并通过同一套回归，不能仅通过修改 URL 就视为等价。
-- 模型接入升级以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` 为准；本说明不表示目标网关已经实现。
+- 模型接入、Skills、Memory 升级以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v0.5+）为准；本说明不表示目标能力已经实现。
+- 用户注册与认证分级在**思政课平台用户管理**实现；本 API 目标态校验平台身份 claims，**不实现**手机注册/KYC（见计划 §2.6）。当前仍为本地 JWT 登录 MVP。
 
 ## 运行与验证
 

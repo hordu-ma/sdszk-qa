@@ -20,9 +20,13 @@ Instruction precedence follows the same order. Do not scan the entire `.github` 
 ## Scope
 
 - This file is the always-on workspace guidance. Keep it short and move domain-specific rules into scoped docs.
+- Product range, phases, acceptance, product Skills, and user Memory: `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` (v0.5+) is the single source of truth. Do not treat `2026-product-extension-*.md` as schedule.
+- User registration and identity upgrade (registered vs verified) are specified in plan §2.6 and **must be implemented in the 思政课平台 user-management system**, not in this repo. Do not add phone signup, SMS, or KYC flows here; only consume platform tokens/claims when integrating.
 - Use `src/docs/codex-harness.md` as the Codex validation harness entrypoint.
 - Keep `.github` for GitHub Actions plus Codex-readable auxiliary instructions, skills, hooks, and agent playbooks; use `.github/INDEX.md` before opening other `.github` files.
 - For large or cross-cutting work, prefer the closest matching skill or agent before editing code.
+- Do not implement teacher/student total scoring or ranking. Diagnosis is formative and evidence-based, not a score product.
+- Do not invent open agent tool markets or silent long-term user profiling; follow the plan's product Skills and Memory model when those features are built.
 
 ## Delivery Baseline
 
@@ -51,7 +55,8 @@ Instruction precedence follows the same order. Do not scan the entire `.github` 
 
 ## Conventions
 
-- Python uses 4 spaces, type hints on new or changed code, and thin FastAPI routes with business logic in `services`.
-- Vue files stay under `src/apps/web/src`; views use PascalCase filenames and shared API callers live in `src/api`.
+- Python uses 4 spaces, type hints on new or changed code, and thin FastAPI routes with business logic in `services` (today much chat orchestration still lives in `routes/chat.py`; prefer extracting when touching that path).
+- Vue files stay under `src/apps/web/src`; views use PascalCase filenames and shared API callers live in `src/api`. Target UX for teaching workflows is desktop-first workbench, not mobile-only chat.
 - Mock external LLM calls in tests. Do not depend on real model endpoints during CI or routine validation.
 - When updating Codex workflow customization, keep `AGENTS.md` minimal, keep `.instructions.md` files focused, and keep harness docs concise.
+- Prefer the vertical-sample engineering order in the development plan over parallel feature sprawl.
