@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # 低于该值视为资料不足。经中文样例标定：短语命中约 0.4–0.67，
     # 自然问句约 0.25，无关内容为 0。
     RETRIEVE_MIN_RELEVANCE: float = 0.15
+    RETRIEVE_CANDIDATE_LIMIT: int = 200
+    RETRIEVE_LEXICAL_WEIGHT: float = 0.7
+    RETRIEVE_VECTOR_WEIGHT: float = 0.3
 
     # JWT 配置
     JWT_SECRET: str = Field(..., min_length=1)

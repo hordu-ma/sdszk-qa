@@ -6,12 +6,18 @@
 from .audit_logs import AuditLog
 from .base import Base, TimestampMixin, to_dict
 from .cases import Case
-from .memory import ClassContextProfile, MemoryInjectionAudit, UserPreference
+from .memory import (
+    ClassContextProfile,
+    MemoryInjectionAudit,
+    PinnedMemoryItem,
+    UserPreference,
+)
 from .messages import Message
 from .sessions import Session
 from .skills import SkillDefinition
 from .users import User
 from .workbench import (
+    ArtifactExport,
     KnowledgeChunk,
     KnowledgeDocument,
     ModelCallAudit,
@@ -41,4 +47,6 @@ __all__ = [
     "UserPreference",
     "ClassContextProfile",
     "MemoryInjectionAudit",
+    "PinnedMemoryItem",
+    "ArtifactExport",
 ]

@@ -5,13 +5,25 @@ import zipfile
 
 import pytest
 
-from src.apps.api.services.knowledge_service import _ilike_pattern, chunk_text, extract_text
+from src.apps.api.models import TeachingProject
+from src.apps.api.services.knowledge_service import (
+    _char_vector_similarity,
+    _ilike_pattern,
+    chunk_text,
+    extract_text,
+)
+from src.apps.api.services.model_gateway import (
+    OllamaAdapter,
+    OpenAICompatibleAdapter,
+    resolve_provider_adapter,
+)
 from src.apps.api.services.skill_runtime import (
     SKILL_REGISTRY,
     RegisteredSkill,
     input_hash,
     register_skill,
 )
+from src.apps.api.services.vertical_sample_service import build_docx
 
 
 def test_extract_text_supports_markdown() -> None:
@@ -53,6 +65,58 @@ def test_registry_registers_retrieve_basis_baseline() -> None:
     assert skill.skill_version == "1.1.0"
     assert skill.maturity == "baseline"
     assert skill.required_roles == ()
+
+
+def test_registry_contains_vertical_sample_chain() -> None:
+    assert list(SKILL_REGISTRY) == [
+        "skill.retrieve_basis",
+        "skill.alignment_card",
+        "skill.design_blueprint",
+        "skill.generate_section",
+        "skill.diagnose_artifact",
+        "skill.export_artifact",
+    ]
+    assert all(item.degradation_policy for item in SKILL_REGISTRY.values())
+
+
+def test_char_vector_similarity_prefers_related_text() -> None:
+    related = _char_vector_similarity("家国情怀教学目标", "家国情怀目标与评价证据一致")
+    unrelated = _char_vector_similarity("家国情怀教学目标", "数据库备份与容器运行")
+    assert related > unrelated
+
+
+def test_build_docx_contains_required_ooxml_parts() -> None:
+    project = TeachingProject(
+        id=1,
+        owner_id=1,
+        title="高中议题式教学样板",
+        stage="高中",
+        course_type="议题式",
+    )
+    data = build_docx(
+        project,
+        {
+            "alignment_card": {"core_question": "如何理解家国情怀", "objectives": ["目标"]},
+            "design_blueprint": {"learning_tasks": [{"title": "研读"}]},
+            "lesson_design": {"section_name": "课时设计", "activities": [{"title": "讨论"}]},
+            "diagnosis": {"items": [{"dimension": "依据可追溯", "status": "aligned"}]},
+        },
+    )
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert "word/document.xml" in archive.namelist()
+        assert "高中议题式教学样板" in archive.read("word/document.xml").decode()
+
+
+def test_provider_adapters_parse_stream_contracts() -> None:
+    ollama = OllamaAdapter()
+    content, done = ollama.parse_line('{"message":{"content":"鲁韵"},"done":false}')
+    assert (content, done) == ("鲁韵", False)
+
+    openai = OpenAICompatibleAdapter()
+    content, done = openai.parse_line('data: {"choices":[{"delta":{"content":"思政"}}]}')
+    assert (content, done) == ("思政", False)
+    assert openai.parse_line("data: [DONE]") == ("", True)
+    assert isinstance(resolve_provider_adapter("vllm"), OpenAICompatibleAdapter)
 
 
 def test_registry_rejects_scoring_skills() -> None:

@@ -35,9 +35,7 @@ class ClassContextProfile(Base, TimestampMixin):
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_class_profile_user_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100))
     # 班额、设备、已知差异等用户自述内容；系统不推断、不补全
     context: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -53,9 +51,7 @@ class MemoryInjectionAudit(Base):
     __tablename__ = "memory_injection_audits"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     skill_run_id: Mapped[int] = mapped_column(
         ForeignKey("skill_runs.id", ondelete="CASCADE"), index=True
     )
@@ -63,3 +59,21 @@ class MemoryInjectionAudit(Base):
     memory_id: Mapped[int] = mapped_column()
     snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(server_default="now()", index=True)
+
+
+class PinnedMemoryItem(Base, TimestampMixin):
+    """用户显式钉选的项目或模板；只作为可管理工作记忆。"""
+
+    __tablename__ = "pinned_memory_items"
+    __table_args__ = (
+        UniqueConstraint("user_id", "item_type", "name", name="uq_pinned_item_user_type_name"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    item_type: Mapped[str] = mapped_column(String(30))
+    project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teaching_projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)

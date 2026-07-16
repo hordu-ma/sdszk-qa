@@ -7,8 +7,13 @@
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.apps.api.models import ClassContextProfile, UserPreference
-from src.apps.api.schemas.workbench import ClassProfileCreate, UserPreferenceUpdate
+from src.apps.api.models import PinnedMemoryItem, TeachingProject, UserPreference
+from src.apps.api.models.memory import ClassContextProfile
+from src.apps.api.schemas.workbench import (
+    ClassProfileCreate,
+    PinnedItemCreate,
+    UserPreferenceUpdate,
+)
 
 
 async def get_preference(db: AsyncSession, user_id: int) -> UserPreference | None:
@@ -64,7 +69,46 @@ async def delete_class_profile(db: AsyncSession, user_id: int, profile_id: int) 
     return _rowcount(result) > 0
 
 
-async def clear_memory(db: AsyncSession, user_id: int) -> tuple[bool, int]:
+async def list_pinned_items(db: AsyncSession, user_id: int) -> list[PinnedMemoryItem]:
+    result = await db.execute(
+        select(PinnedMemoryItem)
+        .where(PinnedMemoryItem.user_id == user_id)
+        .order_by(PinnedMemoryItem.updated_at.desc())
+    )
+    return list(result.scalars())
+
+
+async def create_pinned_item(
+    db: AsyncSession, user_id: int, data: PinnedItemCreate
+) -> PinnedMemoryItem:
+    if data.item_type == "project":
+        if data.project_id is None:
+            raise ValueError("钉选项目必须提供 project_id")
+        result = await db.execute(
+            select(TeachingProject).where(
+                TeachingProject.id == data.project_id,
+                TeachingProject.owner_id == user_id,
+            )
+        )
+        if result.scalar_one_or_none() is None:
+            raise ValueError("只能钉选本人教学项目")
+    item = PinnedMemoryItem(user_id=user_id, **data.model_dump())
+    db.add(item)
+    await db.flush()
+    return item
+
+
+async def delete_pinned_item(db: AsyncSession, user_id: int, item_id: int) -> bool:
+    result = await db.execute(
+        delete(PinnedMemoryItem).where(
+            PinnedMemoryItem.id == item_id,
+            PinnedMemoryItem.user_id == user_id,
+        )
+    )
+    return _rowcount(result) > 0
+
+
+async def clear_memory(db: AsyncSession, user_id: int) -> tuple[bool, int, int]:
     """一键清除本人全部 Memory；注入审计保留（历史留痕，不含可再注入内容）。"""
     preference_result = await db.execute(
         delete(UserPreference).where(UserPreference.user_id == user_id)
@@ -72,4 +116,11 @@ async def clear_memory(db: AsyncSession, user_id: int) -> tuple[bool, int]:
     profiles_result = await db.execute(
         delete(ClassContextProfile).where(ClassContextProfile.user_id == user_id)
     )
-    return _rowcount(preference_result) > 0, _rowcount(profiles_result)
+    pinned_result = await db.execute(
+        delete(PinnedMemoryItem).where(PinnedMemoryItem.user_id == user_id)
+    )
+    return (
+        _rowcount(preference_result) > 0,
+        _rowcount(profiles_result),
+        _rowcount(pinned_result),
+    )

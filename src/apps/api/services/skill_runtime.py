@@ -31,11 +31,28 @@ from src.apps.api.models import (
     UserPreference,
 )
 from src.apps.api.schemas.workbench import (
+    AlignmentCardInput,
+    AlignmentCardOutput,
+    DesignBlueprintInput,
+    DesignBlueprintOutput,
+    DiagnoseArtifactInput,
+    DiagnoseArtifactOutput,
+    ExportArtifactInput,
+    ExportArtifactOutput,
+    GenerateSectionInput,
+    GenerateSectionOutput,
     MemoryRef,
     RetrieveBasisInput,
     RetrieveBasisOutput,
 )
 from src.apps.api.services.knowledge_service import retrieve_basis_handler
+from src.apps.api.services.vertical_sample_service import (
+    alignment_card_handler,
+    design_blueprint_handler,
+    diagnose_artifact_handler,
+    export_artifact_handler,
+    generate_section_handler,
+)
 
 SkillHandler = Callable[[AsyncSession, User, BaseModel, SkillRun], Awaitable[BaseModel]]
 
@@ -55,6 +72,11 @@ class RegisteredSkill:
     required_roles: tuple[str, ...] = ()  # 空表示所有已认证用户
     quota_class: str = "standard"
     timeout_ms: int = 30_000
+    max_retries: int = 0
+    model_logic_name: str | None = None
+    rule_set_version: str | None = None
+    knowledge_scope: str | None = None
+    degradation_policy: str | None = None
 
 
 SKILL_REGISTRY: dict[str, RegisteredSkill] = {}
@@ -93,6 +115,11 @@ async def ensure_definition(db: AsyncSession, skill: RegisteredSkill) -> SkillDe
             required_roles=list(skill.required_roles),
             quota_class=skill.quota_class,
             timeout_ms=skill.timeout_ms,
+            max_retries=skill.max_retries,
+            model_logic_name=skill.model_logic_name,
+            rule_set_version=skill.rule_set_version,
+            knowledge_scope=skill.knowledge_scope,
+            degradation_policy=skill.degradation_policy,
         )
         db.add(definition)
         await db.flush()
@@ -101,6 +128,15 @@ async def ensure_definition(db: AsyncSession, skill: RegisteredSkill) -> SkillDe
         definition.input_schema = skill.input_model.model_json_schema()
         definition.output_schema = skill.output_model.model_json_schema()
         definition.maturity = skill.maturity
+        definition.execution_mode = skill.execution_mode
+        definition.required_roles = list(skill.required_roles)
+        definition.quota_class = skill.quota_class
+        definition.timeout_ms = skill.timeout_ms
+        definition.max_retries = skill.max_retries
+        definition.model_logic_name = skill.model_logic_name
+        definition.rule_set_version = skill.rule_set_version
+        definition.knowledge_scope = skill.knowledge_scope
+        definition.degradation_policy = skill.degradation_policy
         await db.flush()
     return definition
 
@@ -112,9 +148,7 @@ async def sync_skill_registry(db: AsyncSession) -> None:
     await db.commit()
 
 
-async def resolve_memory_refs(
-    db: AsyncSession, user: User, refs: list[MemoryRef]
-) -> list[dict]:
+async def resolve_memory_refs(db: AsyncSession, user: User, refs: list[MemoryRef]) -> list[dict]:
     """解析用户显式确认的记忆引用；已删除或越权引用一律拒绝。"""
     resolved: list[dict] = []
     for ref in refs:
@@ -179,9 +213,7 @@ async def run_skill(
         raise BusinessError("Skill 不存在", status_code=404, error_code="skill_not_found")
     definition = await ensure_definition(db, skill)
     if definition.status != "enabled":
-        raise BusinessError(
-            "Skill 已停用", status_code=409, error_code="skill_disabled"
-        )
+        raise BusinessError("Skill 已停用", status_code=409, error_code="skill_disabled")
     if skill.required_roles and user.role not in skill.required_roles:
         raise BusinessError(
             "当前角色无权执行该 Skill", status_code=403, error_code="skill_forbidden"
@@ -246,7 +278,7 @@ async def run_skill(
     return run, output
 
 
-# ---- 阶段 1 Skill 注册（当前仅 retrieve_basis 达到基线成熟度） ----
+# ---- 阶段 1 Skill 注册：查依据—备课—诊断—导出纵向样板 ----
 
 register_skill(
     RegisteredSkill(
@@ -257,5 +289,76 @@ register_skill(
         output_model=RetrieveBasisOutput,
         handler=retrieve_basis_handler,  # pyright: ignore[reportArgumentType]
         maturity="baseline",
+        knowledge_scope="approved_project_documents",
+        degradation_policy="explicit_insufficient_basis",
+    )
+)
+
+register_skill(
+    RegisteredSkill(
+        skill_id="skill.alignment_card",
+        skill_version="1.0.0",
+        name="生成课程依据对齐卡",
+        input_model=AlignmentCardInput,
+        output_model=AlignmentCardOutput,
+        handler=alignment_card_handler,  # pyright: ignore[reportArgumentType]
+        maturity="vertical_sample",
+        knowledge_scope="approved_project_documents",
+        degradation_policy="draft_with_basis_warning",
+    )
+)
+
+register_skill(
+    RegisteredSkill(
+        skill_id="skill.design_blueprint",
+        skill_version="1.0.0",
+        name="生成目标—证据—任务蓝图",
+        input_model=DesignBlueprintInput,
+        output_model=DesignBlueprintOutput,
+        handler=design_blueprint_handler,  # pyright: ignore[reportArgumentType]
+        maturity="vertical_sample",
+        rule_set_version="high-school-inquiry-v1",
+        degradation_policy="require_alignment_card",
+    )
+)
+
+register_skill(
+    RegisteredSkill(
+        skill_id="skill.generate_section",
+        skill_version="1.0.0",
+        name="生成课时设计分块",
+        input_model=GenerateSectionInput,
+        output_model=GenerateSectionOutput,
+        handler=generate_section_handler,  # pyright: ignore[reportArgumentType]
+        maturity="vertical_sample",
+        rule_set_version="high-school-inquiry-v1",
+        degradation_policy="require_design_blueprint",
+    )
+)
+
+register_skill(
+    RegisteredSkill(
+        skill_id="skill.diagnose_artifact",
+        skill_version="1.0.0",
+        name="执行证据化轻量诊断",
+        input_model=DiagnoseArtifactInput,
+        output_model=DiagnoseArtifactOutput,
+        handler=diagnose_artifact_handler,  # pyright: ignore[reportArgumentType]
+        maturity="vertical_sample",
+        rule_set_version="high-school-inquiry-v1",
+        degradation_policy="return_attention_items_without_total_value",
+    )
+)
+
+register_skill(
+    RegisteredSkill(
+        skill_id="skill.export_artifact",
+        skill_version="1.0.0",
+        name="导出标准 Word 教学成果",
+        input_model=ExportArtifactInput,
+        output_model=ExportArtifactOutput,
+        handler=export_artifact_handler,  # pyright: ignore[reportArgumentType]
+        maturity="vertical_sample",
+        degradation_policy="require_diagnosis",
     )
 )

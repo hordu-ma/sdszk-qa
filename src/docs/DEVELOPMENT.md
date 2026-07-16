@@ -6,7 +6,7 @@
 ## 项目速览
 
 - 这是"鲁韵思政大模型"的代码仓库：一个面向思政课教师的教学智能支持平台。
-- 当前已实现：问答链路、教学项目/资料/任务、依据检索、Skills 运行时最小集、Memory 最小集。详见 [README](../../README.md)。
+- 当前已实现：问答链路、教学项目/资料/任务、降级混合检索、六个样板 Skills、显式 Memory、纵向样板、版本差异和 Word 导出。详见 [README](../../README.md)。
 - 产品范围、阶段和验收只看一份文档：[主开发计划](2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0）。目标能力不等于已实现能力，写文档和注释时不要混淆。
 
 目录结构：
@@ -20,7 +20,7 @@
 | `src/cases` | 种子案例数据 |
 | `src/docs` | 计划与文档 |
 
-阅读顺序：`AGENTS.md` → 本文 → 涉及产品范围时读主开发计划相关章节 → 需要具体工作流时经 `.github/INDEX.md` 找最小相关文档。
+阅读顺序：`AGENTS.md` → 本文 → 涉及产品范围时读主开发计划相关章节 → 开发样板时读[阶段 1 工程冻结基线](2026-stage1-g0-engineering-baseline.md) → 需要具体工作流时经 `.github/INDEX.md` 找最小相关文档。
 
 ## 环境准备（新 clone）
 

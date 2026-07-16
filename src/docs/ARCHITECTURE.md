@@ -9,7 +9,7 @@
 | --- | --- |
 | `src/apps/api/main.py` | 应用入口：中间件、异常处理、路由注册、启动恢复 |
 | `src/apps/api/routes/` | HTTP 层（auth / cases / sessions / chat / workbench），保持薄层 |
-| `src/apps/api/services/` | 业务层：问答编排、ModelClient、项目、知识处理、Skills 运行时、Memory |
+| `src/apps/api/services/` | 业务层：问答编排、Provider Adapter、项目、知识处理、Skills、Memory、纵向样板与导出 |
 | `src/apps/api/schemas/` | Pydantic 请求/响应与 Skill 输入输出契约 |
 | `src/apps/api/models/` | SQLAlchemy ORM（含 SkillDefinition 与 Memory 对象） |
 | `src/apps/api/migrations/` | Alembic 迁移 |
@@ -37,8 +37,9 @@ flowchart LR
 
 - **Skill 执行只有一个入口**：`skill_runtime.run_skill`。它负责权限检查、输入输出 Schema 校验、`input_hash`、Memory 注入审计和 SkillRun 生命周期；业务 handler 只做领域逻辑。
 - **Memory 不走暗道**：只有用户显式传入的 `memory_refs` 会被解析，解析前校验归属并写 `MemoryInjectionAudit`；已清除的引用会被拒绝。
-- **检索在数据库内完成**：`retrieve_basis` 用 pg_trgm 相似度在 PostgreSQL 内排序过滤，低于阈值时返回"资料不足"，不伪造依据。
-- **模型调用只认逻辑模型名**：ModelClient 屏蔽 Ollama / OpenAI 兼容接口差异并记录调用审计；换 Provider 不改业务代码。
+- **检索可降级且可替换**：`retrieve_basis` 以 pg_trgm 召回并用字符 n-gram 向量重排；低于阈值返回"资料不足"。正式 Embedding/Reranker 可替换同一候选/重排契约。
+- **模型调用只认逻辑模型名**：Ollama 与 OpenAI-compatible/vLLM Provider Adapter 屏蔽接口差异并记录调用审计；换 Provider 不改业务代码。
+- **样板版本不可变**：对齐卡、蓝图、课时设计和诊断各形成一个 ProjectVersion；导出件关联最终版本与 SkillRun。
 - **后台任务可恢复**：资料解析任务状态存库，应用重启后由 lifespan 自动恢复。
 
 ## 部署形态
@@ -67,15 +68,15 @@ flowchart LR
 
 | 组件 | 当前状态 | 目标（阶段） |
 | --- | --- | --- |
-| 检索 | pg_trgm 库内词法检索 + 资料不足阈值 | 全文 + 向量混合检索、Reranker、页码级引用（1B） |
-| Skills | 运行时最小集，仅 `retrieve_basis` v1.1.0 达基线；配额/降级字段已登记未启用 | 阶段 1 全部 Skills 注册，配额与降级策略生效（1B） |
-| Memory | 偏好 + 班情 + 注入审计 + 清除/导出 | 注入确认 UX、模板钉选、与生成类 Skills 联动（1B–2） |
-| 模型服务 | 最小 ModelClient（逻辑模型名 + 调用审计） | 完整 ModelGateway：注册、路由、能力发现、Provider 一致性回归 |
-| 教学成果 | 项目/版本骨架（content 为自由 JSON） | 结构化教学设计 Schema、生成/诊断/导出闭环（1B–2） |
+| 检索 | pg_trgm + 字符向量重排降级链、资料不足阈值 | 正式 Embedding/Reranker、页码级引用（D0/1B） |
+| Skills | 六个样板 Skill 统一运行、版本与降级契约 | 专家冻结的完整阶段 1 目录、正式额度与质量门禁 |
+| Memory | 偏好 + 班情 + 钉选 + 显式界面确认 + 审计/清除/导出 | 保留/删除 SLA、授权共享模板（阶段 2–3） |
+| 模型服务 | 逻辑模型名 + Ollama/OpenAI-compatible Adapter + 调用审计 | 模型注册、能力路由、Provider 一致性与固定 vLLM 资产 |
+| 教学成果 | 高中议题式结构化生成、非评分诊断、版本差异、Word 导出技术样板 | 专家回归后的纵向样板和其他学段扩展 |
 | 身份 | 本地 JWT 登录（过渡） | 校验思政课平台签发的 claims，本仓不做注册/KYC（计划 §2.6） |
 | 多智能体 / 多模态 | 未开始 | 阶段 4 门禁式交付，Agent 只能调用 Skills 注册表 |
 
-其余阶段 1 Skills 的输入输出 Schema 属阶段 0《产品 Skills 目录 v1》冻结范围，未冻结前不在代码内发明契约。
+当前六个 Skill 的工程契约见《阶段 1 工程冻结基线》；专家与客户未签字前只作为技术样板，不构成 G0/G1 通过。
 
 ## 阶段 1 工程顺序（计划 §5.4.1 摘要）
 
@@ -84,8 +85,8 @@ flowchart LR
 → 6 Skills 运行时 → 7 Memory 最小集 → 8 样板生成-诊断-导出 → 9 桌面工作台 → 10 双环境晋级
 ```
 
-当前位置：第 1–7 步已有最小基线（第 5 步的向量腿待 D0 选型），第 8 步起未开始。
+当前位置：第 1–9 步已有单一高中议题式技术样板；第 5 步当前使用字符向量降级链，正式语义模型待 D0；第 10 步 `luyun-demo` 晋级未完成。
 
 ## 一句话总结
 
-问答链路、教学项目/资料/任务、库内检索、Skills 运行时和 Memory 最小集已在 `luyun-int` 共同运行；接下来按计划补齐向量检索、纵向样板、完整 ModelGateway 和 `luyun-demo` 晋级。
+问答兼容链路与高中议题式“查依据—备课—诊断—导出”技术样板已经同构；下一门槛是正式语义模型、专家回归和 `luyun-demo` 同镜像晋级，而不是横向铺更多模块。

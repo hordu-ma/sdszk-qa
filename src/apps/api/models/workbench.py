@@ -18,9 +18,7 @@ class TeachingProject(Base, TimestampMixin):
     __tablename__ = "teaching_projects"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    owner_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     stage: Mapped[str] = mapped_column(String(50))
     course_type: Mapped[str] = mapped_column(String(50))
@@ -64,9 +62,7 @@ class KnowledgeDocument(Base, TimestampMixin):
     project_id: Mapped[int] = mapped_column(
         ForeignKey("teaching_projects.id", ondelete="CASCADE"), index=True
     )
-    owner_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     filename: Mapped[str] = mapped_column(String(255))
     content_type: Mapped[str] = mapped_column(String(120))
     object_key: Mapped[str] = mapped_column(String(500), unique=True)
@@ -108,9 +104,7 @@ class TaskRun(Base, TimestampMixin):
     __tablename__ = "task_runs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     project_id: Mapped[int | None] = mapped_column(
         ForeignKey("teaching_projects.id", ondelete="CASCADE"), nullable=True, index=True
     )
@@ -132,9 +126,7 @@ class SkillRun(Base, TimestampMixin):
     __tablename__ = "skill_runs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     project_id: Mapped[int | None] = mapped_column(
         ForeignKey("teaching_projects.id", ondelete="CASCADE"), nullable=True, index=True
     )
@@ -170,4 +162,27 @@ class ModelCallAudit(Base):
     completion_tokens: Mapped[int | None] = mapped_column(nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default="now()", index=True)
+
+
+class ArtifactExport(Base):
+    """由 export_artifact Skill 生成、可鉴权下载的不可变导出件。"""
+
+    __tablename__ = "artifact_exports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("teaching_projects.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    skill_run_id: Mapped[int] = mapped_column(
+        ForeignKey("skill_runs.id", ondelete="RESTRICT"), unique=True, index=True
+    )
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("project_versions.id", ondelete="RESTRICT"), index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255))
+    object_key: Mapped[str] = mapped_column(String(500), unique=True)
+    checksum_sha256: Mapped[str] = mapped_column(String(64))
+    template_version: Mapped[str] = mapped_column(String(30))
     created_at: Mapped[datetime] = mapped_column(server_default="now()", index=True)

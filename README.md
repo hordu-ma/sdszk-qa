@@ -11,8 +11,8 @@
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |
 | 问答 MVP | 可用 | 登录、主题、会话、历史、SSE 流式问答 |
-| 阶段 1A | 进行中 | 已部署 `luyun-int` 并经 Virtus 验证；尚未满足 1A 全部验收条件 |
-| 阶段 1B / G1 | 未开始验收 | 纵向样板、导出、专家评测与稳定环境晋级未完成 |
+| 阶段 1A | 工程底座可用，整体未验收 | `luyun-int` 与 Virtus 已验证；正式语义模型和完整 G0 外部签字未完成 |
+| 阶段 1B / G1 | 技术样板可运行，未通过 G1 | 高中议题式生成—诊断—版本—Word 闭环已实现；专业评测与稳定环境晋级未完成 |
 | Base-Spark 接入 | 链路已通 | Tailnet HTTPS 可访问；ACL 授权由 Tailnet 管理侧负责 |
 
 ### 已实现能力
@@ -26,10 +26,12 @@
 
 - 教学项目与版本：创建项目、保存不可变版本快照
 - 资料库：上传（DOCX / 文本 PDF / Markdown / TXT）、后台解析分块、审核门禁（未审核资料不进入检索）
-- 依据检索：`skill.retrieve_basis`，PostgreSQL 库内相似度排序，检索不到可靠依据时明确提示"资料不足"
-- Skills 运行时：Skill 注册表 + 统一执行入口（权限、输入输出校验、运行审计、停用开关）；当前仅注册 `retrieve_basis`
-- Memory：账户偏好、班情档案，注入必须由用户显式指定并留审计，支持一键清除和导出
+- 依据检索：`skill.retrieve_basis`，`pg_trgm` 召回 + 字符向量重排的可回归降级链，检索不到可靠依据时明确提示"资料不足"
+- Skills 运行时：统一权限、Schema、运行审计、停用与降级契约；已注册查依据、对齐卡、蓝图、分块生成、形成性诊断和导出六个 Skill
+- Memory：账户偏好、班情档案、项目/模板钉选；每次注入必须由用户在界面显式勾选，支持导出和一键清除
 - 异步任务：排队、进度、取消、重试，应用重启后自动恢复
+- 高中议题式样板：依据对齐卡 → 目标—证据—任务蓝图 → 课时分块 → 非评分诊断 → 标准 Word 导出
+- 版本工作区：每步形成不可变版本，可查看结构化差异，并追溯到 SkillRun、来源版本和导出模板
 
 **工程质量**
 
@@ -39,7 +41,7 @@
 
 ### 尚未完成（主要项）
 
-向量混合检索（待模型选型）、其余阶段 1 Skills（待阶段 0 目录冻结）、Memory 注入确认界面、教学设计生成/诊断/导出的纵向样板、固定版本 vLLM、`luyun-demo` 稳定演示环境。完整清单见主开发计划 §1.2。
+正式语义 Embedding/Reranker、专家审核的完整阶段 1 Skill/规则目录、120–160 个案例专业回归、固定版本 vLLM、`luyun-demo` 稳定演示环境和 G0/G1 外部签字。当前字符向量链是可运行降级基线，不冒充最终语义混合 RAG。完整清单见主开发计划 §1.2。
 
 ## 系统组成
 
@@ -54,7 +56,7 @@
 ## 主要使用流程
 
 - **问答：** 登录 → 选主题 → 创建会话 → 流式问答 → 查看历史
-- **工作台：** 登录 → 创建项目/版本 → 上传资料 → 审核 → 检索依据（可注入班情 Memory）→ 查看任务留痕
+- **工作台：** 登录 → 创建项目 → 上传并审核资料 → 显式选择 Memory → 依序运行纵向样板 → 诊断/版本差异 → 导出 Word
 
 ## 关键接口
 
@@ -63,8 +65,9 @@
 - 对话：`POST /api/chat`（SSE）
 - 项目与任务：`/api/workbench/projects`、`/api/workbench/tasks`
 - 资料：`/api/workbench/projects/{id}/documents`、`/api/workbench/documents/{id}/review`
-- Skills：`GET /api/workbench/skills`、`POST /api/workbench/skills/retrieve-basis`
-- Memory：`/api/workbench/memory/preference`、`/api/workbench/memory/class-profiles`、`/api/workbench/memory/export`、`POST /api/workbench/memory/clear`
+- Skills：`GET /api/workbench/skills`、`POST /api/workbench/skills/{retrieve-basis|alignment-card|design-blueprint|generate-section|diagnose-artifact|export-artifact}`
+- Memory：`/api/workbench/memory/preference`、`class-profiles`、`pinned-items`、`export`、`clear`
+- 版本/导出：`/api/workbench/projects/{id}/versions`、`versions/diff`、`/api/workbench/exports/{id}/download`
 
 ## 快速开始
 
@@ -83,6 +86,7 @@ make test-integration    # 集成测试
 | --- | --- | --- |
 | [主开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md) | 范围、阶段 0–4、验收、Skills/Memory 设计（唯一权威） | 涉及产品范围、排期、验收时 |
 | [开发指南](src/docs/DEVELOPMENT.md) | 上手、命令、验证分层、交付标准 | 开始开发前 |
+| [阶段 1 工程冻结基线](src/docs/2026-stage1-g0-engineering-baseline.md) | 当前样板、Skills、Memory、诊断与外部签字边界 | 开发或验收纵向样板时 |
 | [架构说明](src/docs/ARCHITECTURE.md) | 当前结构与目标架构边界 | 了解代码组织时 |
 | [基础设施说明](src/infra/README.md) | Compose、部署、base-spark 运维手册 | 部署与运维时 |
 | [AGENTS.md](AGENTS.md) | coding agent 的工作规则 | agent 交付前 |
@@ -115,4 +119,5 @@ make test-integration    # 集成测试
 - 问答：messages、sessions、audit_logs
 - 工作台：teaching_projects、project_versions、knowledge_documents、knowledge_chunks
 - 运行留痕：task_runs、skill_runs（含 input_hash、memory_refs、error_code）、model_call_audits
-- Skills 与 Memory：skill_definitions、user_preferences、class_context_profiles、memory_injection_audits
+- Skills 与 Memory：skill_definitions、user_preferences、class_context_profiles、pinned_memory_items、memory_injection_audits
+- 导出：artifact_exports（关联项目、版本、SkillRun、模板和校验和）

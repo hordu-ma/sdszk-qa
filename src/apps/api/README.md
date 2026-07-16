@@ -1,6 +1,6 @@
 # API 模块说明（鲁韵思政）
 
-本目录包含鲁韵思政后端 API，基于 FastAPI + SQLAlchemy（异步）构建，当前提供认证、主题/会话、SSE 流式问答，以及阶段 1A 项目、版本、知识资料、任务和依据检索基础能力。
+本目录包含鲁韵思政后端 API，基于 FastAPI + SQLAlchemy（异步）构建，当前提供认证、主题/会话、SSE 流式问答，以及项目、知识资料、任务、显式 Memory 和高中议题式纵向样板能力。
 
 > 基础设施与部署请参考：`src/infra/README.md`。
 
@@ -50,8 +50,8 @@ api/
 - `routes/chat.py`
   - SSE 流式问答（核心链路，`POST /api/chat`）
 - `routes/workbench.py`
-  - 教学项目/版本、资料上传与审核、任务列表、Skill 列表与 `retrieve_basis`
-  - Memory 端点：偏好读写、班情档案增删查、导出与一键清除
+  - 教学项目/版本/差异、资料上传与审核、任务、六个样板 Skill 与 Word 导出
+  - Memory 端点：偏好、班情、项目/模板钉选、导出与一键清除
   - 资料审核仅限 `reviewer`/`admin` 角色，阶段 1A 审核范围为全库（可审任意用户资料）；组织级隔离按计划 WP2.5 在阶段 2 引入
 
 ## 服务层（services）
@@ -59,13 +59,14 @@ api/
 - `chat_orchestration.py`：提示词、会话上下文和 token 估算。
 - `model_gateway.py`：最小 ModelClient、Ollama/OpenAI 兼容调用、统一错误和调用审计。
 - `project_service.py`：教学项目和版本操作。
-- `knowledge_service.py`：资料解析、任务恢复、审核过滤和 pg_trgm 库内词法检索（`search_chunks` + `retrieve_basis_handler`）。
+- `knowledge_service.py`：资料解析、任务恢复、审核过滤，以及 pg_trgm + 字符向量重排降级链。
 - `skill_runtime.py`：Skill 注册表、权限与 Schema 校验、Memory 注入审计和 SkillRun 生命周期；`run_skill` 是唯一 Skill 执行入口。
-- `memory_service.py`：偏好、班情档案、一键清除与导出。
+- `memory_service.py`：偏好、班情、钉选、一键清除与导出。
+- `vertical_sample_service.py`：对齐卡、蓝图、课时分块、形成性诊断、版本差异和 DOCX 导出。
 当前边界（详见架构说明）：
 
-- 仅 `skill.retrieve_basis`（v1.1.0）达到基线成熟度；其余阶段 1 Skills 待阶段 0 目录冻结后注册。
-- 配额/降级策略字段已登记但未启用执行；向量混合检索待 D0 选型。
+- `retrieve_basis` 为 baseline；其余五个 Skill 为 vertical_sample，外部专业签字前不冒充正式产品成熟度。
+- 配额/降级契约已登记；字符向量重排是可回归降级链，正式语义 Embedding/Reranker 待 D0。
 - Memory 注入只接受用户显式传入的 `memory_refs`，不做任何自动注入。
 - 禁止实现评分/排名模块：`tests/test_no_scoring_paths.py` 做防护断言，`register_skill` 拒绝评分类 skill_id。
 
@@ -85,7 +86,8 @@ api/
 - `knowledge_documents` / `knowledge_chunks`：资料与片段
 - `task_runs` / `skill_runs` / `model_call_audits`：任务、Skill 与模型调用留痕
 - `skill_definitions`：注册 Skill 的版本、Schema、权限与停用开关
-- `user_preferences` / `class_context_profiles` / `memory_injection_audits`：Memory 对象与注入审计
+- `user_preferences` / `class_context_profiles` / `pinned_memory_items` / `memory_injection_audits`：Memory 对象与注入审计
+- `artifact_exports`：关联项目、版本、SkillRun、模板与校验和的导出件
 
 ## 调用链路
 
@@ -96,7 +98,7 @@ api/
 
 ## 模型服务边界
 
-- 当前问答通过最小 ModelClient 使用 `LLM_LOGICAL_MODEL`、`LLM_PROVIDER` 和 Provider 模型 ID，支持 Ollama 原生流式接口或 OpenAI 兼容接口，并记录模型调用审计。
+- 当前问答通过逻辑模型名和 Provider Adapter 支持 Ollama 原生流式接口或 OpenAI-compatible/vLLM 接口，并记录模型调用审计。
 - 完整目标仍是 ModelGateway 的模型注册、任务路由、能力发现和 Provider Adapter 一致性回归；正式环境、稳定演示和最终验收默认采用 vLLM，Ollama 仅用于前期开发、兼容性验证和明确标注的降级。
 - vLLM 与 Ollama 的模型 ID、Tokenizer、Chat Template、量化和输出行为必须分别登记并通过同一套回归，不能仅通过修改 URL 就视为等价。
 - 模型接入、Skills、Memory 升级以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）为准；本说明不表示目标能力已经实现。

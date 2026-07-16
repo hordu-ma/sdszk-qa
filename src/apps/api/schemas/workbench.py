@@ -139,6 +139,9 @@ class SkillInfo(BaseModel):
     execution_mode: str
     maturity: str
     required_roles: list[str]
+    quota_class: str
+    timeout_ms: int
+    degradation_policy: str | None
 
 
 class UserPreferenceUpdate(BaseModel):
@@ -176,13 +179,174 @@ class ClassProfileResponse(BaseModel):
     updated_at: datetime
 
 
+class PinnedItemCreate(BaseModel):
+    item_type: str = Field(pattern="^(project|template)$")
+    project_id: int | None = None
+    name: str = Field(min_length=1, max_length=120)
+    payload: dict = Field(default_factory=dict)
+
+
+class PinnedItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    item_type: str
+    project_id: int | None
+    name: str
+    payload: dict
+    created_at: datetime
+    updated_at: datetime
+
+
 class MemoryExportResponse(BaseModel):
     """个人记忆清单导出（计划 WP1.3c：可导出、可清除）。"""
 
     preference: UserPreferenceResponse | None
     class_profiles: list[ClassProfileResponse]
+    pinned_items: list[PinnedItemResponse] = Field(default_factory=list)
 
 
 class MemoryClearResponse(BaseModel):
     cleared_preference: bool
     cleared_class_profiles: int
+    cleared_pinned_items: int
+
+
+class AlignmentCardInput(BaseModel):
+    project_id: int
+    topic: str = Field(min_length=2, max_length=200)
+    core_question: str = Field(min_length=2, max_length=500)
+    basis_query: str = Field(min_length=2, max_length=500)
+
+
+class AlignmentCardOutput(BaseModel):
+    topic: str
+    core_question: str
+    objectives: list[str]
+    basis_summary: list[str]
+    citations: list[BasisCitation]
+    warnings: list[str]
+    version_number: int
+
+
+class AlignmentCardRequest(AlignmentCardInput):
+    memory_refs: list[MemoryRef] = Field(default_factory=list, max_length=10)
+
+
+class AlignmentCardResponse(AlignmentCardOutput):
+    skill_run_id: int
+    skill_id: str = "skill.alignment_card"
+    skill_version: str
+
+
+class DesignBlueprintInput(BaseModel):
+    project_id: int
+    lesson_minutes: int = Field(default=45, ge=20, le=180)
+
+
+class DesignBlueprintOutput(BaseModel):
+    core_question: str
+    objectives: list[str]
+    evidence: list[str]
+    learning_tasks: list[dict]
+    lesson_minutes: int
+    version_number: int
+
+
+class DesignBlueprintRequest(DesignBlueprintInput):
+    memory_refs: list[MemoryRef] = Field(default_factory=list, max_length=10)
+
+
+class DesignBlueprintResponse(DesignBlueprintOutput):
+    skill_run_id: int
+    skill_id: str = "skill.design_blueprint"
+    skill_version: str
+
+
+class GenerateSectionInput(BaseModel):
+    project_id: int
+    section_name: str = Field(default="课时设计", min_length=2, max_length=100)
+    guidance: str = Field(default="", max_length=1000)
+
+
+class GenerateSectionOutput(BaseModel):
+    section_name: str
+    opening: str
+    activities: list[dict]
+    assessment_evidence: list[str]
+    teacher_notes: list[str]
+    version_number: int
+
+
+class GenerateSectionRequest(GenerateSectionInput):
+    memory_refs: list[MemoryRef] = Field(default_factory=list, max_length=10)
+
+
+class GenerateSectionResponse(GenerateSectionOutput):
+    skill_run_id: int
+    skill_id: str = "skill.generate_section"
+    skill_version: str
+
+
+class DiagnoseArtifactInput(BaseModel):
+    project_id: int
+
+
+class DiagnosisItem(BaseModel):
+    dimension: str
+    status: str = Field(pattern="^(aligned|needs_attention)$")
+    evidence: str
+    suggestion: str
+
+
+class DiagnoseArtifactOutput(BaseModel):
+    conclusion: str
+    items: list[DiagnosisItem]
+    blocking_issues: list[str]
+    version_number: int
+
+
+class DiagnoseArtifactRequest(DiagnoseArtifactInput):
+    memory_refs: list[MemoryRef] = Field(default_factory=list, max_length=10)
+
+
+class DiagnoseArtifactResponse(DiagnoseArtifactOutput):
+    skill_run_id: int
+    skill_id: str = "skill.diagnose_artifact"
+    skill_version: str
+
+
+class ExportArtifactInput(BaseModel):
+    project_id: int
+    template_name: str = Field(default="standard-v1", min_length=2, max_length=100)
+
+
+class ExportArtifactOutput(BaseModel):
+    export_id: int
+    filename: str
+    download_url: str
+    template_version: str
+    version_number: int
+
+
+class ExportArtifactRequest(ExportArtifactInput):
+    memory_refs: list[MemoryRef] = Field(default_factory=list, max_length=10)
+
+
+class ExportArtifactResponse(ExportArtifactOutput):
+    skill_run_id: int
+    skill_id: str = "skill.export_artifact"
+    skill_version: str
+
+
+class VersionDiffSection(BaseModel):
+    section: str
+    before: object | None
+    after: object | None
+
+
+class VersionDiffResponse(BaseModel):
+    project_id: int
+    from_version: int
+    to_version: int
+    changed_sections: list[VersionDiffSection]

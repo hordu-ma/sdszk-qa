@@ -3,6 +3,8 @@
 import json
 import time
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from typing import Protocol
 
 import httpx
 
@@ -17,6 +19,79 @@ class ModelGatewayError(Exception):
     def __init__(self, message: str, code: str) -> None:
         self.code = code
         super().__init__(message)
+
+
+@dataclass(frozen=True)
+class ProviderRequest:
+    url: str
+    payload: dict
+
+
+class ProviderAdapter(Protocol):
+    """模型 Provider 适配契约；业务层只使用逻辑模型名。"""
+
+    def build_request(
+        self, messages: list[dict[str, str]], *, max_tokens: int
+    ) -> ProviderRequest: ...
+
+    def parse_line(self, line: str) -> tuple[str, bool]: ...
+
+
+class OllamaAdapter:
+    def build_request(
+        self, messages: list[dict[str, str]], *, max_tokens: int
+    ) -> ProviderRequest:
+        return ProviderRequest(
+            url=f"{settings.LLM_BASE_URL.rstrip('/')}/api/chat",
+            payload={
+                "model": settings.LLM_MODEL,
+                "messages": messages,
+                "stream": True,
+                "think": False,
+                "options": {
+                    "temperature": settings.LLM_TEMPERATURE,
+                    "num_predict": max_tokens,
+                },
+            },
+        )
+
+    def parse_line(self, line: str) -> tuple[str, bool]:
+        chunk = json.loads(line.strip())
+        return str(chunk.get("message", {}).get("content", "")), bool(chunk.get("done"))
+
+
+class OpenAICompatibleAdapter:
+    def build_request(
+        self, messages: list[dict[str, str]], *, max_tokens: int
+    ) -> ProviderRequest:
+        return ProviderRequest(
+            url=f"{settings.LLM_BASE_URL.rstrip('/')}/v1/chat/completions",
+            payload={
+                "model": settings.LLM_MODEL,
+                "messages": messages,
+                "stream": True,
+                "temperature": settings.LLM_TEMPERATURE,
+                "max_tokens": max_tokens,
+            },
+        )
+
+    def parse_line(self, line: str) -> tuple[str, bool]:
+        if not line.startswith("data: "):
+            return "", False
+        data = line.removeprefix("data: ").strip()
+        if data == "[DONE]":
+            return "", True
+        chunk = json.loads(data)
+        content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+        return str(content), False
+
+
+def resolve_provider_adapter(provider: str) -> ProviderAdapter:
+    if provider.lower() == "ollama":
+        return OllamaAdapter()
+    if provider.lower() in {"vllm", "openai_compatible", "openai"}:
+        return OpenAICompatibleAdapter()
+    raise ModelGatewayError(f"不支持的模型 Provider: {provider}", "provider_unsupported")
 
 
 class ModelClient:
@@ -35,33 +110,13 @@ class ModelClient:
         error_code: str | None = None
         completion_chars = 0
         try:
-            is_ollama = settings.LLM_PROVIDER.lower() == "ollama"
-            if is_ollama:
-                url = f"{settings.LLM_BASE_URL.rstrip('/')}/api/chat"
-                payload = {
-                    "model": settings.LLM_MODEL,
-                    "messages": messages,
-                    "stream": True,
-                    "think": False,
-                    "options": {
-                        "temperature": settings.LLM_TEMPERATURE,
-                        "num_predict": max_tokens,
-                    },
-                }
-            else:
-                url = f"{settings.LLM_BASE_URL.rstrip('/')}/v1/chat/completions"
-                payload = {
-                    "model": settings.LLM_MODEL,
-                    "messages": messages,
-                    "stream": True,
-                    "temperature": settings.LLM_TEMPERATURE,
-                    "max_tokens": max_tokens,
-                }
+            adapter = resolve_provider_adapter(settings.LLM_PROVIDER)
+            provider_request = adapter.build_request(messages, max_tokens=max_tokens)
             async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
                 async with client.stream(
                     "POST",
-                    url,
-                    json=payload,
+                    provider_request.url,
+                    json=provider_request.payload,
                 ) as response:
                     if response.status_code != 200:
                         body = (await response.aread()).decode(errors="replace")[:500]
@@ -72,29 +127,10 @@ class ModelClient:
                     async for line in response.aiter_lines():
                         if not line:
                             continue
-                        data_str = (
-                            line.strip()
-                            if is_ollama
-                            else line.removeprefix("data: ").strip()
-                        )
-                        if not is_ollama and not line.startswith("data: "):
-                            continue
-                        if data_str == "[DONE]":
-                            break
                         try:
-                            chunk = json.loads(data_str)
+                            content, done = adapter.parse_line(line)
                         except json.JSONDecodeError:
                             continue
-                        if is_ollama:
-                            content = chunk.get("message", {}).get("content", "")
-                            done = bool(chunk.get("done"))
-                        else:
-                            content = (
-                                chunk.get("choices", [{}])[0]
-                                .get("delta", {})
-                                .get("content", "")
-                            )
-                            done = False
                         if content:
                             completion_chars += len(content)
                             yield content

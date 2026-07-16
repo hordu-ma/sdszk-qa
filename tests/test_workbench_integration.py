@@ -46,15 +46,19 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
 
     source = "课程标准指出家国情怀教学目标应与学习任务和评价证据保持一致。".encode()
 
-    async def _put_object(*args: object, **kwargs: object) -> None:
-        del args, kwargs
+    objects: dict[str, bytes] = {}
 
-    async def _get_object(*args: object, **kwargs: object) -> bytes:
-        del args, kwargs
-        return source
+    async def _put_object(object_key: str, data: bytes, content_type: str) -> None:
+        del content_type
+        objects[object_key] = data
+
+    async def _get_object(object_key: str) -> bytes:
+        return objects.get(object_key, source)
 
     monkeypatch.setattr("src.apps.api.routes.workbench.put_object", _put_object)
+    monkeypatch.setattr("src.apps.api.routes.workbench.get_object", _get_object)
     monkeypatch.setattr("src.apps.api.services.knowledge_service.get_object", _get_object)
+    monkeypatch.setattr("src.apps.api.services.vertical_sample_service.put_object", _put_object)
 
     try:
         transport = httpx.ASGITransport(app=app)
@@ -100,9 +104,75 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             )
             assert retrieval.status_code == 200
             assert retrieval.json()["insufficient_basis"] is False
-            assert retrieval.json()["retrieval_mode"] == "lexical_trgm"
+            assert retrieval.json()["retrieval_mode"] == "hybrid_trgm_char_vector"
             assert retrieval.json()["skill_version"] == "1.1.0"
             assert retrieval.json()["citations"][0]["filename"] == "basis.md"
+
+            alignment = await client.post(
+                "/api/workbench/skills/alignment-card",
+                json={
+                    "project_id": project_id,
+                    "topic": "高中家国情怀议题式教学",
+                    "core_question": "青年如何把个人理想融入国家发展",
+                    "basis_query": "家国情怀教学目标",
+                },
+                headers=headers,
+            )
+            assert alignment.status_code == 200
+            assert alignment.json()["version_number"] == 2
+            assert alignment.json()["citations"]
+
+            blueprint = await client.post(
+                "/api/workbench/skills/design-blueprint",
+                json={"project_id": project_id, "lesson_minutes": 45},
+                headers=headers,
+            )
+            assert blueprint.status_code == 200
+            assert len(blueprint.json()["learning_tasks"]) == 3
+
+            generated = await client.post(
+                "/api/workbench/skills/generate-section",
+                json={"project_id": project_id, "guidance": "增加同伴互评"},
+                headers=headers,
+            )
+            assert generated.status_code == 200
+            assert generated.json()["activities"]
+
+            diagnosis = await client.post(
+                "/api/workbench/skills/diagnose-artifact",
+                json={"project_id": project_id},
+                headers=headers,
+            )
+            assert diagnosis.status_code == 200
+            assert diagnosis.json()["conclusion"] == "可进入教师确认"
+            assert all(item["status"] == "aligned" for item in diagnosis.json()["items"])
+
+            exported = await client.post(
+                "/api/workbench/skills/export-artifact",
+                json={"project_id": project_id, "template_name": "standard-v1"},
+                headers=headers,
+            )
+            assert exported.status_code == 200
+            download = await client.get(exported.json()["download_url"], headers=headers)
+            assert download.status_code == 200
+            assert download.content.startswith(b"PK")
+
+            versions = await client.get(
+                f"/api/workbench/projects/{project_id}/versions", headers=headers
+            )
+            assert len(versions.json()) == 5
+            diff = await client.get(
+                f"/api/workbench/projects/{project_id}/versions/diff",
+                params={"from_version": 1, "to_version": 5},
+                headers=headers,
+            )
+            assert diff.status_code == 200
+            assert {item["section"] for item in diff.json()["changed_sections"]} >= {
+                "alignment_card",
+                "design_blueprint",
+                "lesson_design",
+                "diagnosis",
+            }
 
             tasks = await client.get(
                 "/api/workbench/tasks", params={"project_id": project_id}, headers=headers
@@ -179,6 +249,7 @@ async def test_review_requires_reviewer_role_and_allows_cross_user(
                 headers=teacher_headers,
             )
             project_id = project.json()["id"]
+
             upload = await client.post(
                 f"/api/workbench/projects/{project_id}/documents",
                 files={"file": ("basis.md", source, "text/markdown")},
@@ -240,7 +311,14 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
 
             skills = await client.get("/api/workbench/skills", headers=headers)
             assert skills.status_code == 200
-            assert [item["skill_id"] for item in skills.json()] == ["skill.retrieve_basis"]
+            assert [item["skill_id"] for item in skills.json()] == [
+                "skill.retrieve_basis",
+                "skill.alignment_card",
+                "skill.design_blueprint",
+                "skill.generate_section",
+                "skill.diagnose_artifact",
+                "skill.export_artifact",
+            ]
             assert skills.json()[0]["status"] == "enabled"
 
             preference = await client.put(
@@ -264,6 +342,18 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
                 headers=headers,
             )
             project_id = project.json()["id"]
+
+            pinned = await client.post(
+                "/api/workbench/memory/pinned-items",
+                json={
+                    "item_type": "project",
+                    "project_id": project_id,
+                    "name": "记忆注入样板",
+                    "payload": {"reason": "常用样板"},
+                },
+                headers=headers,
+            )
+            assert pinned.status_code == 201
 
             memory_refs = [{"memory_type": "class_context_profile", "memory_id": profile_id}]
             retrieval = await client.post(
@@ -299,11 +389,13 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
             export = await client.get("/api/workbench/memory/export", headers=headers)
             assert export.json()["preference"]["default_stage"] == "初中"
             assert len(export.json()["class_profiles"]) == 1
+            assert len(export.json()["pinned_items"]) == 1
 
             cleared = await client.post("/api/workbench/memory/clear", headers=headers)
             assert cleared.json() == {
                 "cleared_preference": True,
                 "cleared_class_profiles": 1,
+                "cleared_pinned_items": 1,
             }
 
             rejected = await client.post(

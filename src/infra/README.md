@@ -227,11 +227,11 @@ Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当
 
 两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。
 
-阶段 1A 已实现 `luyun-int` Compose、loopback Web 入口、ModelClient/Provider 标识、项目/资料/任务、`retrieve_basis` 库内词法检索、产品 Skills 运行时最小集和核心用户 Memory 最小集。2026-07-16 已将增量镜像部署到 `luyun-int`，并完成迁移、备份、端到端功能、重启持久化、真实 SSE 与镜像回滚/恢复验收。`luyun-demo` 晋级、固定版本 vLLM、向量混合检索和完整纵向样板仍未完成，不得对外宣称完成。
+阶段 1 工程样板已在 `luyun-int` 形成“查依据—备课—诊断—导出”技术闭环：项目/版本、资料/任务、六个样板 Skills、显式 Memory、降级混合检索、非评分诊断、版本差异和 Word 导出均已部署。2026-07-16 已完成迁移往返、发布前备份、HTTPS 端到端功能、应用重启持久化、真实 SSE 与镜像回滚/恢复验收。`luyun-demo` 晋级、固定版本 vLLM、正式语义 Embedding/Reranker、专家回归和 G0/G1 外部签字仍未完成，不得对外宣称阶段整体完成。
 
 > 迁移 `f7b8c9d0e123` 起依赖 PostgreSQL 标准 contrib 扩展 `pg_trgm`（迁移内 `CREATE EXTENSION IF NOT EXISTS` 自动创建，要求数据库用户具备创建扩展权限；官方 postgres 镜像的 `POSTGRES_USER` 默认满足）。
 
-### Base-Spark 阶段 1A 集成环境
+### Base-Spark 阶段 1 集成环境
 
 敏感变量必须保存在仓库外。Base-Spark 当前使用 `/home/pgx/luyun-sizheng-int.env`（权限 `0600`）；Snap 版 Docker Compose 无法读取 `/home/pgx/.config/` 下的运行文件，不要把 env 移回该目录。该文件是**重新构建或重新创建容器**的前置条件，不要提交到 Git。首次部署或发布新镜像的顺序：
 
@@ -242,7 +242,9 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
 
-2026-07-16 验收基线：镜像 `stage1a-20260716-7f9e9b2`，迁移 `f7b8c9d0e123 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260716-112947/`。数据库迁移已经过 up/down/up，并已实测回滚至 `stage1a-20260715` 后再恢复新镜像。
+2026-07-16 当前验收基线：镜像 `stage1-sample-20260716-r2`，迁移 `h8c9d0e1f234 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260716-121140/`。数据库迁移已经过 `f7b8c9d0e123 → h8c9d0e1f234 → f7b8c9d0e123 → h8c9d0e1f234` 往返；`r1` 功能镜像已回滚至上一稳定版本 `stage1a-20260716-7f9e9b2` 并恢复，迁移一致性修正后重建为当前 `r2`，容器与 HTTPS 健康检查均通过。
+
+本次 HTTPS 验收已覆盖登录、六个 Skill、项目/资料/任务、审核、显式 Memory、对齐卡、蓝图、课时分块、非评分诊断、版本差异、Word 下载和 Memory 清除；下载文件头为有效 DOCX/ZIP。真实 Ollama SSE 返回 `[DONE]`，API 重启后问答消息仍可读取。用户已完成此前工作台的 Virtus 人工浏览器验收；本次新增纵向样板界面尚未另行标记为 Virtus 人工验收，服务器侧 HTTPS API 验收不替代该项。
 
 当前已有容器的日常启用不需要重建，也不需要再次执行 seed：
 
@@ -264,7 +266,7 @@ docker stop luyun-int-minio-1 luyun-int-postgres-1
 
 不要使用 `docker compose down -v` 或删除命名卷进行普通停用；`-v` 会删除数据库和对象存储数据。容器设置为 `restart: unless-stopped`，宿主重启后会自动恢复；如果曾手动 `docker stop`，需按上面的日常启用步骤重新启动。
 
-Base-Spark 当前防火墙不允许新建 Docker bridge 从宿主转发，因此阶段 1A Compose 使用 host network，但所有服务分别固定绑定独立 loopback 端口：Web `8088`、API `28000`、PostgreSQL `25432`、MinIO `29000/29001`。它们不会直接暴露给局域网或 Tailnet。
+Base-Spark 当前防火墙不允许新建 Docker bridge 从宿主转发，因此阶段 1 Compose 使用 host network，但所有服务分别固定绑定独立 loopback 端口：Web `8088`、API `28000`、PostgreSQL `25432`、MinIO `29000/29001`。它们不会直接暴露给局域网或 Tailnet。
 
 ### Tailscale Serve 启用、停用与验证
 
@@ -324,7 +326,7 @@ tailscale serve status
 | 密码 | `Luyun-Stage1A-0715!` |
 | 当前角色 | `admin`（用于资料审核门禁演示） |
 
-该账号只用于阶段 1A 合成数据验证。正式客户部署、公开演示或 Tailnet 访问范围扩大前，必须删除或轮换该账号和密码；不得复用当前数据库、JWT、MinIO 等环境 Secret。
+该账号只用于阶段 1 合成数据验证。正式客户部署、公开演示或 Tailnet 访问范围扩大前，必须删除或轮换该账号和密码；不得复用当前数据库、JWT、MinIO 等环境 Secret。
 
 #### 常见故障
 

@@ -146,6 +146,75 @@ export interface RetrieveBasisResponse {
   citations: BasisCitation[];
 }
 
+export interface MemoryRef {
+  memory_type: "user_preference" | "class_context_profile";
+  memory_id: number;
+}
+
+export interface UserPreference {
+  id: number;
+  default_stage: string | null;
+  default_course_type: string | null;
+  textbook_version: string | null;
+  export_template: string | null;
+  extra: Record<string, unknown>;
+  updated_at: string;
+}
+
+export interface ClassProfile {
+  id: number;
+  name: string;
+  context: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PinnedItem {
+  id: number;
+  item_type: "project" | "template";
+  project_id: number | null;
+  name: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectVersion {
+  id: number;
+  project_id: number;
+  version_number: number;
+  status: string;
+  content: Record<string, unknown>;
+  created_by: number;
+  created_at: string;
+}
+
+export interface VersionDiff {
+  project_id: number;
+  from_version: number;
+  to_version: number;
+  changed_sections: Array<{
+    section: string;
+    before: unknown;
+    after: unknown;
+  }>;
+}
+
+export interface SkillStepResponse {
+  skill_run_id: number;
+  skill_id: string;
+  skill_version: string;
+  version_number: number;
+  [key: string]: unknown;
+}
+
+export interface ExportArtifactResponse extends SkillStepResponse {
+  export_id: number;
+  filename: string;
+  download_url: string;
+  template_version: string;
+}
+
 export interface ModelStatus {
   logical_model: string;
   provider: string;

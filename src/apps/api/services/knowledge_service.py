@@ -3,8 +3,10 @@
 import asyncio
 import hashlib
 import io
+import math
 import re
 import zipfile
+from collections import Counter
 from datetime import UTC, datetime
 from xml.etree import ElementTree
 
@@ -207,7 +209,7 @@ async def recover_document_tasks() -> None:
             asyncio.create_task(process_document_task(task.id, document_id))
 
 
-RETRIEVAL_MODE = "lexical_trgm"
+RETRIEVAL_MODE = "hybrid_trgm_char_vector"
 _ILIKE_ESCAPE = "\\"
 
 
@@ -226,11 +228,10 @@ async def search_chunks(
     query: str,
     limit: int,
 ) -> list[dict]:
-    """库内词法检索：pg_trgm 相似度排序 + 子串兜底。
+    """阶段 1 样板混合检索：pg_trgm 召回 + 字符向量重排。
 
-    排序与阈值过滤在 PostgreSQL 内完成；
-    2–3 字短查询走 ILIKE 子串兜底；
-    向量混合检索待 D0 选型后接入。
+    字符 n-gram 向量是无需额外模型的可回归降级路径；D0 冻结
+    Embedding/Reranker 后可在同一候选与重排契约下替换。
     """
     score = func.greatest(
         func.word_similarity(query, KnowledgeChunk.content),
@@ -250,22 +251,49 @@ async def search_chunks(
             KnowledgeDocument.owner_id == user_id,
             KnowledgeDocument.status == "ready",
             KnowledgeDocument.review_status == "approved",
-            score >= settings.RETRIEVE_MIN_RELEVANCE,
         )
         .order_by(score.desc(), KnowledgeChunk.id)
-        .limit(limit)
+        .limit(settings.RETRIEVE_CANDIDATE_LIMIT)
     )
-    return [
-        {
-            "document_id": document.id,
-            "filename": document.filename,
-            "chunk_id": chunk.id,
-            "location_label": chunk.location_label,
-            "content": chunk.content,
-            "relevance": round(float(relevance), 4),
-        }
-        for chunk, document, relevance in result.tuples().all()
-    ]
+    ranked: list[dict] = []
+    for chunk, document, lexical_relevance in result.tuples().all():
+        vector_relevance = _char_vector_similarity(query, chunk.content)
+        relevance = (
+            settings.RETRIEVE_LEXICAL_WEIGHT * float(lexical_relevance)
+            + settings.RETRIEVE_VECTOR_WEIGHT * vector_relevance
+        )
+        if relevance < settings.RETRIEVE_MIN_RELEVANCE:
+            continue
+        ranked.append(
+            {
+                "document_id": document.id,
+                "filename": document.filename,
+                "chunk_id": chunk.id,
+                "location_label": chunk.location_label,
+                "content": chunk.content,
+                "relevance": round(relevance, 4),
+            }
+        )
+    ranked.sort(key=lambda item: (-float(item["relevance"]), int(item["chunk_id"])))
+    return ranked[:limit]
+
+
+def _char_vector(text: str) -> Counter[str]:
+    normalized = re.sub(r"\s+", "", text.lower())
+    if len(normalized) < 2:
+        return Counter(normalized)
+    return Counter(normalized[index : index + 2] for index in range(len(normalized) - 1))
+
+
+def _char_vector_similarity(left: str, right: str) -> float:
+    left_vector = _char_vector(left)
+    right_vector = _char_vector(right)
+    if not left_vector or not right_vector:
+        return 0.0
+    dot = sum(value * right_vector.get(key, 0) for key, value in left_vector.items())
+    left_norm = math.sqrt(sum(value * value for value in left_vector.values()))
+    right_norm = math.sqrt(sum(value * value for value in right_vector.values()))
+    return dot / (left_norm * right_norm) if left_norm and right_norm else 0.0
 
 
 async def retrieve_basis_handler(

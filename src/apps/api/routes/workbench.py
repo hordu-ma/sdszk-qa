@@ -2,21 +2,54 @@
 
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import quote
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy import select
 
 from src.apps.api.config import settings
 from src.apps.api.dependencies import CurrentUser, DbSession
-from src.apps.api.models import KnowledgeDocument, ProjectVersion, TaskRun, TeachingProject
+from src.apps.api.models import (
+    ArtifactExport,
+    KnowledgeDocument,
+    ProjectVersion,
+    TaskRun,
+    TeachingProject,
+)
 from src.apps.api.schemas.workbench import (
+    AlignmentCardOutput,
+    AlignmentCardRequest,
+    AlignmentCardResponse,
     ClassProfileCreate,
     ClassProfileResponse,
+    DesignBlueprintOutput,
+    DesignBlueprintRequest,
+    DesignBlueprintResponse,
+    DiagnoseArtifactOutput,
+    DiagnoseArtifactRequest,
+    DiagnoseArtifactResponse,
     DocumentResponse,
     DocumentReviewRequest,
+    ExportArtifactOutput,
+    ExportArtifactRequest,
+    ExportArtifactResponse,
+    GenerateSectionOutput,
+    GenerateSectionRequest,
+    GenerateSectionResponse,
     MemoryClearResponse,
     MemoryExportResponse,
+    PinnedItemCreate,
+    PinnedItemResponse,
     ProjectCreate,
     ProjectResponse,
     ProjectVersionCreate,
@@ -29,24 +62,30 @@ from src.apps.api.schemas.workbench import (
     UploadAccepted,
     UserPreferenceResponse,
     UserPreferenceUpdate,
+    VersionDiffResponse,
 )
 from src.apps.api.services.audit import write_audit_log
 from src.apps.api.services.knowledge_service import (
     SUPPORTED_SUFFIXES,
     checksum,
+    get_object,
     process_document_task,
     put_object,
 )
 from src.apps.api.services.memory_service import (
     clear_memory,
     create_class_profile,
+    create_pinned_item,
     delete_class_profile,
+    delete_pinned_item,
     get_preference,
     list_class_profiles,
+    list_pinned_items,
     upsert_preference,
 )
 from src.apps.api.services.project_service import create_version, get_owned_project
 from src.apps.api.services.skill_runtime import SKILL_REGISTRY, ensure_definition, run_skill
+from src.apps.api.services.vertical_sample_service import diff_versions
 
 router = APIRouter()
 
@@ -86,9 +125,7 @@ async def list_projects(db: DbSession, current_user: CurrentUser) -> list[Projec
 
 
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
-async def get_project(
-    project_id: int, db: DbSession, current_user: CurrentUser
-) -> ProjectResponse:
+async def get_project(project_id: int, db: DbSession, current_user: CurrentUser) -> ProjectResponse:
     project = await get_owned_project(db, project_id, current_user.id)
     return ProjectResponse.model_validate(project)
 
@@ -124,6 +161,23 @@ async def list_project_versions(
         .order_by(ProjectVersion.version_number.desc())
     )
     return [ProjectVersionResponse.model_validate(item) for item in result.scalars()]
+
+
+@router.get("/projects/{project_id}/versions/diff", response_model=VersionDiffResponse)
+async def compare_project_versions(
+    project_id: int,
+    from_version: int,
+    to_version: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> VersionDiffResponse:
+    return await diff_versions(
+        db,
+        project_id=project_id,
+        user_id=current_user.id,
+        from_version=from_version,
+        to_version=to_version,
+    )
 
 
 @router.post(
@@ -269,6 +323,9 @@ async def list_skills(db: DbSession, current_user: CurrentUser) -> list[SkillInf
                 execution_mode=skill.execution_mode,
                 maturity=skill.maturity,
                 required_roles=list(skill.required_roles),
+                quota_class=skill.quota_class,
+                timeout_ms=skill.timeout_ms,
+                degradation_policy=skill.degradation_policy,
             )
         )
     await db.commit()
@@ -295,6 +352,91 @@ async def run_retrieve_basis(
         insufficient_basis=output.insufficient_basis,
         retrieval_mode=output.retrieval_mode,
         citations=output.citations,
+    )
+
+
+@router.post("/skills/alignment-card", response_model=AlignmentCardResponse)
+async def run_alignment_card(
+    data: AlignmentCardRequest, db: DbSession, current_user: CurrentUser
+) -> AlignmentCardResponse:
+    run, output = await run_skill(
+        db,
+        skill_id="skill.alignment_card",
+        user=current_user,
+        payload=data.model_dump(exclude={"memory_refs"}),
+        memory_refs=data.memory_refs,
+    )
+    assert isinstance(output, AlignmentCardOutput)
+    return AlignmentCardResponse(
+        skill_run_id=run.id, skill_version=run.skill_version, **output.model_dump()
+    )
+
+
+@router.post("/skills/design-blueprint", response_model=DesignBlueprintResponse)
+async def run_design_blueprint(
+    data: DesignBlueprintRequest, db: DbSession, current_user: CurrentUser
+) -> DesignBlueprintResponse:
+    run, output = await run_skill(
+        db,
+        skill_id="skill.design_blueprint",
+        user=current_user,
+        payload=data.model_dump(exclude={"memory_refs"}),
+        memory_refs=data.memory_refs,
+    )
+    assert isinstance(output, DesignBlueprintOutput)
+    return DesignBlueprintResponse(
+        skill_run_id=run.id, skill_version=run.skill_version, **output.model_dump()
+    )
+
+
+@router.post("/skills/generate-section", response_model=GenerateSectionResponse)
+async def run_generate_section(
+    data: GenerateSectionRequest, db: DbSession, current_user: CurrentUser
+) -> GenerateSectionResponse:
+    run, output = await run_skill(
+        db,
+        skill_id="skill.generate_section",
+        user=current_user,
+        payload=data.model_dump(exclude={"memory_refs"}),
+        memory_refs=data.memory_refs,
+    )
+    assert isinstance(output, GenerateSectionOutput)
+    return GenerateSectionResponse(
+        skill_run_id=run.id, skill_version=run.skill_version, **output.model_dump()
+    )
+
+
+@router.post("/skills/diagnose-artifact", response_model=DiagnoseArtifactResponse)
+async def run_diagnose_artifact(
+    data: DiagnoseArtifactRequest, db: DbSession, current_user: CurrentUser
+) -> DiagnoseArtifactResponse:
+    run, output = await run_skill(
+        db,
+        skill_id="skill.diagnose_artifact",
+        user=current_user,
+        payload=data.model_dump(exclude={"memory_refs"}),
+        memory_refs=data.memory_refs,
+    )
+    assert isinstance(output, DiagnoseArtifactOutput)
+    return DiagnoseArtifactResponse(
+        skill_run_id=run.id, skill_version=run.skill_version, **output.model_dump()
+    )
+
+
+@router.post("/skills/export-artifact", response_model=ExportArtifactResponse)
+async def run_export_artifact(
+    data: ExportArtifactRequest, db: DbSession, current_user: CurrentUser
+) -> ExportArtifactResponse:
+    run, output = await run_skill(
+        db,
+        skill_id="skill.export_artifact",
+        user=current_user,
+        payload=data.model_dump(exclude={"memory_refs"}),
+        memory_refs=data.memory_refs,
+    )
+    assert isinstance(output, ExportArtifactOutput)
+    return ExportArtifactResponse(
+        skill_run_id=run.id, skill_version=run.skill_version, **output.model_dump()
     )
 
 
@@ -383,16 +525,71 @@ async def remove_class_profile(
     await db.commit()
 
 
+@router.get("/memory/pinned-items", response_model=list[PinnedItemResponse])
+async def read_pinned_items(db: DbSession, current_user: CurrentUser) -> list[PinnedItemResponse]:
+    items = await list_pinned_items(db, current_user.id)
+    return [PinnedItemResponse.model_validate(item) for item in items]
+
+
+@router.post(
+    "/memory/pinned-items",
+    response_model=PinnedItemResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_pinned_item(
+    request: Request,
+    data: PinnedItemCreate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> PinnedItemResponse:
+    try:
+        item = await create_pinned_item(db, current_user.id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    await write_audit_log(
+        db,
+        request,
+        "create_pinned_memory_item",
+        current_user.id,
+        "pinned_memory_item",
+        str(item.id),
+        {"item_type": item.item_type, "project_id": item.project_id},
+    )
+    await db.commit()
+    await db.refresh(item)
+    return PinnedItemResponse.model_validate(item)
+
+
+@router.delete("/memory/pinned-items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_pinned_item(
+    request: Request,
+    item_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> None:
+    if not await delete_pinned_item(db, current_user.id, item_id):
+        raise HTTPException(status_code=404, detail="钉选项不存在")
+    await write_audit_log(
+        db,
+        request,
+        "delete_pinned_memory_item",
+        current_user.id,
+        "pinned_memory_item",
+        str(item_id),
+    )
+    await db.commit()
+
+
 @router.get("/memory/export", response_model=MemoryExportResponse)
 async def export_memory(db: DbSession, current_user: CurrentUser) -> MemoryExportResponse:
     """导出个人记忆清单（计划 WP1.3c）。"""
     preference = await get_preference(db, current_user.id)
     profiles = await list_class_profiles(db, current_user.id)
+    pinned_items = await list_pinned_items(db, current_user.id)
     return MemoryExportResponse(
-        preference=(
-            UserPreferenceResponse.model_validate(preference) if preference else None
-        ),
+        preference=(UserPreferenceResponse.model_validate(preference) if preference else None),
         class_profiles=[ClassProfileResponse.model_validate(item) for item in profiles],
+        pinned_items=[PinnedItemResponse.model_validate(item) for item in pinned_items],
     )
 
 
@@ -403,7 +600,9 @@ async def clear_all_memory(
     current_user: CurrentUser,
 ) -> MemoryClearResponse:
     """一键清除本人全部 Memory；清除后的引用不可再注入新 SkillRun。"""
-    cleared_preference, cleared_profiles = await clear_memory(db, current_user.id)
+    cleared_preference, cleared_profiles, cleared_pinned_items = await clear_memory(
+        db, current_user.id
+    )
     await write_audit_log(
         db,
         request,
@@ -411,12 +610,36 @@ async def clear_all_memory(
         current_user.id,
         "user_memory",
         str(current_user.id),
-        {"cleared_preference": cleared_preference, "cleared_class_profiles": cleared_profiles},
+        {
+            "cleared_preference": cleared_preference,
+            "cleared_class_profiles": cleared_profiles,
+            "cleared_pinned_items": cleared_pinned_items,
+        },
     )
     await db.commit()
     return MemoryClearResponse(
         cleared_preference=cleared_preference,
         cleared_class_profiles=cleared_profiles,
+        cleared_pinned_items=cleared_pinned_items,
+    )
+
+
+@router.get("/exports/{export_id}/download")
+async def download_export(export_id: int, db: DbSession, current_user: CurrentUser) -> Response:
+    result = await db.execute(
+        select(ArtifactExport).where(
+            ArtifactExport.id == export_id,
+            ArtifactExport.user_id == current_user.id,
+        )
+    )
+    artifact = result.scalar_one_or_none()
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="导出件不存在")
+    data = await get_object(artifact.object_key)
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(artifact.filename)}"},
     )
 
 
