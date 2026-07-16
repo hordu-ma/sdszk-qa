@@ -216,12 +216,13 @@ async def review_document(
     db: DbSession,
     current_user: CurrentUser,
 ) -> DocumentResponse:
+    # 阶段 1A 审核范围为全库：审核员/管理员可审任意用户的资料；
+    # 组织级隔离（试点组织白名单）按开发计划 WP2.5 在阶段 2 引入。
     if current_user.role not in {"admin", "reviewer"}:
         raise HTTPException(status_code=403, detail="只有审核员或管理员可以审核资料")
     document = await db.get(KnowledgeDocument, document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="资料不存在")
-    await get_owned_project(db, document.project_id, current_user.id)
     document.review_status = data.review_status
     await write_audit_log(
         db,

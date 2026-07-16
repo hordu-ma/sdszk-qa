@@ -26,7 +26,7 @@ class User(Base, TimestampMixin):
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True, comment="用户名")
     hashed_password: Mapped[str] = mapped_column(String(255), comment="密码哈希")
     full_name: Mapped[str] = mapped_column(String(100), comment="姓名")
-    role: Mapped[str] = mapped_column(String(20), comment="角色：student/teacher/admin")
+    role: Mapped[str] = mapped_column(String(20), comment="角色：student/teacher/reviewer/admin")
     is_active: Mapped[bool] = mapped_column(default=True, comment="是否激活")
     external_user_id: Mapped[str | None] = mapped_column(
         String(100), unique=True, nullable=True, index=True, comment="外部系统用户ID"

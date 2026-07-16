@@ -52,7 +52,7 @@ async def create_or_update_user(
         username: 用户名
         password: 明文密码
         full_name: 姓名
-        role: 角色（student/teacher/admin）
+        role: 角色（student/teacher/reviewer/admin）
         external_user_id: 外部系统用户ID
 
     Returns:

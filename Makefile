@@ -2,7 +2,7 @@ PYTHON ?= uv run --frozen --extra dev
 WEB_DIR := src/apps/web
 COMPOSE_DEV := src/infra/compose/dev.yml
 
-.PHONY: setup setup-backend setup-frontend lint typecheck test test-unit test-integration test-api test-cov web-build harness-bootstrap harness-backend harness-quick harness-full dev-up dev-down doctor
+.PHONY: setup setup-backend setup-frontend lint typecheck test test-unit test-integration test-api test-cov validate-cases web-build harness-bootstrap harness-backend harness-quick harness-full dev-up dev-down doctor
 
 setup: setup-backend setup-frontend
 
@@ -40,6 +40,9 @@ test-api:
 
 test-cov:
 	$(PYTHON) pytest --cov=src/apps/api --cov-report=term-missing
+
+validate-cases:
+	$(PYTHON) python src/scripts/validate_cases.py
 
 web-build:
 	npm --prefix $(WEB_DIR) run build

@@ -17,6 +17,7 @@
 - 资料上传、后台解析、审核门禁和 `retrieve_basis` 可追溯检索基线
 - 桌面优先工作台基础页（项目、版本、资料、任务与依据检索）
 - `base-spark` 的 `luyun-int` 集成栈及 Virtus/Tailscale HTTPS 验证链路
+- 种子案例一致性校验（`make validate-cases`）与"无评分/排名 API"防护测试基线
 
 > 当前代码**不包含评分/排名模块**；目标产品的教学诊断同样不以教师总分或排名为默认输出。
 > 当前只完成阶段 1A 的首个可部署增量，并不等于阶段 1 或 G1 完成。完整 Skills 注册/权限运行时、Memory、混合向量检索与 Reranker、纵向样板、Word 导出、固定版本 vLLM 和 `luyun-demo` 晋级仍未完成。
@@ -124,6 +125,7 @@ make harness-quick
 make test-integration
 make harness-full
 make test-cov
+make validate-cases
 ```
 
 ## 可审计数据（当前）

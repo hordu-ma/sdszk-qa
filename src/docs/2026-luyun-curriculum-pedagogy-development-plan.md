@@ -866,6 +866,8 @@ disabled_at
 
 阶段 0 必须修正命名和标签（允许在 v1.0 签字前作为数据卫生工作完成），再扩展为专家评测案例。金标案例应逐步脱离 `reference_answer.primary` 单句方向描述，改为：输入条件、必引用、禁止项、量规条目、可接受差异与专家解释。
 
+**实施记录（2026-07-16）：** 上述三个错位文件已按内容重命名为 `case_002_rule_of_law.json`、`case_003_labor_education.json`、`case_005_national_security.json`（案例内容与标题未改动，导入按标题匹配不受影响）；已新增 `src/scripts/validate_cases.py` 一致性校验脚本（`make validate-cases`）并接入单元测试回归。`reference_answer.primary` 的量规化改造仍按本节要求在阶段 0 完成。
+
 ### 6.2 评测集分阶段建设建议
 
 评测集按阶段扩展，避免在短周期内用数量替代质量：

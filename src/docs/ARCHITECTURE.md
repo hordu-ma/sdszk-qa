@@ -15,10 +15,7 @@
 - 脚本：`src/scripts`（导入/同步等工具脚本）
 - 计划与规格：`src/docs/`
 
-## 根目录 Python 文件
-
-- `main.py` 是一个小型演示入口，不用于启动 API。
-- API 入口为 `src/apps/api/main.py`。
+API 入口为 `src/apps/api/main.py`（根目录不再保留演示入口脚本）。
 
 ## 后端结构（当前）
 

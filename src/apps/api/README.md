@@ -51,6 +51,7 @@ api/
   - SSE 流式问答（核心链路，`POST /api/chat`）
 - `routes/workbench.py`
   - 教学项目/版本、资料上传与审核、任务列表和 `retrieve_basis`
+  - 资料审核仅限 `reviewer`/`admin` 角色，阶段 1A 审核范围为全库（可审任意用户资料）；组织级隔离按计划 WP2.5 在阶段 2 引入
 
 ## 服务层（services）
 
@@ -59,7 +60,7 @@ api/
 - `project_service.py`：教学项目和版本操作。
 - `knowledge_service.py`：资料解析、任务恢复、审核过滤和依据检索。
 - **边界：** 当前不是完整 Skills/Memory/ModelGateway 运行时；`retrieve_basis` 是阶段 1A 的单 Skill 基线，检索仍为可审计词项匹配，尚未完成向量 + Reranker 混合检索。
-- **禁止：** 实现教师/学生总分评分排名模块（与产品“诊断非评分”原则冲突）。
+- **禁止：** 实现教师/学生总分评分排名模块（与产品“诊断非评分”原则冲突）；`tests/test_no_scoring_paths.py` 对 API 面与领域模型做防护断言。
 
 ## 工具层（utils）
 
