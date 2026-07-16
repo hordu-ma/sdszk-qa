@@ -55,7 +55,7 @@
 | 2 | `ARCHITECTURE.md`、`src/infra/README.md`、`README.md` | 当前实现与部署基线（须标注已实现/目标） |
 | 3 | `2026-product-extension-feature-spec.md` | 能力图与招标参数素材，**非排期** |
 | 4 | `2026-product-extension-development-suggestions.md` | 方向讨论稿，**非排期** |
-| 5 | `AGENTS.md`、`src/docs/codex-*.md`、`.github/*` | 代理与工程交付约束 |
+| 5 | `AGENTS.md`、`src/docs/DEVELOPMENT.md`、`.github/*` | 代理与工程交付约束 |
 
 冲突处理：产品范围与验收以本文为准；实现细节以代码与架构说明为准，但不得把目标能力写成已实现。
 

@@ -1,10 +1,10 @@
-# Infrastructure 基础设施配置
+# 基础设施说明
 
-本文档说明 `src/infra` 目录中各个配置文件的作用及其适用场景。
+本文档说明 `src/infra` 目录中各配置文件的作用，以及 `base-spark` 集成环境的运维步骤。
 
-> 本地开发启动请参考：`src/docs/本地开发启动指南.md`。
-> 当前已新增 `base-spark.yml` 作为阶段 1A 集成环境基线；正式 A/B 生产文件仍是问答 MVP 基线。
-> 目标口径与阶段顺序以 `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md`（v1.0）为准；演示环境不得抢跑未实现教学能力。
+> 本地开发命令见[开发指南](../docs/DEVELOPMENT.md)。
+> `base-spark.yml` 是阶段 1A 集成环境基线；正式 A/B 生产文件仍是问答 MVP 基线。
+> 演示环境只能展示已实现能力，阶段口径以主开发计划为准。
 
 ## 目录结构
 

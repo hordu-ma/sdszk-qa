@@ -62,8 +62,12 @@ api/
 - `knowledge_service.py`：资料解析、任务恢复、审核过滤和 pg_trgm 库内词法检索（`search_chunks` + `retrieve_basis_handler`）。
 - `skill_runtime.py`：Skill 注册表、权限与 Schema 校验、Memory 注入审计和 SkillRun 生命周期；`run_skill` 是唯一 Skill 执行入口。
 - `memory_service.py`：偏好、班情档案、一键清除与导出。
-- **边界：** 当前 Skills/Memory 为最小基线，仅 `skill.retrieve_basis`（v1.1.0）达到基线成熟度；其余阶段 1 Skills 的 Schema 待阶段 0《产品 Skills 目录 v1》冻结后注册。配额/降级策略字段已登记但未启用执行；向量 + Reranker 混合检索待 D0 选型。Memory 注入仅接受用户显式传入的 `memory_refs`，不做任何自动注入。
-- **禁止：** 实现教师/学生总分评分排名模块（与产品“诊断非评分”原则冲突）；`tests/test_no_scoring_paths.py` 对 API 面与领域模型做防护断言，`skill_runtime.register_skill` 拒绝评分类 skill_id。
+当前边界（详见架构说明）：
+
+- 仅 `skill.retrieve_basis`（v1.1.0）达到基线成熟度；其余阶段 1 Skills 待阶段 0 目录冻结后注册。
+- 配额/降级策略字段已登记但未启用执行；向量混合检索待 D0 选型。
+- Memory 注入只接受用户显式传入的 `memory_refs`，不做任何自动注入。
+- 禁止实现评分/排名模块：`tests/test_no_scoring_paths.py` 做防护断言，`register_skill` 拒绝评分类 skill_id。
 
 ## 工具层（utils）
 

@@ -9,7 +9,7 @@ Use this skill for cross-cutting delivery work that touches multiple areas of th
 
 ## Execute Workflow
 
-1. Read `src/docs/codex-onboarding.md` for project entrypoints and validation expectations.
+1. Read `src/docs/DEVELOPMENT.md` for project entrypoints and validation expectations.
 2. Prefer root `Makefile` targets for setup, lint, typing, tests, web build, and local compose tasks.
 3. Reuse existing `.github/instructions/` and more specific `.github/skills/` before creating new patterns.
 4. Run the smallest relevant validation set first, then expand only if the change surface requires it.
@@ -23,5 +23,5 @@ Use this skill for cross-cutting delivery work that touches multiple areas of th
 
 ## References
 
-- Onboarding guide: `src/docs/codex-onboarding.md`
+- Development guide: `src/docs/DEVELOPMENT.md`
 - Testing guidance: `.github/instructions/testing.instructions.md`

@@ -4,8 +4,8 @@ Read this file before opening any other file in `.github/`.
 
 ## Purpose
 
-`.github` is retained for GitHub Actions plus Codex-readable scoped guidance, skills, hooks, and agent playbooks.
-It is not the primary Codex entrypoint; start from `AGENTS.md` and `src/docs/codex-harness.md`, then use this index to find the minimum relevant `.github` document for the current task.
+`.github` is retained for GitHub Actions plus agent-readable scoped guidance, skills, hooks, and agent playbooks.
+It is not the primary entrypoint; start from `AGENTS.md` and `src/docs/DEVELOPMENT.md`, then use this index to find the minimum relevant `.github` document for the current task.
 Use this file instead of scanning the entire `.github` directory.
 
 ## Reading Order
