@@ -6,7 +6,7 @@
 ## 项目速览
 
 - 这是"鲁韵思政大模型"的代码仓库：一个面向思政课教师的教学智能支持平台。
-- 当前已实现：问答链路、教学项目/资料/任务、降级混合检索、六个样板 Skills、显式 Memory、纵向样板、版本差异和 Word 导出。详见 [README](../../README.md)。
+- 当前已实现：问答链路、教学项目/资料/任务、版本化语义 RAG、六个样板 Skills、显式 Memory、纵向样板、版本差异、Word 导出和版本化工程评测。详见 [README](../../README.md)。
 - 产品范围、阶段和验收只看一份文档：[主开发计划](2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0）。目标能力不等于已实现能力，写文档和注释时不要混淆。
 
 目录结构：
@@ -44,7 +44,7 @@ make harness-quick       # 首次完整快速验证
 | `make validate-cases` | 种子案例一致性校验 | 无 |
 | `make web-build` | 仅前端构建 | 无 |
 
-集成测试需要 PostgreSQL（连接串与 `tests/conftest.py` 一致）：
+集成测试需要带 `vector` 扩展的 PostgreSQL（Compose 已固定 `pgvector/pgvector:pg17-trixie`）：
 
 ```bash
 make dev-up      # 启动本地 PostgreSQL、MinIO、API
@@ -74,7 +74,7 @@ npm --prefix src/apps/web run build
 
 1. 最小可行改动，不做无关重构；优先服务当前纵向样板，不并行铺模块。
 2. 路由保持薄层，业务逻辑放 `services/`；Skill 执行统一走 `skill_runtime.run_skill`。
-3. 测试中必须 mock 外部 LLM 调用，不依赖真实模型服务。
+3. 测试中必须 mock 外部 LLM、Embedding 和 Reranker 调用，不依赖真实模型服务。
 4. 改配置或接口时，交付说明中写清影响范围和回滚方式。
 5. 不实现教师/学生评分、排名（`tests/test_no_scoring_paths.py` 有防护断言）。
 6. 不把隐式会话历史当作用户 Memory；Memory 只走显式对象与注入审计。
@@ -97,6 +97,7 @@ npm --prefix src/apps/web run build
 | `src/apps/api/config.py` | 配置在导入时生效，测试环境变量需稳定 |
 | `src/infra/compose/*.yml`、`nginx.conf` | 涉及部署联调，改动前后说明影响范围 |
 | 数据库模型与迁移 | 变更 schema 要同步 migration、service、schema 和 tests |
+| `services/retrieval_gateway.py` | 外部向量契约；必须校验维度、返回数量、rerank 索引完整性并保留降级链 |
 
 ## CI 对齐
 

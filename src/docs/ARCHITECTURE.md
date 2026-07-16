@@ -9,7 +9,7 @@
 | --- | --- |
 | `src/apps/api/main.py` | 应用入口：中间件、异常处理、路由注册、启动恢复 |
 | `src/apps/api/routes/` | HTTP 层（auth / cases / sessions / chat / workbench），保持薄层 |
-| `src/apps/api/services/` | 业务层：问答编排、Provider Adapter、项目、知识处理、Skills、Memory、纵向样板与导出 |
+| `src/apps/api/services/` | 业务层：问答编排、模型/检索 Provider Adapter、项目、知识处理、Skills、Memory、评测、纵向样板与导出 |
 | `src/apps/api/schemas/` | Pydantic 请求/响应与 Skill 输入输出契约 |
 | `src/apps/api/models/` | SQLAlchemy ORM（含 SkillDefinition 与 Memory 对象） |
 | `src/apps/api/migrations/` | Alembic 迁移 |
@@ -37,7 +37,8 @@ flowchart LR
 
 - **Skill 执行只有一个入口**：`skill_runtime.run_skill`。它负责权限检查、输入输出 Schema 校验、`input_hash`、Memory 注入审计和 SkillRun 生命周期；业务 handler 只做领域逻辑。
 - **Memory 不走暗道**：只有用户显式传入的 `memory_refs` 会被解析，解析前校验归属并写 `MemoryInjectionAudit`；已清除的引用会被拒绝。
-- **检索可降级且可替换**：`retrieve_basis` 以 pg_trgm 召回并用字符 n-gram 向量重排；低于阈值返回"资料不足"。正式 Embedding/Reranker 可替换同一候选/重排契约。
+- **检索可降级且可追溯**：`retrieve_basis` 合并 pg_trgm 与 pgvector 候选，再由固定 revision Reranker 重排；语义 Provider 失败时显式回退字符 n-gram 链。索引只在完整构建后原子激活。
+- **评测可复现**：工程数据集冻结后记录内容哈希；每次运行保存应用、vLLM、模型 revision、检索参数和 Skill 版本清单。这里只判断技术预期命中，不输出教师或学生分数。
 - **模型调用只认逻辑模型名**：Ollama 与 OpenAI-compatible/vLLM Provider Adapter 屏蔽接口差异并记录调用审计；换 Provider 不改业务代码。
 - **样板版本不可变**：对齐卡、蓝图、课时设计和诊断各形成一个 ProjectVersion；导出件关联最终版本与 SkillRun。
 - **后台任务可恢复**：资料解析任务状态存库，应用重启后由 lifespan 自动恢复。
@@ -62,16 +63,16 @@ flowchart LR
   → 专业/安全/迁移/回滚门禁 → 同一镜像晋级 luyun-demo（未建成）
 ```
 
-当前 Provider 为 Ollama `qwen3.5:27b`（明示过渡）；固定版本 vLLM 验证（D0）与 `luyun-demo` 尚未完成。
+问答生成仍可使用 Ollama `qwen3.5:27b`（明示过渡）；固定版 vLLM 0.18.0 的生成/Embedding/Reranker 工程候选通过独立 loopback Provider 接入。候选模型专业冻结与 `luyun-demo` 尚未完成。
 
 ## 当前实现 vs 目标架构
 
 | 组件 | 当前状态 | 目标（阶段） |
 | --- | --- | --- |
-| 检索 | pg_trgm + 字符向量重排降级链、资料不足阈值 | 正式 Embedding/Reranker、页码级引用（D0/1B） |
+| 检索 | pg_trgm + pgvector + Reranker，字符向量显式降级，索引版本追溯 | 专家冻结模型/阈值、页码级引用（G0/1B） |
 | Skills | 六个样板 Skill 统一运行、版本与降级契约 | 专家冻结的完整阶段 1 目录、正式额度与质量门禁 |
 | Memory | 偏好 + 班情 + 钉选 + 显式界面确认 + 审计/清除/导出 | 保留/删除 SLA、授权共享模板（阶段 2–3） |
-| 模型服务 | 逻辑模型名 + Ollama/OpenAI-compatible Adapter + 调用审计 | 模型注册、能力路由、Provider 一致性与固定 vLLM 资产 |
+| 模型服务 | 逻辑模型名 + Provider Adapter + 固定 vLLM/模型资产登记 | 完整能力路由、Provider 一致性和专业选型门禁 |
 | 教学成果 | 高中议题式结构化生成、非评分诊断、版本差异、Word 导出技术样板 | 专家回归后的纵向样板和其他学段扩展 |
 | 身份 | 本地 JWT 登录（过渡） | 校验思政课平台签发的 claims，本仓不做注册/KYC（计划 §2.6） |
 | 多智能体 / 多模态 | 未开始 | 阶段 4 门禁式交付，Agent 只能调用 Skills 注册表 |
@@ -85,8 +86,8 @@ flowchart LR
 → 6 Skills 运行时 → 7 Memory 最小集 → 8 样板生成-诊断-导出 → 9 桌面工作台 → 10 双环境晋级
 ```
 
-当前位置：第 1–9 步已有单一高中议题式技术样板；第 5 步当前使用字符向量降级链，正式语义模型待 D0；第 10 步 `luyun-demo` 晋级未完成。
+当前位置：第 1–9 步已有单一高中议题式技术样板；第 5 步已具备可版本化语义 RAG 和字符向量降级，第 10 步 `luyun-demo` 晋级未完成。
 
 ## 一句话总结
 
-问答兼容链路与高中议题式“查依据—备课—诊断—导出”技术样板已经同构；下一门槛是正式语义模型、专家回归和 `luyun-demo` 同镜像晋级，而不是横向铺更多模块。
+问答兼容链路、高中议题式纵向样板、版本化语义 RAG 和工程评测底座已同构；下一门槛是专家金标回归、候选模型专业冻结和 `luyun-demo` 同镜像晋级。

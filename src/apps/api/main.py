@@ -39,10 +39,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """启动时同步 Skill 注册表，并恢复应用重启前未完成的阶段 1A 任务。"""
     from .dependencies import AsyncSessionLocal
     from .services.knowledge_service import recover_document_tasks
+    from .services.model_asset_service import sync_model_assets
     from .services.skill_runtime import sync_skill_registry
 
     async with AsyncSessionLocal() as db:
         await sync_skill_registry(db)
+        await sync_model_assets(db)
     await recover_document_tasks()
     yield
 

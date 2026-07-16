@@ -22,6 +22,8 @@ from src.apps.api.dependencies import CurrentUser, DbSession
 from src.apps.api.models import (
     ArtifactExport,
     KnowledgeDocument,
+    KnowledgeIndexVersion,
+    ModelAsset,
     ProjectVersion,
     TaskRun,
     TeachingProject,
@@ -40,14 +42,22 @@ from src.apps.api.schemas.workbench import (
     DiagnoseArtifactResponse,
     DocumentResponse,
     DocumentReviewRequest,
+    EvaluationCaseCreate,
+    EvaluationCaseResponse,
+    EvaluationCaseResultResponse,
+    EvaluationDatasetCreate,
+    EvaluationDatasetResponse,
+    EvaluationRunResponse,
     ExportArtifactOutput,
     ExportArtifactRequest,
     ExportArtifactResponse,
     GenerateSectionOutput,
     GenerateSectionRequest,
     GenerateSectionResponse,
+    KnowledgeIndexVersionResponse,
     MemoryClearResponse,
     MemoryExportResponse,
+    ModelAssetResponse,
     PinnedItemCreate,
     PinnedItemResponse,
     ProjectCreate,
@@ -65,12 +75,22 @@ from src.apps.api.schemas.workbench import (
     VersionDiffResponse,
 )
 from src.apps.api.services.audit import write_audit_log
+from src.apps.api.services.evaluation_service import (
+    add_case,
+    create_dataset,
+    freeze_dataset,
+    get_owned_run,
+    list_datasets,
+    list_run_results,
+    run_dataset,
+)
 from src.apps.api.services.knowledge_service import (
     SUPPORTED_SUFFIXES,
     checksum,
     get_object,
     process_document_task,
     put_object,
+    rebuild_project_index,
 )
 from src.apps.api.services.memory_service import (
     clear_memory,
@@ -708,3 +728,195 @@ async def model_status(current_user: CurrentUser) -> dict[str, str | bool]:
         "provider_model": settings.LLM_MODEL,
         "degraded": settings.LLM_PROVIDER.lower() != "vllm",
     }
+
+
+@router.get("/runtime/model-assets", response_model=list[ModelAssetResponse])
+async def list_model_assets(db: DbSession, current_user: CurrentUser) -> list[ModelAssetResponse]:
+    del current_user
+    result = await db.execute(
+        select(ModelAsset).order_by(ModelAsset.asset_type, ModelAsset.created_at.desc())
+    )
+    return [ModelAssetResponse.model_validate(item) for item in result.scalars()]
+
+
+@router.get(
+    "/projects/{project_id}/knowledge-indexes",
+    response_model=list[KnowledgeIndexVersionResponse],
+)
+async def list_knowledge_indexes(
+    project_id: int, db: DbSession, current_user: CurrentUser
+) -> list[KnowledgeIndexVersionResponse]:
+    await get_owned_project(db, project_id, current_user.id)
+    result = await db.execute(
+        select(KnowledgeIndexVersion)
+        .where(KnowledgeIndexVersion.project_id == project_id)
+        .order_by(KnowledgeIndexVersion.version_number.desc())
+    )
+    return [KnowledgeIndexVersionResponse.model_validate(item) for item in result.scalars()]
+
+
+@router.post(
+    "/projects/{project_id}/knowledge-indexes/rebuild",
+    response_model=KnowledgeIndexVersionResponse,
+)
+async def rebuild_knowledge_index(
+    project_id: int,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> KnowledgeIndexVersionResponse:
+    try:
+        version = await rebuild_project_index(
+            db, project_id=project_id, user_id=current_user.id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    await write_audit_log(
+        db,
+        request,
+        "rebuild_knowledge_index",
+        current_user.id,
+        "knowledge_index_version",
+        str(version.id),
+        {"project_id": project_id, "version_number": version.version_number},
+    )
+    await db.commit()
+    return KnowledgeIndexVersionResponse.model_validate(version)
+
+
+@router.post(
+    "/evaluation/datasets",
+    response_model=EvaluationDatasetResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_evaluation_dataset(
+    payload: EvaluationDatasetCreate,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> EvaluationDatasetResponse:
+    dataset = await create_dataset(
+        db,
+        user=current_user,
+        project_id=payload.project_id,
+        dataset_key=payload.dataset_key,
+        name=payload.name,
+        description=payload.description,
+    )
+    await write_audit_log(
+        db,
+        request,
+        "create_evaluation_dataset",
+        current_user.id,
+        "evaluation_dataset",
+        str(dataset.id),
+        {"dataset_key": dataset.dataset_key, "version_number": dataset.version_number},
+    )
+    await db.commit()
+    return EvaluationDatasetResponse.model_validate(dataset)
+
+
+@router.get(
+    "/evaluation/datasets", response_model=list[EvaluationDatasetResponse]
+)
+async def list_evaluation_datasets(
+    project_id: int, db: DbSession, current_user: CurrentUser
+) -> list[EvaluationDatasetResponse]:
+    datasets = await list_datasets(db, project_id=project_id, user_id=current_user.id)
+    return [EvaluationDatasetResponse.model_validate(item) for item in datasets]
+
+
+@router.post(
+    "/evaluation/datasets/{dataset_id}/cases",
+    response_model=EvaluationCaseResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_evaluation_case(
+    dataset_id: int,
+    payload: EvaluationCaseCreate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> EvaluationCaseResponse:
+    case_item = await add_case(
+        db,
+        user=current_user,
+        dataset_id=dataset_id,
+        case_key=payload.case_key,
+        query=payload.query,
+        expected_document_ids=payload.expected_document_ids,
+        expected_insufficient_basis=payload.expected_insufficient_basis,
+        case_metadata=payload.case_metadata,
+    )
+    return EvaluationCaseResponse.model_validate(case_item)
+
+
+@router.post(
+    "/evaluation/datasets/{dataset_id}/freeze",
+    response_model=EvaluationDatasetResponse,
+)
+async def freeze_evaluation_dataset(
+    dataset_id: int,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> EvaluationDatasetResponse:
+    dataset = await freeze_dataset(db, dataset_id=dataset_id, user_id=current_user.id)
+    await write_audit_log(
+        db,
+        request,
+        "freeze_evaluation_dataset",
+        current_user.id,
+        "evaluation_dataset",
+        str(dataset.id),
+        {"content_hash": dataset.content_hash, "case_count": dataset.case_count},
+    )
+    await db.commit()
+    return EvaluationDatasetResponse.model_validate(dataset)
+
+
+@router.post(
+    "/evaluation/datasets/{dataset_id}/runs",
+    response_model=EvaluationRunResponse,
+)
+async def run_evaluation_dataset(
+    dataset_id: int,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> EvaluationRunResponse:
+    run = await run_dataset(db, dataset_id=dataset_id, user=current_user)
+    await write_audit_log(
+        db,
+        request,
+        "run_evaluation_dataset",
+        current_user.id,
+        "evaluation_run",
+        str(run.id),
+        {
+            "dataset_id": dataset_id,
+            "matched_cases": run.matched_cases,
+            "failed_cases": run.failed_cases,
+            "error_cases": run.error_cases,
+        },
+    )
+    await db.commit()
+    return EvaluationRunResponse.model_validate(run)
+
+
+@router.get("/evaluation/runs/{run_id}", response_model=EvaluationRunResponse)
+async def get_evaluation_run(
+    run_id: int, db: DbSession, current_user: CurrentUser
+) -> EvaluationRunResponse:
+    run = await get_owned_run(db, run_id, current_user.id)
+    return EvaluationRunResponse.model_validate(run)
+
+
+@router.get(
+    "/evaluation/runs/{run_id}/results",
+    response_model=list[EvaluationCaseResultResponse],
+)
+async def get_evaluation_results(
+    run_id: int, db: DbSession, current_user: CurrentUser
+) -> list[EvaluationCaseResultResponse]:
+    results = await list_run_results(db, run_id, current_user.id)
+    return [EvaluationCaseResultResponse.model_validate(item) for item in results]

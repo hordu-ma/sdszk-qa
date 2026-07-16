@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres@sha256:538bdb8c6b278f2f09070a4d79f04a83363a795ed23ec0d92d6b70cabc398eae
+    image: pgvector/pgvector:pg17-trixie@sha256:4cef73a5d4bac06038cc930190f787a353b4f3513c076d8b6a99a70f13ba6f9f
     restart: unless-stopped
     network_mode: host
     command: ["postgres", "-c", "listen_addresses=127.0.0.1", "-p", "25432"]
@@ -32,6 +32,93 @@ services:
       timeout: 3s
       retries: 20
 
+  vllm-generation:
+    profiles: ["model-baseline"]
+    image: vllm/vllm-openai:v0.18.0@sha256:c32358ebfc115d56ade2acfdbcd00df5b115417dbd6006547c88f07e2b39de06
+    restart: unless-stopped
+    runtime: nvidia
+    ipc: host
+    network_mode: host
+    command:
+      - Qwen/Qwen2.5-0.5B-Instruct
+      - --revision
+      - 7ae557604adf67be50417f59c2c2f167def9a775
+      - --served-model-name
+      - teaching-chat-engineering
+      - --host
+      - 127.0.0.1
+      - --port
+      - "28001"
+      - --max-model-len
+      - "4096"
+      - --gpu-memory-utilization
+      - "0.20"
+    volumes:
+      - vllm_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:28001/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+
+  vllm-embedding:
+    profiles: ["semantic-rag"]
+    image: vllm/vllm-openai:v0.18.0@sha256:c32358ebfc115d56ade2acfdbcd00df5b115417dbd6006547c88f07e2b39de06
+    restart: unless-stopped
+    runtime: nvidia
+    ipc: host
+    network_mode: host
+    command:
+      - BAAI/bge-small-zh-v1.5
+      - --revision
+      - 7999e1d3359715c523056ef9478215996d62a620
+      - --served-model-name
+      - teaching-embedding
+      - --runner
+      - pooling
+      - --host
+      - 127.0.0.1
+      - --port
+      - "28002"
+      - --gpu-memory-utilization
+      - "0.10"
+    volumes:
+      - vllm_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:28002/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+
+  vllm-reranker:
+    profiles: ["semantic-rag"]
+    image: vllm/vllm-openai:v0.18.0@sha256:c32358ebfc115d56ade2acfdbcd00df5b115417dbd6006547c88f07e2b39de06
+    restart: unless-stopped
+    runtime: nvidia
+    ipc: host
+    network_mode: host
+    command:
+      - BAAI/bge-reranker-v2-m3
+      - --revision
+      - 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+      - --served-model-name
+      - teaching-reranker
+      - --runner
+      - pooling
+      - --host
+      - 127.0.0.1
+      - --port
+      - "28003"
+      - --gpu-memory-utilization
+      - "0.15"
+    volumes:
+      - vllm_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:28003/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+
   api:
     image: luyun-sizheng-api:${RELEASE_TAG:-stage1a}
     build:
@@ -53,6 +140,20 @@ services:
       LLM_TIMEOUT: ${LLM_TIMEOUT:-180}
       LLM_MAX_CONTEXT_LEN: ${LLM_MAX_CONTEXT_LEN:-8192}
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-1000}
+      APP_RELEASE: ${RELEASE_TAG:-stage1}
+      VLLM_RUNTIME_VERSION: "0.18.0"
+      VLLM_RUNTIME_IMAGE: vllm/vllm-openai:v0.18.0@sha256:c32358ebfc115d56ade2acfdbcd00df5b115417dbd6006547c88f07e2b39de06
+      SEMANTIC_RAG_ENABLED: ${SEMANTIC_RAG_ENABLED:-false}
+      EMBEDDING_BASE_URL: http://127.0.0.1:28002
+      EMBEDDING_MODEL: BAAI/bge-small-zh-v1.5
+      EMBEDDING_REVISION: 7999e1d3359715c523056ef9478215996d62a620
+      EMBEDDING_SERVED_NAME: teaching-embedding
+      EMBEDDING_DIMENSIONS: 512
+      EMBEDDING_MAX_TOKENS: 512
+      RERANKER_BASE_URL: http://127.0.0.1:28003
+      RERANKER_MODEL: BAAI/bge-reranker-v2-m3
+      RERANKER_REVISION: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+      RERANKER_SERVED_NAME: teaching-reranker
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       DEMO_USERNAME: ${DEMO_USERNAME:-demo_teacher}
       DEMO_PASSWORD: ${DEMO_PASSWORD:?DEMO_PASSWORD is required}
@@ -85,3 +186,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  vllm_cache:

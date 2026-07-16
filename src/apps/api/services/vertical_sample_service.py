@@ -85,14 +85,14 @@ async def alignment_card_handler(
 ) -> AlignmentCardOutput:
     project, source = await _latest_version(db, payload.project_id, user.id)
     run.project_id = project.id
-    rows = await search_chunks(
+    search_result = await search_chunks(
         db,
         project_id=project.id,
         user_id=user.id,
         query=payload.basis_query,
         limit=5,
     )
-    citations = [BasisCitation(**row) for row in rows]
+    citations = [BasisCitation(**row) for row in search_result.citations]
     objectives = [
         f"围绕“{payload.core_question}”解释核心概念并形成有依据的判断",
         f"结合“{payload.topic}”真实情境比较不同选择及其影响",

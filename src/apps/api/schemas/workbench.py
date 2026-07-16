@@ -144,6 +144,117 @@ class SkillInfo(BaseModel):
     degradation_policy: str | None
 
 
+class ModelAssetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    asset_type: str
+    logical_name: str
+    provider: str
+    repository: str
+    revision: str
+    served_model_name: str
+    runtime: str
+    runtime_version: str
+    runtime_image: str
+    status: str
+    asset_metadata: dict
+
+
+class KnowledgeIndexVersionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_id: int
+    version_number: int
+    status: str
+    embedding_model: str
+    embedding_revision: str
+    reranker_model: str
+    reranker_revision: str
+    dimensions: int
+    config_hash: str
+    chunk_count: int
+    error_message: str | None
+    activated_at: datetime | None
+    created_at: datetime
+
+
+class EvaluationDatasetCreate(BaseModel):
+    project_id: int
+    dataset_key: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9][a-z0-9_-]+$")
+    name: str = Field(min_length=2, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class EvaluationDatasetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_id: int
+    dataset_key: str
+    version_number: int
+    name: str
+    description: str | None
+    status: str
+    content_hash: str | None
+    case_count: int
+    frozen_at: datetime | None
+    created_at: datetime
+
+
+class EvaluationCaseCreate(BaseModel):
+    case_key: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9][a-z0-9_-]+$")
+    query: str = Field(min_length=2, max_length=500)
+    expected_document_ids: list[int] = Field(default_factory=list, max_length=20)
+    expected_insufficient_basis: bool = False
+    case_metadata: dict = Field(default_factory=dict)
+
+
+class EvaluationCaseResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    dataset_id: int
+    case_key: str
+    query: str
+    expected_document_ids: list[int]
+    expected_insufficient_basis: bool
+    case_metadata: dict
+    created_at: datetime
+
+
+class EvaluationRunResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    dataset_id: int
+    status: str
+    dataset_hash: str
+    release_manifest: dict
+    total_cases: int
+    matched_cases: int
+    failed_cases: int
+    error_cases: int
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class EvaluationCaseResultResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    run_id: int
+    case_id: int
+    status: str
+    returned_document_ids: list[int]
+    insufficient_basis: bool
+    checks: dict
+    error_message: str | None
+    latency_ms: int | None
+    created_at: datetime
+
+
 class UserPreferenceUpdate(BaseModel):
     default_stage: str | None = Field(default=None, max_length=50)
     default_course_type: str | None = Field(default=None, max_length=50)

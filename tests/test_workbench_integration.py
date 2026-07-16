@@ -15,13 +15,17 @@ from src.apps.api.models import (
     TeachingProject,
     User,
 )
+from src.apps.api.services.model_asset_service import sync_model_assets
 
 
 async def _ensure_schema() -> None:
     """建表并启用库内检索所需扩展（CI 全新数据库场景）。"""
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(User.metadata.create_all)
+    async with AsyncSessionLocal() as db:
+        await sync_model_assets(db)
 
 
 @pytest.mark.integration
@@ -88,9 +92,10 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             )
             assert documents.json()[0]["status"] == "ready"
             assert documents.json()[0]["review_status"] == "pending"
+            document_id = documents.json()[0]["id"]
 
             review = await client.post(
-                f"/api/workbench/documents/{documents.json()[0]['id']}/review",
+                f"/api/workbench/documents/{document_id}/review",
                 json={"review_status": "approved"},
                 headers=headers,
             )
@@ -107,6 +112,85 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             assert retrieval.json()["retrieval_mode"] == "hybrid_trgm_char_vector"
             assert retrieval.json()["skill_version"] == "1.1.0"
             assert retrieval.json()["citations"][0]["filename"] == "basis.md"
+
+            model_assets = await client.get(
+                "/api/workbench/runtime/model-assets", headers=headers
+            )
+            assert model_assets.status_code == 200
+            assert {item["asset_type"] for item in model_assets.json()} == {
+                "generation",
+                "embedding",
+                "reranker",
+            }
+            assert all(len(item["revision"]) == 40 for item in model_assets.json())
+            assert {item["status"] for item in model_assets.json()} == {"candidate"}
+
+            dataset = await client.post(
+                "/api/workbench/evaluation/datasets",
+                json={
+                    "project_id": project_id,
+                    "dataset_key": "retrieval-smoke",
+                    "name": "检索工程冒烟集",
+                },
+                headers=headers,
+            )
+            assert dataset.status_code == 201
+            assert dataset.json()["version_number"] == 1
+            dataset_id = dataset.json()["id"]
+            evaluation_case = await client.post(
+                f"/api/workbench/evaluation/datasets/{dataset_id}/cases",
+                json={
+                    "case_key": "family-country-goal",
+                    "query": "家国情怀教学目标",
+                    "expected_document_ids": [document_id],
+                },
+                headers=headers,
+            )
+            assert evaluation_case.status_code == 201
+            frozen = await client.post(
+                f"/api/workbench/evaluation/datasets/{dataset_id}/freeze",
+                headers=headers,
+            )
+            assert frozen.status_code == 200
+            assert frozen.json()["status"] == "frozen"
+            assert len(frozen.json()["content_hash"]) == 64
+            rejected_case = await client.post(
+                f"/api/workbench/evaluation/datasets/{dataset_id}/cases",
+                json={"case_key": "late-case", "query": "不得写入"},
+                headers=headers,
+            )
+            assert rejected_case.status_code == 409
+            evaluation_run = await client.post(
+                f"/api/workbench/evaluation/datasets/{dataset_id}/runs",
+                headers=headers,
+            )
+            assert evaluation_run.status_code == 200
+            assert evaluation_run.json()["status"] == "completed"
+            assert evaluation_run.json()["matched_cases"] == 1
+            assert evaluation_run.json()["release_manifest"]["vllm"][
+                "runtime_version"
+            ] == "0.18.0"
+            assert evaluation_run.json()["release_manifest"]["retrieval"][
+                "embedding_max_tokens"
+            ] == 512
+            run_id = evaluation_run.json()["id"]
+            evaluation_results = await client.get(
+                f"/api/workbench/evaluation/runs/{run_id}/results", headers=headers
+            )
+            assert evaluation_results.status_code == 200
+            assert evaluation_results.json()[0]["status"] == "matched"
+
+            next_dataset = await client.post(
+                "/api/workbench/evaluation/datasets",
+                json={
+                    "project_id": project_id,
+                    "dataset_key": "retrieval-smoke",
+                    "name": "检索工程冒烟集第二版",
+                },
+                headers=headers,
+            )
+            assert next_dataset.status_code == 201
+            assert next_dataset.json()["version_number"] == 2
 
             alignment = await client.post(
                 "/api/workbench/skills/alignment-card",

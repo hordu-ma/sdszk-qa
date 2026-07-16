@@ -6,6 +6,13 @@
 from .audit_logs import AuditLog
 from .base import Base, TimestampMixin, to_dict
 from .cases import Case
+from .evaluation import (
+    EvaluationCase,
+    EvaluationCaseResult,
+    EvaluationDataset,
+    EvaluationRun,
+    ModelAsset,
+)
 from .memory import (
     ClassContextProfile,
     MemoryInjectionAudit,
@@ -20,6 +27,7 @@ from .workbench import (
     ArtifactExport,
     KnowledgeChunk,
     KnowledgeDocument,
+    KnowledgeIndexVersion,
     ModelCallAudit,
     ProjectVersion,
     SkillRun,
@@ -40,6 +48,7 @@ __all__ = [
     "ProjectVersion",
     "KnowledgeDocument",
     "KnowledgeChunk",
+    "KnowledgeIndexVersion",
     "TaskRun",
     "SkillRun",
     "SkillDefinition",
@@ -49,4 +58,9 @@ __all__ = [
     "MemoryInjectionAudit",
     "PinnedMemoryItem",
     "ArtifactExport",
+    "ModelAsset",
+    "EvaluationDataset",
+    "EvaluationCase",
+    "EvaluationRun",
+    "EvaluationCaseResult",
 ]

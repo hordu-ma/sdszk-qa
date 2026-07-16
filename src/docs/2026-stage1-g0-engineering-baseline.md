@@ -17,6 +17,7 @@
 - 闭环：依据对齐卡 → 目标—证据—任务蓝图 → 课时分块 → 形成性诊断 → 标准 Word 导出。
 - 诊断原则：只给证据、状态和修改建议，不给教师/学生总分、等级、排名或绩效结论。
 - Memory 原则：只注入用户在本次运行中显式勾选的对象；清除后不可用于新 SkillRun。
+- 模型与检索原则：固定运行时和模型 revision 仅作为工程候选；专业选型仍待专家金标评测。
 
 ## 2. 产品 Skills 目录 v1（工程冻结部分）
 
@@ -70,11 +71,18 @@
 
 ## 5. 检索与模型工程决策
 
-当前可运行检索链为 PostgreSQL `pg_trgm` 候选召回 + 字符 n-gram 向量余弦重排，模式名为 `hybrid_trgm_char_vector`。它具备确定性、离线可回归和资料不足降级，适合当前工程样板。
+当前完整检索链为 PostgreSQL `pg_trgm` + pgvector 余弦候选召回，再经 vLLM Reranker 重排，模式名为 `hybrid_trgm_pgvector_reranker`。Embedding/Reranker 不可用时显式降级为 `hybrid_trgm_char_vector`；两条链均保留审核过滤和资料不足阈值。
 
-边界：字符向量不是正式语义 Embedding，也不能替代经评测的 Reranker。正式 Embedding、Reranker、模型资产哈希和 vLLM arm64 兼容性仍属于 D0/G0 外部决策；冻结前不得把当前降级链描述为最终混合 RAG。
+工程候选冻结为 vLLM `0.18.0` 镜像摘要、`Qwen/Qwen2.5-0.5B-Instruct`、`BAAI/bge-small-zh-v1.5`（512 维）和 `BAAI/bge-reranker-v2-m3` 的精确 Hugging Face revision。知识索引记录模型、revision、维度、配置哈希和状态；新版本完整写入后才激活，失败版本不替换上一有效索引。
 
-生成模型继续通过逻辑模型名调用。Provider Adapter 契约已区分 Ollama 与 OpenAI-compatible/vLLM；`luyun-int` 当前允许 Ollama 过渡，`luyun-demo` 正式候选必须等待 vLLM Go/No-Go。
+边界：以上是工程兼容性候选，不代表正式教学质量选型。生成模型继续通过逻辑模型名调用；`luyun-int` 问答允许 Ollama 过渡，`luyun-demo` 正式候选仍须通过专家金标回归和 Go/No-Go。
+
+## 5.1 可版本化工程评测
+
+- 数据集按 `project + dataset_key + version_number` 递增；冻结后禁止修改，记录 canonical JSON 的 SHA256。
+- 每次运行绑定数据集哈希与应用发布、vLLM 镜像、三个模型 revision、检索参数和 Skill 版本清单。
+- 单案例只记录 expected document/资料不足是否命中、检索模式、延迟和错误；汇总为 matched/failed/error 技术计数。
+- 当前框架不含专家金标，不设置专业通过阈值，也不输出教师/学生总分、等级或排名。
 
 ## 6. 版本、导出与追溯
 
@@ -96,11 +104,13 @@ make harness-full
 
 1. 创建高中议题式项目。
 2. 上传并审核资料。
-3. 保存偏好或班情，并显式勾选本次使用项。
-4. 运行对齐卡、蓝图、课时设计、形成性诊断。
-5. 比较 v1 与最新版本。
-6. 导出并打开 DOCX。
-7. 清除 Memory，确认旧引用不能用于新 SkillRun。
+3. 确认知识索引为 `active`，检索模式为 `hybrid_trgm_pgvector_reranker`。
+4. 保存偏好或班情，并显式勾选本次使用项。
+5. 运行对齐卡、蓝图、课时设计、形成性诊断。
+6. 比较 v1 与最新版本，导出并打开 DOCX。
+7. 创建工程评测数据集和案例，冻结后确认不可修改，执行并核对发布清单与逐案例结果。
+8. 停止 Reranker，确认检索显式降级且不返回 5xx；恢复服务后确认健康。
+9. 清除 Memory，确认旧引用不能用于新 SkillRun。
 
 ## 8. 仍需外部签字的 G0 输入
 
@@ -108,7 +118,7 @@ make harness-full
 - 客户确认样板主题、对外话术、试点人员和 G1 阈值。
 - 资料版权、有效期、更新责任人和审核 SLA。
 - 60–80 个 G0 种子案例审核；G1 扩展到 120–160 个。
-- 正式 Embedding、Reranker、vLLM 模型与硬件容量 Go/No-Go。
+- Embedding、Reranker、生成模型的专业冻结，以及长上下文/并发/容量 Go/No-Go。
 - ACL/Grant、身份声明、合规、RTO/RPO、红队和事故流程责任人。
 
 以上未签字前，结论保持：工程纵向样板可运行；阶段 1A、阶段 1B、G0、G1 均不得标记为整体完成。

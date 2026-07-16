@@ -3,7 +3,8 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, ForeignKey, String, Text, UniqueConstraint
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import JSON, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -84,6 +85,12 @@ class KnowledgeChunk(Base):
     __tablename__ = "knowledge_chunks"
     __table_args__ = (
         UniqueConstraint("document_id", "chunk_index", name="uq_document_chunk_index"),
+        Index(
+            "ix_knowledge_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -93,9 +100,43 @@ class KnowledgeChunk(Base):
     chunk_index: Mapped[int]
     content: Mapped[str] = mapped_column(Text)
     location_label: Mapped[str] = mapped_column(String(100))
+    index_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("knowledge_index_versions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(512), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    embedding_revision: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    semantic_indexed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default="now()")
 
     document: Mapped["KnowledgeDocument"] = relationship(back_populates="chunks")
+
+
+class KnowledgeIndexVersion(Base, TimestampMixin):
+    """项目级可追溯知识索引配置版本。"""
+
+    __tablename__ = "knowledge_index_versions"
+    __table_args__ = (
+        UniqueConstraint("project_id", "version_number", name="uq_knowledge_index_version"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("teaching_projects.id", ondelete="CASCADE"), index=True
+    )
+    version_number: Mapped[int]
+    status: Mapped[str] = mapped_column(String(30), default="building", index=True)
+    embedding_model: Mapped[str] = mapped_column(String(255))
+    embedding_revision: Mapped[str] = mapped_column(String(64))
+    reranker_model: Mapped[str] = mapped_column(String(255))
+    reranker_revision: Mapped[str] = mapped_column(String(64))
+    dimensions: Mapped[int]
+    config_hash: Mapped[str] = mapped_column(String(64), index=True)
+    chunk_count: Mapped[int] = mapped_column(default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    activated_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
 class TaskRun(Base, TimestampMixin):

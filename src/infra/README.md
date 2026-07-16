@@ -3,7 +3,7 @@
 本文档说明 `src/infra` 目录中各配置文件的作用，以及 `base-spark` 集成环境的运维步骤。
 
 > 本地开发命令见[开发指南](../docs/DEVELOPMENT.md)。
-> `base-spark.yml` 是阶段 1A 集成环境基线；正式 A/B 生产文件仍是问答 MVP 基线。
+> `base-spark.yml` 是阶段 1 工程集成环境基线；正式 A/B 生产文件仍是问答 MVP 基线。
 > 演示环境只能展示已实现能力，阶段口径以主开发计划为准。
 
 ## 目录结构
@@ -30,7 +30,7 @@ infra/
 
 **包含的服务**：
 
-- **PostgreSQL (15-Alpine)**
+- **PostgreSQL 17 + pgvector**
   - 数据库服务
   - 默认暴露端口 5432
   - 支持环境变量配置用户名、密码、数据库名
@@ -142,7 +142,7 @@ ENV=dev
 
 - 正式校内部署、稳定演示和最终验收默认使用 vLLM。
 - Ollama 仅用于前期开发、vLLM 兼容性验证期间的过渡和明确标注的备用 Provider。
-- 当前 `prod-b.yml` 使用 `vllm/vllm-openai:latest`，只代表现有基线；进入演示冻结或生产发布前必须改为经验证的固定版本，并登记镜像摘要、模型权重、Tokenizer、Chat Template 和推理参数。
+- `prod-b.yml` 已固定到 vLLM `0.18.0` 镜像摘要和生成模型 revision；进入演示冻结或生产发布前仍须在目标硬件完成专业质量、Chat Template、结构化输出、SSE、容量和重启门禁。
 - 应用最终通过 ModelGateway 使用逻辑模型名；在网关落地前，`LLM_MODEL` 仍必须与当前 Provider 的 `/v1/models` 返回 ID 一致。
 
 ---
@@ -227,9 +227,9 @@ Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当
 
 两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。
 
-阶段 1 工程样板已在 `luyun-int` 形成“查依据—备课—诊断—导出”技术闭环：项目/版本、资料/任务、六个样板 Skills、显式 Memory、降级混合检索、非评分诊断、版本差异和 Word 导出均已部署。2026-07-16 已完成迁移往返、发布前备份、HTTPS 端到端功能、应用重启持久化、真实 SSE 与镜像回滚/恢复验收。`luyun-demo` 晋级、固定版本 vLLM、正式语义 Embedding/Reranker、专家回归和 G0/G1 外部签字仍未完成，不得对外宣称阶段整体完成。
+阶段 1 工程样板已在 `luyun-int` 形成“查依据—备课—诊断—导出”技术闭环。本轮新增固定版本 vLLM 编排与模型资产登记、`pg_trgm + pgvector + Reranker` 语义检索、显式字符向量降级，以及可冻结、可哈希、可绑定发布清单的工程评测框架。三类模型仍是工程候选资产，评测案例仍是工程 fixture；专家回归、正式模型选型、`luyun-demo` 晋级和 G0/G1 外部签字尚未完成。
 
-> 迁移 `f7b8c9d0e123` 起依赖 PostgreSQL 标准 contrib 扩展 `pg_trgm`（迁移内 `CREATE EXTENSION IF NOT EXISTS` 自动创建，要求数据库用户具备创建扩展权限；官方 postgres 镜像的 `POSTGRES_USER` 默认满足）。
+> 迁移 `f7b8c9d0e123` 起依赖 `pg_trgm`，迁移 `i9d0e1f2a345` 起依赖 `vector`。Base-Spark 使用固定摘要的 `pgvector/pgvector:pg17-trixie`；迁移会执行 `CREATE EXTENSION IF NOT EXISTS`，数据库用户须具备创建扩展权限。
 
 ### Base-Spark 阶段 1 集成环境
 
@@ -238,11 +238,31 @@ Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当
 ```bash
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml build
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml run --rm --no-deps -w /app/src/apps/api api uv run alembic upgrade head
-docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml up -d
+docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml --profile model-baseline --profile semantic-rag up -d --wait
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
 
-2026-07-16 当前验收基线：镜像 `stage1-sample-20260716-r2`，迁移 `h8c9d0e1f234 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260716-121140/`。数据库迁移已经过 `f7b8c9d0e123 → h8c9d0e1f234 → f7b8c9d0e123 → h8c9d0e1f234` 往返；`r1` 功能镜像已回滚至上一稳定版本 `stage1a-20260716-7f9e9b2` 并恢复，迁移一致性修正后重建为当前 `r2`，容器与 HTTPS 健康检查均通过。
+2026-07-16 本轮发布候选：应用镜像 `stage1-rag-eval-20260716-r1`，迁移 `i9d0e1f2a345 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260716-130000-rag-eval/`。数据库迁移已通过 `h8c9d0e1f234 → i9d0e1f2a345 → h8c9d0e1f234 → i9d0e1f2a345` 往返。固定模型资产如下，均为工程候选，不代表专业选型：
+
+| 类型 | 资产 | 固定 revision | 服务名 / loopback |
+| --- | --- | --- | --- |
+| 运行时 | `vllm/vllm-openai:v0.18.0` | 镜像摘要见 Compose | — |
+| 生成 | `Qwen/Qwen2.5-0.5B-Instruct` | `7ae557604adf67be50417f59c2c2f167def9a775` | `teaching-chat-engineering` / `28001` |
+| Embedding | `BAAI/bge-small-zh-v1.5` | `7999e1d3359715c523056ef9478215996d62a620` | `teaching-embedding` / `28002` |
+| Reranker | `BAAI/bge-reranker-v2-m3` | `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e` | `teaching-reranker` / `28003` |
+
+模型服务由 Compose profile 控制；正常停启保留模型缓存卷：
+
+```bash
+docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml --profile model-baseline --profile semantic-rag start vllm-generation vllm-embedding vllm-reranker
+curl -fsS http://127.0.0.1:28001/health
+curl -fsS http://127.0.0.1:28002/health
+curl -fsS http://127.0.0.1:28003/health
+
+docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml --profile model-baseline --profile semantic-rag stop vllm-reranker vllm-embedding vllm-generation
+```
+
+本轮实机验收结果：三类服务均报告 vLLM `0.18.0`；生成服务通过 Chat、JSON Schema 结构化输出和 SSE `[DONE]`；Embedding 返回两条 512 维向量；Reranker 对相关/无关文档给出完整索引和可区分相关度。HTTPS 业务链完成 active 语义索引、`hybrid_trgm_pgvector_reranker` 检索、冻结数据集、发布清单和逐案例结果；停用 Reranker 后检索显式降级为 `hybrid_trgm_char_vector` 且无 5xx，服务恢复后健康。应用重启后索引、评测与模型资产仍在；旧应用镜像回滚和当前镜像恢复均通过。
 
 本次 HTTPS 验收已覆盖登录、六个 Skill、项目/资料/任务、审核、显式 Memory、对齐卡、蓝图、课时分块、非评分诊断、版本差异、Word 下载和 Memory 清除；下载文件头为有效 DOCX/ZIP。真实 Ollama SSE 返回 `[DONE]`，API 重启后问答消息仍可读取。用户已完成此前工作台的 Virtus 人工浏览器验收；本次新增纵向样板界面尚未另行标记为 Virtus 人工验收，服务器侧 HTTPS API 验收不替代该项。
 
@@ -250,6 +270,7 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 
 ```bash
 docker start luyun-int-postgres-1 luyun-int-minio-1
+docker start luyun-int-vllm-generation-1 luyun-int-vllm-embedding-1 luyun-int-vllm-reranker-1
 docker start luyun-int-api-1
 docker start luyun-int-web-1
 docker ps --filter name=luyun-int --format 'table {{.Names}}\t{{.Status}}'
@@ -261,12 +282,13 @@ curl -fsS http://127.0.0.1:8088/healthz
 ```bash
 tailscale serve --https=443 off
 docker stop luyun-int-web-1 luyun-int-api-1
+docker stop luyun-int-vllm-reranker-1 luyun-int-vllm-embedding-1 luyun-int-vllm-generation-1
 docker stop luyun-int-minio-1 luyun-int-postgres-1
 ```
 
 不要使用 `docker compose down -v` 或删除命名卷进行普通停用；`-v` 会删除数据库和对象存储数据。容器设置为 `restart: unless-stopped`，宿主重启后会自动恢复；如果曾手动 `docker stop`，需按上面的日常启用步骤重新启动。
 
-Base-Spark 当前防火墙不允许新建 Docker bridge 从宿主转发，因此阶段 1 Compose 使用 host network，但所有服务分别固定绑定独立 loopback 端口：Web `8088`、API `28000`、PostgreSQL `25432`、MinIO `29000/29001`。它们不会直接暴露给局域网或 Tailnet。
+Base-Spark 当前防火墙不允许新建 Docker bridge 从宿主转发，因此阶段 1 Compose 使用 host network，但所有服务分别固定绑定独立 loopback 端口：Web `8088`、API `28000`、PostgreSQL `25432`、MinIO `29000/29001`、vLLM 生成/Embedding/Reranker `28001/28002/28003`。它们不会直接暴露给局域网或 Tailnet。
 
 ### Tailscale Serve 启用、停用与验证
 
@@ -284,6 +306,7 @@ Serve 只向同一 Tailnet 提供 HTTPS，不启用 Funnel，也不直接暴露 
 
    ```bash
    docker start luyun-int-postgres-1 luyun-int-minio-1
+   docker start luyun-int-vllm-generation-1 luyun-int-vllm-embedding-1 luyun-int-vllm-reranker-1
    docker start luyun-int-api-1
    docker start luyun-int-web-1
    curl -fsS http://127.0.0.1:8088/healthz
@@ -373,6 +396,7 @@ ssh -N -L 18088:127.0.0.1:8088 pgx@base-spark
 | ----------------------------- | ------ | ---------------- |
 | `CUDA_VISIBLE_DEVICES`        | 0      | GPU 设备编号     |
 | `VLLM_MODEL_PATH`             | 必需   | 模型文件路径     |
+| `VLLM_MODEL_REVISION`         | 必需   | 模型精确 revision |
 | `VLLM_MODEL_VOLUME`           | 必需   | 模型挂载卷       |
 | `VLLM_MAX_MODEL_LEN`          | 8192   | 模型最大序列长度 |
 | `VLLM_GPU_MEMORY_UTILIZATION` | 0.9    | GPU 显存利用率   |

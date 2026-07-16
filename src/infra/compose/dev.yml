@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg17-trixie@sha256:69573b32242ca232f65871d4cb916ba7210a372b9bd74068204c1a9a57bada4f
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -47,6 +47,9 @@ services:
       LLM_MODEL: ${LLM_MODEL:-/home/malig/.cache/modelscope/hub/models/Qwen/Qwen2___5-1___5B-Instruct}
       LLM_MAX_CONTEXT_LEN: ${LLM_MAX_CONTEXT_LEN:-1800}
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-200}
+      SEMANTIC_RAG_ENABLED: ${SEMANTIC_RAG_ENABLED:-false}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-http://host.docker.internal:28002}
+      RERANKER_BASE_URL: ${RERANKER_BASE_URL:-http://host.docker.internal:28003}
       ENV: ${ENV:-dev}
       JWT_SECRET: ${JWT_SECRET:-dev-change-me}
     depends_on:

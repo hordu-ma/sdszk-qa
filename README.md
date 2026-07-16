@@ -11,8 +11,8 @@
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |
 | 问答 MVP | 可用 | 登录、主题、会话、历史、SSE 流式问答 |
-| 阶段 1A | 工程底座可用，整体未验收 | `luyun-int` 与 Virtus 已验证；正式语义模型和完整 G0 外部签字未完成 |
-| 阶段 1B / G1 | 技术样板可运行，未通过 G1 | 高中议题式生成—诊断—版本—Word 闭环已实现；专业评测与稳定环境晋级未完成 |
+| 阶段 1A | 工程底座可用，整体未验收 | 固定版 vLLM、语义 RAG 和版本化工程评测已实现；候选模型与完整 G0 外部签字未冻结 |
+| 阶段 1B / G1 | 技术样板可运行，未通过 G1 | 高中议题式闭环已实现；专家金标评测与稳定环境晋级未完成 |
 | Base-Spark 接入 | 链路已通 | Tailnet HTTPS 可访问；ACL 授权由 Tailnet 管理侧负责 |
 
 ### 已实现能力
@@ -26,7 +26,9 @@
 
 - 教学项目与版本：创建项目、保存不可变版本快照
 - 资料库：上传（DOCX / 文本 PDF / Markdown / TXT）、后台解析分块、审核门禁（未审核资料不进入检索）
-- 依据检索：`skill.retrieve_basis`，`pg_trgm` 召回 + 字符向量重排的可回归降级链，检索不到可靠依据时明确提示"资料不足"
+- 依据检索：`skill.retrieve_basis`，`pg_trgm` + pgvector 语义召回 + Reranker；Provider 故障时显式回退字符向量链，检索不到可靠依据时明确提示"资料不足"
+- 知识索引版本：Embedding/Reranker 仓库、revision、维度和配置哈希可追溯；新索引完整构建后才原子激活
+- 版本化工程评测：数据集按 key/version 冻结，内容 SHA256 不可变；运行绑定应用、vLLM、模型 revision、检索参数和 Skill 版本发布清单
 - Skills 运行时：统一权限、Schema、运行审计、停用与降级契约；已注册查依据、对齐卡、蓝图、分块生成、形成性诊断和导出六个 Skill
 - Memory：账户偏好、班情档案、项目/模板钉选；每次注入必须由用户在界面显式勾选，支持导出和一键清除
 - 异步任务：排队、进度、取消、重试，应用重启后自动恢复
@@ -36,12 +38,13 @@
 **工程质量**
 
 - 模型调用走最小 ModelClient（业务只认逻辑模型名，支持 Ollama / OpenAI 兼容接口）
+- vLLM 运行时固定为 `0.18.0` 镜像摘要，生成、Embedding、Reranker 候选模型固定 Hugging Face revision 并登记入库
 - 种子案例一致性校验（`make validate-cases`）
 - "无评分/排名"防护测试：API 和数据模型中出现评分类标识符会使测试失败
 
 ### 尚未完成（主要项）
 
-正式语义 Embedding/Reranker、专家审核的完整阶段 1 Skill/规则目录、120–160 个案例专业回归、固定版本 vLLM、`luyun-demo` 稳定演示环境和 G0/G1 外部签字。当前字符向量链是可运行降级基线，不冒充最终语义混合 RAG。完整清单见主开发计划 §1.2。
+专家审核的完整阶段 1 Skill/规则目录、专家金标 120–160 个案例及专业阈值、候选模型正式选型、`luyun-demo` 稳定演示环境和 G0/G1 外部签字。当前三个模型是工程兼容性候选，不代表专业选型；工程评测结果不冒充教学质量结论。完整清单见主开发计划 §1.2。
 
 ## 系统组成
 
@@ -49,8 +52,8 @@
 | --- | --- | --- |
 | 前端 | Vue 3 + Vant + Vite | 当前为轻交互问答 + 工作台基础页；目标形态是桌面优先工作台 |
 | 后端 | FastAPI + SQLAlchemy（异步） | 薄路由 + services 业务层 |
-| 存储 | PostgreSQL + MinIO | 业务数据 + 原始文件 |
-| 模型 | Ollama（过渡）/ vLLM（正式基线） | 经 ModelClient 调用，业务不感知具体引擎 |
+| 存储 | PostgreSQL + pgvector + MinIO | 业务数据、语义向量 + 原始文件 |
+| 模型 | vLLM 0.18.0 候选基线 / Ollama 问答过渡 | 经 Provider Adapter 调用，业务不感知具体引擎 |
 | 代理 | Nginx | HTTPS 与 SSE 反代 |
 
 ## 主要使用流程
@@ -68,6 +71,8 @@
 - Skills：`GET /api/workbench/skills`、`POST /api/workbench/skills/{retrieve-basis|alignment-card|design-blueprint|generate-section|diagnose-artifact|export-artifact}`
 - Memory：`/api/workbench/memory/preference`、`class-profiles`、`pinned-items`、`export`、`clear`
 - 版本/导出：`/api/workbench/projects/{id}/versions`、`versions/diff`、`/api/workbench/exports/{id}/download`
+- 模型/索引：`/api/workbench/runtime/model-assets`、`/api/workbench/projects/{id}/knowledge-indexes`
+- 工程评测：`/api/workbench/evaluation/datasets`、`/api/workbench/evaluation/runs/{id}/results`
 
 ## 快速开始
 
@@ -117,7 +122,8 @@ make test-integration    # 集成测试
 ## 可审计数据
 
 - 问答：messages、sessions、audit_logs
-- 工作台：teaching_projects、project_versions、knowledge_documents、knowledge_chunks
+- 工作台：teaching_projects、project_versions、knowledge_documents、knowledge_chunks、knowledge_index_versions
 - 运行留痕：task_runs、skill_runs（含 input_hash、memory_refs、error_code）、model_call_audits
 - Skills 与 Memory：skill_definitions、user_preferences、class_context_profiles、pinned_memory_items、memory_injection_audits
 - 导出：artifact_exports（关联项目、版本、SkillRun、模板和校验和）
+- 模型与评测：model_assets、evaluation_datasets/cases/runs/case_results（冻结哈希与发布清单）

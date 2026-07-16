@@ -25,6 +25,7 @@ os.environ["JWT_SECRET"] = "test-secret"
 os.environ["LLM_MAX_CONTEXT_LEN"] = "1024"
 os.environ["ENV"] = "dev"
 os.environ["DEBUG"] = "true"
+os.environ["SEMANTIC_RAG_ENABLED"] = "false"
 
 
 @pytest.fixture(autouse=True)
@@ -44,6 +45,7 @@ def reload_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_MAX_CONTEXT_LEN", "1024")
     monkeypatch.setenv("ENV", "dev")
     monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.setenv("SEMANTIC_RAG_ENABLED", "false")
 
     import src.apps.api.config as config
 

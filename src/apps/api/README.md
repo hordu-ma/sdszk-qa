@@ -50,7 +50,8 @@ api/
 - `routes/chat.py`
   - SSE 流式问答（核心链路，`POST /api/chat`）
 - `routes/workbench.py`
-  - 教学项目/版本/差异、资料上传与审核、任务、六个样板 Skill 与 Word 导出
+  - 教学项目/版本/差异、资料上传与审核、知识索引、任务、六个样板 Skill 与 Word 导出
+  - 固定模型资产查询、版本化工程评测数据集/案例/冻结/运行/结果
   - Memory 端点：偏好、班情、项目/模板钉选、导出与一键清除
   - 资料审核仅限 `reviewer`/`admin` 角色，阶段 1A 审核范围为全库（可审任意用户资料）；组织级隔离按计划 WP2.5 在阶段 2 引入
 
@@ -59,14 +60,17 @@ api/
 - `chat_orchestration.py`：提示词、会话上下文和 token 估算。
 - `model_gateway.py`：最小 ModelClient、Ollama/OpenAI 兼容调用、统一错误和调用审计。
 - `project_service.py`：教学项目和版本操作。
-- `knowledge_service.py`：资料解析、任务恢复、审核过滤，以及 pg_trgm + 字符向量重排降级链。
+- `knowledge_service.py`：资料解析、任务恢复、审核过滤、版本化语义索引、pg_trgm + pgvector 混合召回与字符向量降级链。
+- `retrieval_gateway.py`：vLLM Embeddings/Rerank HTTP 契约、512 token 截断边界、维度/数量/索引完整性校验。
+- `model_asset_service.py`：固定 vLLM/模型 revision 登记与可复现发布清单。
+- `evaluation_service.py`：评测数据集版本、冻结哈希、运行和逐案例工程结果。
 - `skill_runtime.py`：Skill 注册表、权限与 Schema 校验、Memory 注入审计和 SkillRun 生命周期；`run_skill` 是唯一 Skill 执行入口。
 - `memory_service.py`：偏好、班情、钉选、一键清除与导出。
 - `vertical_sample_service.py`：对齐卡、蓝图、课时分块、形成性诊断、版本差异和 DOCX 导出。
 当前边界（详见架构说明）：
 
 - `retrieve_basis` 为 baseline；其余五个 Skill 为 vertical_sample，外部专业签字前不冒充正式产品成熟度。
-- 配额/降级契约已登记；字符向量重排是可回归降级链，正式语义 Embedding/Reranker 待 D0。
+- 配额/降级契约已登记；语义 Provider 失败时字符向量链继续提供显式降级。当前模型只是 D0 工程候选，正式专业选型待外部评审。
 - Memory 注入只接受用户显式传入的 `memory_refs`，不做任何自动注入。
 - 禁止实现评分/排名模块：`tests/test_no_scoring_paths.py` 做防护断言，`register_skill` 拒绝评分类 skill_id。
 
@@ -88,6 +92,8 @@ api/
 - `skill_definitions`：注册 Skill 的版本、Schema、权限与停用开关
 - `user_preferences` / `class_context_profiles` / `pinned_memory_items` / `memory_injection_audits`：Memory 对象与注入审计
 - `artifact_exports`：关联项目、版本、SkillRun、模板与校验和的导出件
+- `model_assets` / `knowledge_index_versions`：运行时、模型 revision 与知识索引配置追溯
+- `evaluation_datasets` / `evaluation_cases` / `evaluation_runs` / `evaluation_case_results`：冻结数据集和绑定发布清单的技术评测
 
 ## 调用链路
 

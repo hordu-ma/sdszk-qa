@@ -6,7 +6,7 @@ from uuid import uuid4
 import bcrypt
 import httpx
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from src.apps.api.dependencies import AsyncSessionLocal, engine
 from src.apps.api.main import app
@@ -25,6 +25,7 @@ async def _fake_stream_chat(*args: object, **kwargs: object) -> AsyncGenerator[s
 
 async def _ensure_tables() -> None:
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(User.metadata.create_all)
 
 
