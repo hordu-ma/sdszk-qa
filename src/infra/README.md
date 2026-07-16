@@ -72,7 +72,7 @@ docker compose -f src/infra/compose/dev.yml up -d
 - ✅ 使用默认凭证（`JWT_SECRET=dev-change-me`）
 - ✅ LLM 服务指向本地外部 vLLM（`host.docker.internal:8001`）
 
-开发期如需临时使用 Ollama，可通过当前最小 ModelClient 指定 `LLM_PROVIDER`、`LLM_BASE_URL` 和 `LLM_MODEL` 做问答链路验证；这不代表 vLLM/Ollama 已完成统一，也不得作为正式生产配置。完整统一仍须由 ModelGateway 和 Provider Adapter 完成。
+开发期如需临时使用 Ollama，可通过当前最小 ModelClient 和 Provider Adapter 指定 `LLM_PROVIDER`、`LLM_BASE_URL` 和 `LLM_MODEL` 做问答链路验证；这不代表 Ollama 可作为正式默认配置。完整能力路由仍须由后续 ModelGateway 完成。
 
 **环境变量示例**：
 
@@ -143,7 +143,7 @@ ENV=dev
 - 正式校内部署、稳定演示和最终验收默认使用 vLLM。
 - Ollama 仅用于前期开发、vLLM 兼容性验证期间的过渡和明确标注的备用 Provider。
 - `prod-b.yml` 已固定到 vLLM `0.18.0` 镜像摘要和生成模型 revision；进入演示冻结或生产发布前仍须在目标硬件完成专业质量、Chat Template、结构化输出、SSE、容量和重启门禁。
-- 应用最终通过 ModelGateway 使用逻辑模型名；在网关落地前，`LLM_MODEL` 仍必须与当前 Provider 的 `/v1/models` 返回 ID 一致。
+- 应用当前通过 ModelClient/Provider Adapter 使用逻辑模型名；完整 ModelGateway 落地前，`LLM_MODEL` 仍必须与当前 Provider 的 `/v1/models` 返回 ID 一致。
 
 ---
 
@@ -215,7 +215,7 @@ Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当
 
 | 环境 | 用途 | 更新规则 | 模型服务 |
 | --- | --- | --- | --- |
-| `luyun-int` | 开发联调、迁移、Provider 切换和故障测试 | 每个可运行增量或至少每周部署 | 候选 vLLM；允许测试 Ollama |
+| `luyun-int` | 开发联调、迁移、Provider 切换和故障测试 | 每个可运行增量或至少每周部署 | 固定候选 vLLM 主链；允许明示测试 Ollama 备用 |
 | `luyun-demo` | 随时演示和投标彩排 | 只接收通过门禁的同一不可变镜像 | 固定版本 vLLM 默认，Ollama 明示降级 |
 
 发布链路：
@@ -242,7 +242,9 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
 
-2026-07-16 本轮发布候选：应用镜像 `stage1-rag-eval-20260716-r1`，迁移 `i9d0e1f2a345 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260716-130000-rag-eval/`。数据库迁移已通过 `h8c9d0e1f234 → i9d0e1f2a345 → h8c9d0e1f234 → i9d0e1f2a345` 往返。固定模型资产如下，均为工程候选，不代表专业选型：
+2026-07-16 当前发布候选：应用镜像 `stage1-browser-fixes-20260716-r1`，迁移 `i9d0e1f2a345 (head)`，本轮发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260716-140000-browser-fixes/`；上一增量备份保留在 `/home/pgx/backups/luyun-sizheng/20260716-130000-rag-eval/`。数据库迁移此前已通过 `h8c9d0e1f234 → i9d0e1f2a345 → h8c9d0e1f234 → i9d0e1f2a345` 往返；本轮无新迁移。固定模型资产如下，均为工程候选，不代表专业选型：
+
+本轮回滚：先将仓库外运行配置恢复为 `/home/pgx/luyun-sizheng-int.env.bak-20260716-vllm-primary`，或显式填写上一合格 Provider 参数；再把 `RELEASE_TAG` 改回 `stage1-rag-eval-20260716-r1`，按上面的 `up -d --wait` 命令重新创建 API/Web。因为本轮无迁移，正常应用回滚不需要降级数据库；只有数据损坏时才使用上述发布前备份恢复 PostgreSQL/MinIO。
 
 | 类型 | 资产 | 固定 revision | 服务名 / loopback |
 | --- | --- | --- | --- |
@@ -264,7 +266,7 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 
 本轮实机验收结果：三类服务均报告 vLLM `0.18.0`；生成服务通过 Chat、JSON Schema 结构化输出和 SSE `[DONE]`；Embedding 返回两条 512 维向量；Reranker 对相关/无关文档给出完整索引和可区分相关度。HTTPS 业务链完成 active 语义索引、`hybrid_trgm_pgvector_reranker` 检索、冻结数据集、发布清单和逐案例结果；停用 Reranker 后检索显式降级为 `hybrid_trgm_char_vector` 且无 5xx，服务恢复后健康。应用重启后索引、评测与模型资产仍在；旧应用镜像回滚和当前镜像恢复均通过。
 
-本次 HTTPS 验收已覆盖登录、六个 Skill、项目/资料/任务、审核、显式 Memory、对齐卡、蓝图、课时分块、非评分诊断、版本差异、Word 下载和 Memory 清除；下载文件头为有效 DOCX/ZIP。真实 Ollama SSE 返回 `[DONE]`，API 重启后问答消息仍可读取。用户已完成此前工作台的 Virtus 人工浏览器验收；本次新增纵向样板界面尚未另行标记为 Virtus 人工验收，服务器侧 HTTPS API 验收不替代该项。
+本次 HTTPS 验收已覆盖双账号角色、六个 Skill、项目/资料/任务、管理员跨用户审核、教师审核 403、显式 Memory、对齐卡、蓝图、课时分块、非评分诊断、版本差异和 Word 下载。真实 vLLM SSE 返回内容、结束事件和 `[DONE]`，`/api/workbench/model-status` 报告 `vllm · teaching-chat-engineering` 且未降级。真实 Chromium 通过 Tailnet HTTPS 验证步骤门禁逐级解锁、Memory 清除确认、教师端隐藏审核按钮、语义 RAG、失败任务原因和 `word-standard-v2` 下载；DOCX 经 ZIP 检查和 LibreOffice 渲染为 3 页 PDF，包含标题、列表和表格且无内部字典文本。用户已完成此前工作台的 Virtus 人工浏览器验收；本轮自动 Chromium 回归在 Base-Spark 执行，不冒充新的 Virtus 跨设备人工验收。
 
 当前已有容器的日常启用不需要重建，也不需要再次执行 seed：
 
@@ -327,7 +329,7 @@ Serve 只向同一 Tailnet 提供 HTTPS，不启用 Funnel，也不直接暴露 
 
 4. 在已登录同一 Tailnet 的 Virtus 浏览器访问 <https://base-spark.tail84088a.ts.net/>，完成登录、工作台和 SSE 问答冒烟。
 
-2026-07-16 记录：Serve 已按上述命令恢复，Base-Spark 的 Tailnet HTTPS `/healthz` 返回 `ok`，Virtus 的 `tailscale ping` 为直连在线。当前 Base-Spark 无 Virtus SSH 凭据，因此本轮新增页面功能仍需在 Virtus 浏览器中人工复核，不得将本机 HTTPS 健康检查表述为已完成跨机界面验收。
+2026-07-16 记录：Serve 已按上述命令恢复，Base-Spark 的 Tailnet HTTPS `/healthz` 返回 `ok`，Virtus 的 `tailscale ping` 为直连在线。用户已完成人工 Virtus 工作台验收；本轮新增五项修复另通过 Base-Spark 上的真实 Chromium Tailnet HTTPS 自动回归，后者不得表述为新的 Virtus 跨设备人工验收。
 
 #### 每次停用
 
@@ -338,18 +340,20 @@ tailscale serve --https=443 off
 tailscale serve status
 ```
 
-如需完整停机，再按上一节顺序停止 4 个 `luyun-int` 容器。不要用 `tailscale serve reset` 代替普通停用；`reset` 会清空该节点全部 Serve 配置，只有确认不存在其他处理器时才可使用。
+如需完整停机，再按上一节顺序停止全部 7 个 `luyun-int` 容器。不要用 `tailscale serve reset` 代替普通停用；`reset` 会清空该节点全部 Serve 配置，只有确认不存在其他处理器时才可使用。
 
 #### 测试账号
 
 | 项目 | 值 |
 | --- | --- |
 | URL | `https://base-spark.tail84088a.ts.net/` |
-| 用户名 | `demo_teacher` |
-| 密码 | `Luyun-Stage1A-0715!` |
-| 当前角色 | `admin`（用于资料审核门禁演示） |
+| 教师用户名 | `demo_teacher` |
+| 教师角色 | `teacher`（创建项目、上传资料和运行教学流程，不可审核） |
+| 管理员用户名 | `demo_admin` |
+| 管理员角色 | `admin`（审核资料） |
+| 两个账号当前密码 | `Luyun-Stage1A-0715!` |
 
-该账号只用于阶段 1 合成数据验证。正式客户部署、公开演示或 Tailnet 访问范围扩大前，必须删除或轮换该账号和密码；不得复用当前数据库、JWT、MinIO 等环境 Secret。
+这两个账号只用于阶段 1 合成数据验证。正式客户部署、公开演示或 Tailnet 访问范围扩大前，必须删除或轮换账号和密码；不得复用当前数据库、JWT、MinIO 等环境 Secret。
 
 #### 常见故障
 
@@ -365,7 +369,7 @@ tailscale serve status
 ssh -N -L 18088:127.0.0.1:8088 pgx@base-spark
 ```
 
-保持终端运行，并在 `virtus` 浏览器访问 `http://127.0.0.1:18088`。当前如使用 Ollama，页面会明确显示过渡 Provider。
+保持终端运行，并在 `virtus` 浏览器访问 `http://127.0.0.1:18088`。当前正常运行时页面应显示 `vllm · teaching-chat-engineering`；若人工切到 Ollama 备用，页面必须明确显示 Provider 变化。
 
 ---
 

@@ -32,7 +32,7 @@ from src.apps.api.schemas.workbench import (
 from src.apps.api.services.knowledge_service import checksum, put_object, search_chunks
 from src.apps.api.services.project_service import create_version, get_owned_project
 
-TEMPLATE_VERSION = "word-standard-v1"
+TEMPLATE_VERSION = "word-standard-v2"
 
 
 async def _latest_version(
@@ -249,40 +249,171 @@ async def diagnose_artifact_handler(
     return DiagnoseArtifactOutput(**draft, version_number=version.version_number)
 
 
-def _paragraph(text: str, *, heading: bool = False) -> str:
-    style = '<w:pStyle w:val="Heading1"/>' if heading else ""
+def _paragraph(text: object, *, style: str = "Normal", bold: bool = False) -> str:
+    run_properties = "<w:b/>" if bold else ""
     return (
-        f'<w:p><w:pPr>{style}</w:pPr><w:r><w:t xml:space="preserve">'
-        f"{escape(text)}</w:t></w:r></w:p>"
+        f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>'
+        f'<w:r><w:rPr>{run_properties}</w:rPr><w:t xml:space="preserve">'
+        f"{escape(str(text))}</w:t></w:r></w:p>"
+    )
+
+
+def _bullet(text: object) -> str:
+    return _paragraph(f"• {text}")
+
+
+def _table(headers: list[str], rows: list[list[object]]) -> str:
+    def cell(value: object, *, header: bool = False) -> str:
+        shading = '<w:shd w:val="clear" w:fill="DDE8E2"/>' if header else ""
+        return (
+            f"<w:tc><w:tcPr>{shading}<w:tcMar>"
+            '<w:top w:w="80" w:type="dxa"/><w:left w:w="100" w:type="dxa"/>'
+            '<w:bottom w:w="80" w:type="dxa"/><w:right w:w="100" w:type="dxa"/>'
+            f"</w:tcMar></w:tcPr>{_paragraph(value, bold=header)}</w:tc>"
+        )
+
+    border = '<w:sz w:val="4"/><w:val w:val="single"/><w:color w:val="B7C8BF"/>'
+    table_properties = (
+        '<w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblLayout w:type="autofit"/>'
+        f"<w:tblBorders><w:top>{border}</w:top><w:left>{border}</w:left>"
+        f"<w:bottom>{border}</w:bottom><w:right>{border}</w:right>"
+        f"<w:insideH>{border}</w:insideH><w:insideV>{border}</w:insideV>"
+        "</w:tblBorders></w:tblPr>"
+    )
+    header_row = "<w:tr>" + "".join(cell(item, header=True) for item in headers) + "</w:tr>"
+    body_rows = ["<w:tr>" + "".join(cell(item) for item in row) + "</w:tr>" for row in rows]
+    return f"<w:tbl>{table_properties}{header_row}{''.join(body_rows)}</w:tbl>{_paragraph('')}"
+
+
+def _styles_xml() -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
+        '<w:name w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="100" w:line="320" '
+        'w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:eastAsia="Microsoft YaHei"/>'
+        '<w:sz w:val="21"/><w:szCs w:val="21"/></w:rPr></w:style>'
+        '<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn '
+        'w:val="Normal"/><w:qFormat/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/>'
+        '</w:pPr><w:rPr><w:b/><w:color w:val="173F35"/><w:sz w:val="36"/>'
+        '<w:szCs w:val="36"/></w:rPr></w:style>'
+        '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/>'
+        '<w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="260" '
+        'w:after="120"/></w:pPr><w:rPr><w:b/><w:color w:val="173F35"/><w:sz w:val="28"/>'
+        '<w:szCs w:val="28"/></w:rPr></w:style>'
+        '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/>'
+        '<w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="160" '
+        'w:after="80"/></w:pPr><w:rPr><w:b/><w:color w:val="286B58"/><w:sz w:val="23"/>'
+        '<w:szCs w:val="23"/></w:rPr></w:style></w:styles>'
     )
 
 
 def build_docx(project: TeachingProject, content: dict) -> bytes:
-    """用 OOXML 最小包生成可由 Word/LibreOffice 打开的标准导出件。"""
-    paragraphs = [_paragraph(project.title, heading=True)]
+    """生成带标题、列表和教学表格的可交付 Word 成果。"""
     alignment = content.get("alignment_card", {})
     blueprint = content.get("design_blueprint", {})
     design = content.get("lesson_design", {})
     diagnosis = content.get("diagnosis", {})
-    sections: list[tuple[str, list[str]]] = [
-        (
-            "课程依据对齐卡",
-            [str(alignment.get("core_question", "待补")), *alignment.get("objectives", [])],
-        ),
-        ("目标—证据—任务蓝图", [str(item) for item in blueprint.get("learning_tasks", [])]),
-        (
-            str(design.get("section_name", "课时设计")),
-            [str(item) for item in design.get("activities", [])],
-        ),
-        ("形成性诊断", [str(item) for item in diagnosis.get("items", [])]),
+
+    parts = [
+        _paragraph(project.title, style="Title"),
+        _paragraph(f"{project.stage} · {project.course_type}", bold=True),
+        _paragraph("课程依据对齐卡", style="Heading1"),
+        _paragraph("核心议题", style="Heading2"),
+        _paragraph(alignment.get("core_question", "待补")),
+        _paragraph("教学目标", style="Heading2"),
+        *[_bullet(item) for item in alignment.get("objectives", [])],
     ]
-    for title, lines in sections:
-        paragraphs.append(_paragraph(title, heading=True))
-        paragraphs.extend(_paragraph(line) for line in lines)
+    citations = alignment.get("citations", [])
+    if citations:
+        parts.append(_paragraph("依据引用", style="Heading2"))
+        parts.extend(
+            _bullet(
+                f"{item.get('filename', '未知资料')} · {item.get('location_label', '位置待补')}"
+                f" · 相关度 {item.get('relevance', '-')}"
+            )
+            for item in citations
+        )
+    for warning in alignment.get("warnings", []):
+        parts.append(_paragraph(f"提示：{warning}"))
+
+    learning_tasks = blueprint.get("learning_tasks", [])
+    parts.extend(
+        [
+            _paragraph("目标—证据—任务蓝图", style="Heading1"),
+            _paragraph("评价证据", style="Heading2"),
+            *[_bullet(item) for item in blueprint.get("evidence", [])],
+            _table(
+                ["序号", "学习任务", "时间", "评价证据"],
+                [
+                    [
+                        index,
+                        item.get("title", ""),
+                        f"{item.get('minutes', 0)} 分钟",
+                        item.get("evidence", ""),
+                    ]
+                    for index, item in enumerate(learning_tasks, 1)
+                ],
+            ),
+        ]
+    )
+
+    activities = design.get("activities", [])
+    parts.extend(
+        [
+            _paragraph(design.get("section_name", "课时设计"), style="Heading1"),
+            _paragraph("课堂导入", style="Heading2"),
+            _paragraph(design.get("opening", "待补")),
+            _table(
+                ["环节", "时间", "教师活动", "学生活动", "评价证据"],
+                [
+                    [
+                        item.get("title", ""),
+                        f"{item.get('minutes', 0)} 分钟",
+                        item.get("teacher_action", ""),
+                        item.get("student_action", ""),
+                        item.get("evidence", ""),
+                    ]
+                    for item in activities
+                ],
+            ),
+            _paragraph("教师提示", style="Heading2"),
+            *[_bullet(item) for item in design.get("teacher_notes", [])],
+        ]
+    )
+
+    status_labels = {"aligned": "符合", "needs_attention": "需关注"}
+    diagnosis_items = diagnosis.get("items", [])
+    parts.extend(
+        [
+            _paragraph("形成性诊断", style="Heading1"),
+            _paragraph(diagnosis.get("conclusion", "待完成诊断"), bold=True),
+            _table(
+                ["诊断维度", "状态", "证据", "改进建议"],
+                [
+                    [
+                        item.get("dimension", ""),
+                        status_labels.get(item.get("status", ""), item.get("status", "")),
+                        item.get("evidence", ""),
+                        item.get("suggestion", ""),
+                    ]
+                    for item in diagnosis_items
+                ],
+            ),
+        ]
+    )
+    blocking_issues = diagnosis.get("blocking_issues", [])
+    if blocking_issues:
+        parts.append(_paragraph("阻断问题", style="Heading2"))
+        parts.extend(_bullet(item) for item in blocking_issues)
+
     document = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        f"<w:body>{''.join(paragraphs)}<w:sectPr/></w:body></w:document>"
+        f"<w:body>{''.join(parts)}<w:sectPr>"
+        '<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" '
+        'w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/>'
+        "</w:sectPr></w:body></w:document>"
     )
     content_types = (
         '<?xml version="1.0" encoding="UTF-8"?>'
@@ -292,6 +423,8 @@ def build_docx(project: TeachingProject, content: dict) -> bytes:
         '<Default Extension="xml" ContentType="application/xml"/>'
         '<Override PartName="/word/document.xml" '
         'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        '<Override PartName="/word/styles.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
         "</Types>"
     )
     relationships = (
@@ -301,11 +434,20 @@ def build_docx(project: TeachingProject, content: dict) -> bytes:
         'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
         'Target="word/document.xml"/></Relationships>'
     )
+    document_relationships = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" '
+        'Target="styles.xml"/></Relationships>'
+    )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("[Content_Types].xml", content_types)
         archive.writestr("_rels/.rels", relationships)
         archive.writestr("word/document.xml", document)
+        archive.writestr("word/styles.xml", _styles_xml())
+        archive.writestr("word/_rels/document.xml.rels", document_relationships)
     return buffer.getvalue()
 
 

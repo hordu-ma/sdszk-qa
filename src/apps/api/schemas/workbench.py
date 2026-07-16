@@ -429,7 +429,7 @@ class DiagnoseArtifactResponse(DiagnoseArtifactOutput):
 
 class ExportArtifactInput(BaseModel):
     project_id: int
-    template_name: str = Field(default="standard-v1", min_length=2, max_length=100)
+    template_name: str = Field(default="standard-v2", min_length=2, max_length=100)
 
 
 class ExportArtifactOutput(BaseModel):

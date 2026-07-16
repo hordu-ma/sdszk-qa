@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { showFailToast, showSuccessToast } from "vant";
+import { showConfirmDialog, showFailToast, showSuccessToast } from "vant";
 import {
   cancelTask,
   clearMemory,
@@ -44,6 +44,9 @@ import type {
   UserPreference,
   VersionDiff,
 } from "../types/api";
+import { useUserStore } from "../stores/user";
+
+const userStore = useUserStore();
 
 const projects = ref<TeachingProject[]>([]);
 const selectedProjectId = ref<number | null>(null);
@@ -64,7 +67,7 @@ const memoryForm = ref({
   default_stage: "高中",
   default_course_type: "议题式",
   textbook_version: "统编版",
-  export_template: "standard-v1",
+  export_template: "standard-v2",
 });
 const profileForm = ref({ name: "", class_size: 45, focus: "家国情怀" });
 const usePreference = ref(false);
@@ -80,6 +83,17 @@ let timer: number | undefined;
 const selectedProject = computed(() =>
   projects.value.find((item) => item.id === selectedProjectId.value),
 );
+const latestVersionContent = computed<Record<string, unknown>>(
+  () => versions.value[0]?.content || {},
+);
+const hasAlignmentCard = computed(() => Boolean(latestVersionContent.value.alignment_card));
+const hasDesignBlueprint = computed(() => Boolean(latestVersionContent.value.design_blueprint));
+const hasLessonDesign = computed(() => Boolean(latestVersionContent.value.lesson_design));
+const hasDiagnosis = computed(() => Boolean(latestVersionContent.value.diagnosis));
+const canReview = computed(() => ["admin", "reviewer"].includes(userStore.userInfo?.role || ""));
+const hasMemory = computed(() => Boolean(
+  preference.value || classProfiles.value.length || pinnedItems.value.length,
+));
 
 const selectedMemoryRefs = computed<MemoryRef[]>(() => {
   const refs: MemoryRef[] = selectedProfileIds.value.map((memory_id) => ({
@@ -131,7 +145,7 @@ async function refreshMemory() {
       default_stage: preferenceItem.default_stage || "高中",
       default_course_type: preferenceItem.default_course_type || "议题式",
       textbook_version: preferenceItem.textbook_version || "统编版",
-      export_template: preferenceItem.export_template || "standard-v1",
+      export_template: preferenceItem.export_template || "standard-v2",
     };
   }
 }
@@ -232,11 +246,32 @@ async function handleDeletePin(itemId: number) {
 }
 
 async function handleClearMemory() {
-  await clearMemory();
-  usePreference.value = false;
-  selectedProfileIds.value = [];
-  await refreshMemory();
-  showSuccessToast("个人 Memory 已清除");
+  if (!hasMemory.value) return;
+  const summary = [
+    preference.value ? "1 项账户偏好" : "0 项账户偏好",
+    `${classProfiles.value.length} 个班情档案`,
+    `${pinnedItems.value.length} 个钉选项`,
+  ].join("、");
+  try {
+    await showConfirmDialog({
+      title: "确认清除个人 Memory？",
+      message: `将清除 ${summary}。此操作不可撤销。`,
+      confirmButtonText: "确认清除",
+      confirmButtonColor: "#9d3926",
+    });
+  } catch {
+    return;
+  }
+  loading.value = true;
+  try {
+    await clearMemory();
+    usePreference.value = false;
+    selectedProfileIds.value = [];
+    await refreshMemory();
+    showSuccessToast("个人 Memory 已清除");
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function runSampleStep(step: "alignment" | "blueprint" | "generate" | "diagnose") {
@@ -405,8 +440,9 @@ onBeforeUnmount(() => {
             <div class="document-actions">
               <span :class="['status', document.status]">{{ document.status }}</span>
               <span :class="['status', document.review_status]">{{ document.review_status }}</span>
-              <button v-if="document.status === 'ready' && document.review_status === 'pending'" @click="handleReview(document.id, 'approved')">审核通过</button>
-              <button v-if="document.review_status === 'approved'" @click="handleReview(document.id, 'disabled')">停用</button>
+              <button v-if="canReview && document.status === 'ready' && document.review_status === 'pending'" @click="handleReview(document.id, 'approved')">审核通过</button>
+              <button v-if="canReview && document.review_status === 'approved'" @click="handleReview(document.id, 'disabled')">停用</button>
+              <small v-if="!canReview && document.status === 'ready' && document.review_status === 'pending'" class="review-hint">待审核员处理</small>
             </div>
           </div>
           <p v-if="!documents.length" class="empty">支持 DOCX、文本型 PDF、Markdown 和 TXT。</p>
@@ -432,7 +468,11 @@ onBeforeUnmount(() => {
         <h2>4. 异步任务</h2>
         <div class="task-list">
           <div v-for="task in tasks" :key="task.id" class="task-item">
-            <div><strong>#{{ task.id }} {{ task.task_type }}</strong><small>第 {{ task.attempt }} 次 · {{ task.progress }}%</small></div>
+            <div>
+              <strong>#{{ task.id }} {{ task.task_type }}</strong>
+              <small>第 {{ task.attempt }} 次 · {{ task.progress }}%</small>
+              <small v-if="task.error_message" class="task-error">失败原因：{{ task.error_message }}</small>
+            </div>
             <div class="task-actions">
               <span :class="['status', task.status]">{{ task.status }}</span>
               <button v-if="task.status === 'queued' || task.status === 'running'" @click="handleCancel(task.id)">取消</button>
@@ -449,7 +489,7 @@ onBeforeUnmount(() => {
             <h2>5. 个人 Memory（显式确认）</h2>
             <p>只有下方勾选的偏好和班情才会注入下一次 SkillRun。</p>
           </div>
-          <button class="danger-button" @click="handleClearMemory">清除个人 Memory</button>
+          <button class="danger-button" :disabled="loading || !hasMemory" @click="handleClearMemory">清除个人 Memory</button>
         </div>
         <div class="memory-grid">
           <section>
@@ -503,11 +543,15 @@ onBeforeUnmount(() => {
         </div>
         <div class="pipeline-actions">
           <button :disabled="loading || !selectedProjectId" @click="runSampleStep('alignment')">1 对齐卡</button>
-          <button :disabled="loading || !selectedProjectId" @click="runSampleStep('blueprint')">2 教学蓝图</button>
-          <button :disabled="loading || !selectedProjectId" @click="runSampleStep('generate')">3 课时设计</button>
-          <button :disabled="loading || !selectedProjectId" @click="runSampleStep('diagnose')">4 形成性诊断</button>
-          <button :disabled="loading || !selectedProjectId" @click="handleExportArtifact">5 导出 Word</button>
+          <button :disabled="loading || !selectedProjectId || !hasAlignmentCard" title="请先完成对齐卡" @click="runSampleStep('blueprint')">2 教学蓝图</button>
+          <button :disabled="loading || !selectedProjectId || !hasDesignBlueprint" title="请先完成教学蓝图" @click="runSampleStep('generate')">3 课时设计</button>
+          <button :disabled="loading || !selectedProjectId || !hasLessonDesign" title="请先完成课时设计" @click="runSampleStep('diagnose')">4 形成性诊断</button>
+          <button :disabled="loading || !selectedProjectId || !hasDiagnosis" title="请先完成形成性诊断" @click="handleExportArtifact">5 导出 Word</button>
         </div>
+        <p v-if="selectedProjectId" class="workflow-progress">
+          当前进度：对齐卡 {{ hasAlignmentCard ? "✓" : "○" }} · 教学蓝图 {{ hasDesignBlueprint ? "✓" : "○" }} ·
+          课时设计 {{ hasLessonDesign ? "✓" : "○" }} · 形成性诊断 {{ hasDiagnosis ? "✓" : "○" }}
+        </p>
         <div v-if="latestStep" class="step-result">
           <header><strong>{{ latestStep.skill_id }}</strong><span>v{{ latestStep.version_number }}</span></header>
           <pre>{{ JSON.stringify(latestStep, null, 2) }}</pre>
@@ -551,9 +595,9 @@ onBeforeUnmount(() => {
 .form-row, .search-row { display: flex; gap: 10px; }.form-row input, .search-row input { flex: 1; }.form-row input, .form-row select, .search-row input { border: 1px solid #cfd8d1; border-radius: 10px; padding: 11px 12px; background: white; color: #172019; }.panel button, .upload-button { border: 0; border-radius: 10px; padding: 10px 14px; background: #286b58; color: white; cursor: pointer; font: inherit; }.panel button:disabled, .upload-button.disabled { opacity: .45; cursor: not-allowed; }
 .project-tabs { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }.project-tabs button { background: #edf3ef; color: #285143; }.project-tabs button.active { background: #173f35; color: white; }
 .panel-title, .document-item, .task-item, .citation header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }.panel-title p { margin: -10px 0 12px; color: #637068; font-size: 13px; }.upload-button input { display: none; }
-.document-item, .task-item { border-top: 1px solid #edf0ed; padding: 12px 0; }.document-item div, .task-item div:first-child { display: grid; gap: 3px; }.document-item small, .task-item small { color: #778179; }.status { border-radius: 999px; background: #e8ece9; padding: 4px 9px; font-size: 12px; }.status.ready, .status.completed { background: #dcf5e8; color: #17633f; }.status.failed, .status.cancelled { background: #fde5df; color: #9d3926; }.status.processing, .status.running, .status.queued { background: #fff0ce; color: #875b0b; }
+.document-item, .task-item { border-top: 1px solid #edf0ed; padding: 12px 0; }.document-item div, .task-item div:first-child { display: grid; gap: 3px; }.document-item small, .task-item small { color: #778179; }.task-error { color: #9d3926 !important; max-width: 680px; overflow-wrap: anywhere; }.review-hint { color: #875b0b !important; }.status { border-radius: 999px; background: #e8ece9; padding: 4px 9px; font-size: 12px; }.status.ready, .status.completed { background: #dcf5e8; color: #17633f; }.status.failed, .status.cancelled { background: #fde5df; color: #9d3926; }.status.processing, .status.running, .status.queued { background: #fff0ce; color: #875b0b; }
 .document-actions { display: flex !important; align-items: center; gap: 6px !important; }.document-actions button { padding: 5px 8px; font-size: 12px; }.status.approved { background: #dcf5e8; color: #17633f; }.status.pending { background: #fff0ce; color: #875b0b; }.status.disabled, .status.rejected { background: #edf0ed; color: #657068; }
 .retrieve-panel { min-height: 350px; }.citation-list { display: grid; gap: 10px; margin-top: 16px; }.citation { border-left: 4px solid #4c8d77; background: #f5f8f6; padding: 14px; border-radius: 8px; }.citation header span { color: #6b756e; font-size: 12px; }.citation p { white-space: pre-wrap; line-height: 1.65; margin: 10px 0 0; color: #36443a; }.task-actions { display: flex; gap: 7px; align-items: center; }.task-actions button { padding: 5px 9px; font-size: 12px; }.empty { color: #7b857e; font-size: 13px; }
-.memory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }.memory-grid section { border: 1px solid #e4e9e5; border-radius: 12px; padding: 16px; }.stack-form { display: grid; gap: 8px; }.stack-form input, .sample-inputs input, .diff-controls select { border: 1px solid #cfd8d1; border-radius: 9px; padding: 9px 10px; }.memory-actions, .pipeline-actions, .diff-controls { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-top: 12px; }.check-row, .memory-item { display: flex; gap: 8px; align-items: center; }.memory-item { border-top: 1px solid #edf0ed; padding: 9px 0; }.memory-item span { display: grid; gap: 2px; flex: 1; }.memory-item small { color: #778179; }.memory-item button { padding: 5px 8px; font-size: 12px; }.danger-button { background: #9d3926 !important; }.hint { color: #637068; }.sample-inputs { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 9px; }.step-result { margin-top: 16px; border: 1px solid #d7e1da; border-radius: 10px; overflow: hidden; }.step-result header { display: flex; justify-content: space-between; background: #edf3ef; padding: 10px 12px; }.step-result pre, .diff-list pre { white-space: pre-wrap; overflow: auto; font-size: 12px; line-height: 1.5; padding: 12px; margin: 0; background: #f8faf8; }.diff-controls label { display: flex; gap: 6px; align-items: center; }.diff-list { display: grid; gap: 12px; margin-top: 16px; }.diff-list article { border: 1px solid #e1e7e2; border-radius: 10px; padding: 12px; }.diff-list article > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.memory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }.memory-grid section { border: 1px solid #e4e9e5; border-radius: 12px; padding: 16px; }.stack-form { display: grid; gap: 8px; }.stack-form input, .sample-inputs input, .diff-controls select { border: 1px solid #cfd8d1; border-radius: 9px; padding: 9px 10px; }.memory-actions, .pipeline-actions, .diff-controls { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-top: 12px; }.check-row, .memory-item { display: flex; gap: 8px; align-items: center; }.memory-item { border-top: 1px solid #edf0ed; padding: 9px 0; }.memory-item span { display: grid; gap: 2px; flex: 1; }.memory-item small { color: #778179; }.memory-item button { padding: 5px 8px; font-size: 12px; }.danger-button { background: #9d3926 !important; }.hint, .workflow-progress { color: #637068; }.workflow-progress { font-size: 13px; margin: 10px 0 0; }.sample-inputs { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 9px; }.step-result { margin-top: 16px; border: 1px solid #d7e1da; border-radius: 10px; overflow: hidden; }.step-result header { display: flex; justify-content: space-between; background: #edf3ef; padding: 10px 12px; }.step-result pre, .diff-list pre { white-space: pre-wrap; overflow: auto; font-size: 12px; line-height: 1.5; padding: 12px; margin: 0; background: #f8faf8; }.diff-controls label { display: flex; gap: 6px; align-items: center; }.diff-list { display: grid; gap: 12px; margin-top: 16px; }.diff-list article { border: 1px solid #e1e7e2; border-radius: 10px; padding: 12px; }.diff-list article > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
 @media (max-width: 850px) { .workbench-page { padding: 14px; }.hero { align-items: stretch; flex-direction: column; padding: 24px; }.grid { grid-template-columns: 1fr; }.projects-panel, .full-panel { grid-column: auto; }.form-row, .search-row { flex-direction: column; }.provider { min-width: 0; }.memory-grid, .sample-inputs, .diff-list article > div { grid-template-columns: 1fr; } }
 </style>

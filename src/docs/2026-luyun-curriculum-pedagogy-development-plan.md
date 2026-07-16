@@ -99,7 +99,7 @@
 - 本地账号登录、JWT 鉴权。
 - 固定主题与自定义主题。
 - 会话创建、历史会话和消息留存。
-- 经最小 ModelClient 接入 Ollama 原生或 OpenAI 兼容 Provider 的 SSE 流式问答；当前 `luyun-int` 为 Ollama 过渡 Provider。
+- 经最小 ModelClient 接入 Ollama 原生或 OpenAI 兼容 Provider 的 SSE 流式问答；当前 `luyun-int` 已固定使用 vLLM 工程候选主链，Ollama 仅保留为明示备用。
 - 基础限流、Trace ID、结构化日志和操作审计。
 - Vue 3 + Vant 网页端。
 - PostgreSQL 17 + pgvector、MinIO、固定版本 vLLM 工程基线和 A/B 双机部署底座。
@@ -112,9 +112,9 @@
 - 产品 Skills 运行时：统一执行入口、Schema/权限校验、停用/降级契约和运行留痕；当前注册六个工程样板 Skill。
 - 核心用户 Memory：账户偏好、班情档案、项目/模板钉选、前端显式引用确认、注入审计、导出和一键清除。
 - 项目、版本、资料、任务、生成、诊断、差异和导出的桌面优先工作台技术样板。
-- 高中议题式纵向技术样板：课程依据对齐卡、目标—证据—任务蓝图、课时分块、非评分诊断、版本差异与标准 Word 导出。
+- 高中议题式纵向技术样板：课程依据对齐卡、目标—证据—任务蓝图、课时分块、非评分诊断、版本差异与 `word-standard-v2` 结构化 Word 导出；界面按前置成果逐级解锁。
 - Memory 项目/模板钉选与前端显式注入确认；六个样板 Skill 均经统一 SkillRun 留痕。
-- `base-spark` 的 `luyun-int` 集成 Compose、loopback 服务边界和 Tailscale Serve HTTPS；已从 `virtus` 验证登录与 SSE 问答。
+- `base-spark` 的 `luyun-int` 集成 Compose、loopback 服务边界和 Tailscale Serve HTTPS；已从 `virtus` 验证登录与 SSE 问答，并以真实 Chromium 自动回归本轮工作台增量。
 
 上述状态是实施快照，不改变本计划的范围、工作包和 G1 门槛。当前结论：**阶段 1 工程技术样板可运行；阶段 1A、阶段 1B、G0 和 G1 整体均未完成。**
 
@@ -1322,7 +1322,7 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 - **1A 可信平台骨架（4–5 周）：** WP1.1–WP1.4 的最小闭环，重点验收 Teaching Project、ModelClient、异步任务、RAG、`retrieve_basis`、版本追溯和可部署基线。
 - **1B 纵向业务样板（5–7 周）：** 打通“查依据—备课—诊断—导出”四类用户任务入口；内部可由 2.5.1 的多个 Skill 组合，但不要求八个 Skill 都形成独立页面或同等成熟度。完成最小 Memory、桌面工作台、Word 导出、专家回归和双环境晋级后进入 G1。
 
-实施状态（2026-07-16）：**阶段 1 工程样板进行中。** 第 1–10 步已有单一高中议题式技术闭环：Teaching Project/Version、服务层、ModelClient/Provider Adapter、应用内资料任务、审核门禁、语义混合检索与显式降级、六个样板 Skills、显式 Memory、结构化生成、非评分诊断、版本差异、Word 导出和可版本化工程评测。固定版 vLLM 三类工程候选、模型/索引资产登记和 `luyun-int` 增量部署已验证；Virtus 人工浏览器复核由用户于 2026-07-16 确认完成。专业模型冻结、专家评测、`luyun-demo` 同镜像晋级及 G0/G1 外部签字仍未完成，因此不得标记 1A、1B、阶段 1、G0 或 G1 整体完成。
+实施状态（2026-07-16）：**阶段 1 工程样板进行中。** 第 1–9 步已有单一高中议题式技术闭环：Teaching Project/Version、服务层、ModelClient/Provider Adapter、应用内资料任务、审核门禁、语义混合检索与显式降级、六个样板 Skills、显式 Memory、结构化生成、非评分诊断、版本差异、结构化 Word 导出和可版本化工程评测。固定版 vLLM 三类工程候选、模型/索引资产登记和 `luyun-int` 增量部署已验证；当前业务主链已切换为 vLLM，教师/管理员测试身份已分离，工作台具备步骤门禁、Memory 清除确认和失败任务原因反馈。Virtus 人工浏览器复核由用户于 2026-07-16 确认完成，本轮新增界面另通过 Base-Spark 上的真实 Chromium 自动回归。第 10 步 `luyun-demo` 同镜像晋级、专业模型冻结、专家评测及 G0/G1 外部签字仍未完成，因此不得标记 1A、1B、阶段 1、G0 或 G1 整体完成。
 
 实施记录（2026-07-16）：按 §5.4.1 第 5–7 步交付以下增量：
 （a）`retrieve_basis` 检索从应用内词项匹配升级为 PostgreSQL `pg_trgm` 库内词法检索（相似度排序、短查询子串兜底、资料不足阈值 `RETRIEVE_MIN_RELEVANCE`）；向量 + Reranker 混合检索仍待 D0 模型选型后接入。
@@ -1355,6 +1355,16 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 （c）评测框架支持 dataset key 自动递增版本、冻结内容哈希、冻结后不可变、发布清单绑定、逐案例 `matched/failed/error` 技术结果；当前只运行工程 fixture，不作为专业质量评分或发布签字。
 
 （d）`luyun-int` 已部署 `stage1-rag-eval-20260716-r1`，数据库为 `i9d0e1f2a345 (head)`，发布前备份为 `/home/pgx/backups/luyun-sizheng/20260716-130000-rag-eval/`。迁移通过 `h8 → i9 → h8 → i9`；固定 vLLM 的 Chat、结构化 JSON、SSE、Embedding、Reranker 与重启通过；HTTPS 业务链完成语义索引、检索、冻结评测、结果持久化和模型资产验证；Reranker 停机时降级无 5xx；应用回滚至 `stage1a-20260716-7f9e9b2` 并恢复当前镜像成功。
+
+工程实施与部署验收记录（2026-07-16，第四增量）：
+
+（a）`luyun-int` 默认业务 Provider 从 Ollama 过渡链切换为固定 vLLM 生成服务 `teaching-chat-engineering`，仍通过逻辑模型名和 Provider Adapter 调用；Ollama 只保留为人工显式切换的备用路径。
+
+（b）种子身份拆分为 `demo_teacher`（教师）和 `demo_admin`（管理员）。教师可创建项目、上传资料和运行教学闭环但不可审核，管理员可跨用户审核；工作台按角色隐藏审核操作。
+
+（c）Word 模板升级为 `word-standard-v2`，使用 A4 页边距、标题、列表和表格表达对齐卡、蓝图、课堂活动与诊断，不再输出内部字典文本。工作台按最新版本的前置成果逐步解锁；Memory 清除显示对象数量并二次确认；失败任务直接显示服务端错误原因。
+
+（d）`luyun-int` 已部署 `stage1-browser-fixes-20260716-r1`，数据库仍为 `i9d0e1f2a345 (head)`，发布前 PostgreSQL/MinIO 备份为 `/home/pgx/backups/luyun-sizheng/20260716-140000-browser-fixes/`，本轮无新迁移。Tailnet HTTPS API 验证双账号 RBAC、管理员审核、教师 403、vLLM 状态和真实 SSE；真实 Chromium 自动回归步骤门禁、Memory 确认、教师端权限、语义 RAG、失败原因和 Word 下载。导出件经 ZIP 完整性和 LibreOffice 渲染检查。该自动回归不替代新增功能的 Virtus 跨设备人工复核，也不改变阶段/G 门状态。
 
 ### 10.2 工作包
 
@@ -2013,7 +2023,7 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 17. 投标日期、地点、演示时长、必须现场展示的能力、投屏方式和现场联网条件。
 18. Tailnet 管理员、Tailscale HTTPS/ACL 审批人和最终允许访问的身份/设备范围；`virtus` 技术访问已验证。
 19. `base-spark` vLLM 的固定版本、标准模型资产、量化方式、最大上下文、显存上限，以及 D0 Go/No-Go 阈值；OpenClaw 不进入候选方案。
-20. 正式演示账号、脱敏资料、黄金脚本、并发/性能目标，以及故障时是否允许明确披露的预置/缓存结果；当前 `demo_teacher` 仅为阶段 1A 内部测试账号。
+20. 正式演示账号、脱敏资料、黄金脚本、并发/性能目标，以及故障时是否允许明确披露的预置/缓存结果；当前 `demo_teacher` / `demo_admin` 仅为阶段 1A 内部测试账号。
 21. 小程序已确认为合同硬范围；仍需冻结页面清单、平台登录方式、跨端续办协议、消息通知能力和发布主体。
 22. 是否需要单一诊断分数；计划默认全周期不提供，建议签字确认。
 23. 46–63 周周期、阶段 4 的 11–14 人高峰团队和客户侧配合资源；若实际编制更小，确认“最小可行合同切片”是否收缩阶段 3/4 并行度。

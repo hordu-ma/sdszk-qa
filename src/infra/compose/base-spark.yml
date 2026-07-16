@@ -133,12 +133,12 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-luyun}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET:-luyun-sizheng-int}
-      LLM_BASE_URL: http://127.0.0.1:11434
-      LLM_MODEL: ${LLM_MODEL:-qwen3.5:27b}
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://127.0.0.1:28001}
+      LLM_MODEL: ${LLM_MODEL:-teaching-chat-engineering}
+      LLM_PROVIDER: ${LLM_PROVIDER:-vllm}
       LLM_LOGICAL_MODEL: ${LLM_LOGICAL_MODEL:-teaching-chat}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-180}
-      LLM_MAX_CONTEXT_LEN: ${LLM_MAX_CONTEXT_LEN:-8192}
+      LLM_MAX_CONTEXT_LEN: ${LLM_MAX_CONTEXT_LEN:-4096}
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-1000}
       APP_RELEASE: ${RELEASE_TAG:-stage1}
       VLLM_RUNTIME_VERSION: "0.18.0"
@@ -155,9 +155,11 @@ services:
       RERANKER_REVISION: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
       RERANKER_SERVED_NAME: teaching-reranker
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      DEMO_USERNAME: ${DEMO_USERNAME:-demo_teacher}
       DEMO_PASSWORD: ${DEMO_PASSWORD:?DEMO_PASSWORD is required}
-      DEMO_FULL_NAME: ${DEMO_FULL_NAME:-鲁韵验证教师}
+      DEMO_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-demo_admin}
+      DEMO_ADMIN_FULL_NAME: ${DEMO_ADMIN_FULL_NAME:-鲁韵验证管理员}
+      DEMO_TEACHER_USERNAME: ${DEMO_TEACHER_USERNAME:-demo_teacher}
+      DEMO_TEACHER_FULL_NAME: ${DEMO_TEACHER_FULL_NAME:-鲁韵验证教师}
       ENV: production
       DEBUG: "false"
       CORS_ORIGINS: '["https://base-spark.tail84088a.ts.net"]'

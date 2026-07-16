@@ -6,7 +6,7 @@
 ## 项目速览
 
 - 这是"鲁韵思政大模型"的代码仓库：一个面向思政课教师的教学智能支持平台。
-- 当前已实现：问答链路、教学项目/资料/任务、版本化语义 RAG、六个样板 Skills、显式 Memory、纵向样板、版本差异、Word 导出和版本化工程评测。详见 [README](../../README.md)。
+- 当前已实现：vLLM 问答主链、教学项目/资料/任务、版本化语义 RAG、六个样板 Skills、显式 Memory、纵向样板、版本差异、结构化 Word 导出和版本化工程评测。工作台包含步骤门禁、清除确认、角色化审核操作和任务错误反馈。详见 [README](../../README.md)。
 - 产品范围、阶段和验收只看一份文档：[主开发计划](2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0）。目标能力不等于已实现能力，写文档和注释时不要混淆。
 
 目录结构：
@@ -54,6 +54,12 @@ make dev-down
 
 ```text
 postgresql+psycopg://postgres:postgres@localhost:5432/luyun_sizheng
+```
+
+测试夹具读取 `TEST_DATABASE_URL`（不是直接读取 `DATABASE_URL`）。本机默认端口不是带 `vector` 扩展的 PostgreSQL 时，应显式指向独立测试库，禁止把集成测试指向 `luyun-int` 运行库：
+
+```bash
+TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@127.0.0.1:<测试端口>/luyun_sizheng make harness-full
 ```
 
 等价原生命令（不便使用 make 时）：

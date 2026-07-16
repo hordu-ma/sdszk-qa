@@ -233,10 +233,11 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
 
             exported = await client.post(
                 "/api/workbench/skills/export-artifact",
-                json={"project_id": project_id, "template_name": "standard-v1"},
+                json={"project_id": project_id, "template_name": "standard-v2"},
                 headers=headers,
             )
             assert exported.status_code == 200
+            assert exported.json()["template_version"] == "word-standard-v2"
             download = await client.get(exported.json()["download_url"], headers=headers)
             assert download.status_code == 200
             assert download.content.startswith(b"PK")

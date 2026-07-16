@@ -178,7 +178,7 @@ export function diagnoseArtifact(projectId: number, memoryRefs: MemoryRef[]) {
 export function exportArtifact(projectId: number, memoryRefs: MemoryRef[]) {
   return request.post<unknown, ExportArtifactResponse>("/workbench/skills/export-artifact", {
     project_id: projectId,
-    template_name: "standard-v1",
+    template_name: "standard-v2",
     memory_refs: memoryRefs,
   });
 }

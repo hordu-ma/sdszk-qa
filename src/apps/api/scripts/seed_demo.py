@@ -11,26 +11,27 @@ from src.apps.api.models import Case, User
 
 
 async def seed() -> None:
-    username = os.environ["DEMO_USERNAME"]
-    password = os.environ["DEMO_PASSWORD"]
-    full_name = os.getenv("DEMO_FULL_NAME", "鲁韵验证教师")
+    users = _demo_users()
     async with AsyncSessionLocal() as db:
-        user_result = await db.execute(select(User).where(User.username == username))
-        user = user_result.scalar_one_or_none()
-        if user is None:
-            user = User(
-                username=username,
-                hashed_password=bcrypt.hashpw(password.encode()[:72], bcrypt.gensalt()).decode(),
-                full_name=full_name,
-                role="admin",
-                is_active=True,
-            )
-            db.add(user)
-        else:
-            user.role = "admin"
-        case_result = await db.execute(
-            select(Case).where(Case.title == "高中家国情怀议题式教学")
-        )
+        for item in users:
+            user_result = await db.execute(select(User).where(User.username == item["username"]))
+            user = user_result.scalar_one_or_none()
+            if user is None:
+                user = User(
+                    username=item["username"],
+                    hashed_password=bcrypt.hashpw(
+                        item["password"].encode()[:72], bcrypt.gensalt()
+                    ).decode(),
+                    full_name=item["full_name"],
+                    role=item["role"],
+                    is_active=True,
+                )
+                db.add(user)
+            else:
+                user.full_name = item["full_name"]
+                user.role = item["role"]
+                user.is_active = True
+        case_result = await db.execute(select(Case).where(Case.title == "高中家国情怀议题式教学"))
         if case_result.scalar_one_or_none() is None:
             db.add(
                 Case(
@@ -48,7 +49,29 @@ async def seed() -> None:
                 )
             )
         await db.commit()
-    print(f"demo user ready: {username}")
+    print("demo users ready: " + ", ".join(item["username"] for item in users))
+
+
+def _demo_users() -> list[dict[str, str]]:
+    shared_password = os.environ["DEMO_PASSWORD"]
+    return [
+        {
+            "username": os.getenv("DEMO_ADMIN_USERNAME", "demo_admin"),
+            "password": os.getenv("DEMO_ADMIN_PASSWORD", shared_password),
+            "full_name": os.getenv("DEMO_ADMIN_FULL_NAME", "鲁韵验证管理员"),
+            "role": "admin",
+        },
+        {
+            "username": os.getenv(
+                "DEMO_TEACHER_USERNAME", os.getenv("DEMO_USERNAME", "demo_teacher")
+            ),
+            "password": os.getenv("DEMO_TEACHER_PASSWORD", shared_password),
+            "full_name": os.getenv(
+                "DEMO_TEACHER_FULL_NAME", os.getenv("DEMO_FULL_NAME", "鲁韵验证教师")
+            ),
+            "role": "teacher",
+        },
+    ]
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ import zipfile
 import pytest
 
 from src.apps.api.models import TeachingProject
+from src.apps.api.scripts.seed_demo import _demo_users
 from src.apps.api.services.knowledge_service import (
     _char_vector_similarity,
     _ilike_pattern,
@@ -96,15 +97,66 @@ def test_build_docx_contains_required_ooxml_parts() -> None:
     data = build_docx(
         project,
         {
-            "alignment_card": {"core_question": "如何理解家国情怀", "objectives": ["目标"]},
-            "design_blueprint": {"learning_tasks": [{"title": "研读"}]},
-            "lesson_design": {"section_name": "课时设计", "activities": [{"title": "讨论"}]},
-            "diagnosis": {"items": [{"dimension": "依据可追溯", "status": "aligned"}]},
+            "alignment_card": {
+                "core_question": "如何理解家国情怀",
+                "objectives": ["目标"],
+                "citations": [{"filename": "课程标准.md", "location_label": "分块 1"}],
+            },
+            "design_blueprint": {
+                "evidence": ["观点陈述"],
+                "learning_tasks": [{"title": "研读", "minutes": 15, "evidence": "研读记录"}],
+            },
+            "lesson_design": {
+                "section_name": "课时设计",
+                "opening": "从真实情境导入",
+                "activities": [
+                    {
+                        "title": "讨论",
+                        "minutes": 15,
+                        "teacher_action": "提出问题",
+                        "student_action": "引用依据",
+                        "evidence": "课堂发言",
+                    }
+                ],
+                "teacher_notes": ["保留教师确认点"],
+            },
+            "diagnosis": {
+                "conclusion": "可进入教师确认",
+                "items": [
+                    {
+                        "dimension": "依据可追溯",
+                        "status": "aligned",
+                        "evidence": "引用 1 条",
+                        "suggestion": "复核有效期",
+                    }
+                ],
+            },
         },
     )
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         assert "word/document.xml" in archive.namelist()
-        assert "高中议题式教学样板" in archive.read("word/document.xml").decode()
+        assert "word/styles.xml" in archive.namelist()
+        document = archive.read("word/document.xml").decode()
+        assert "高中议题式教学样板" in document
+        assert "教师活动" in document
+        assert "改进建议" in document
+        assert "<w:tbl>" in document
+        assert "{'title'" not in document
+
+
+def test_demo_users_split_admin_and_teacher(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEMO_PASSWORD", "shared-test-password")
+    monkeypatch.setenv("DEMO_ADMIN_USERNAME", "demo_admin")
+    monkeypatch.setenv("DEMO_TEACHER_USERNAME", "demo_teacher")
+    monkeypatch.delenv("DEMO_ADMIN_PASSWORD", raising=False)
+    monkeypatch.delenv("DEMO_TEACHER_PASSWORD", raising=False)
+    users = _demo_users()
+
+    assert [(item["username"], item["role"]) for item in users] == [
+        ("demo_admin", "admin"),
+        ("demo_teacher", "teacher"),
+    ]
+    assert {item["password"] for item in users} == {"shared-test-password"}
 
 
 def test_provider_adapters_parse_stream_contracts() -> None:

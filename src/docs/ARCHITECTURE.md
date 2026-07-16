@@ -40,7 +40,7 @@ flowchart LR
 - **检索可降级且可追溯**：`retrieve_basis` 合并 pg_trgm 与 pgvector 候选，再由固定 revision Reranker 重排；语义 Provider 失败时显式回退字符 n-gram 链。索引只在完整构建后原子激活。
 - **评测可复现**：工程数据集冻结后记录内容哈希；每次运行保存应用、vLLM、模型 revision、检索参数和 Skill 版本清单。这里只判断技术预期命中，不输出教师或学生分数。
 - **模型调用只认逻辑模型名**：Ollama 与 OpenAI-compatible/vLLM Provider Adapter 屏蔽接口差异并记录调用审计；换 Provider 不改业务代码。
-- **样板版本不可变**：对齐卡、蓝图、课时设计和诊断各形成一个 ProjectVersion；导出件关联最终版本与 SkillRun。
+- **样板版本不可变**：对齐卡、蓝图、课时设计和诊断各形成一个 ProjectVersion；前端按最新版本中的前置成果逐级解锁；导出件关联最终版本与 SkillRun。
 - **后台任务可恢复**：资料解析任务状态存库，应用重启后由 lifespan 自动恢复。
 
 ## 部署形态
@@ -63,7 +63,7 @@ flowchart LR
   → 专业/安全/迁移/回滚门禁 → 同一镜像晋级 luyun-demo（未建成）
 ```
 
-问答生成仍可使用 Ollama `qwen3.5:27b`（明示过渡）；固定版 vLLM 0.18.0 的生成/Embedding/Reranker 工程候选通过独立 loopback Provider 接入。候选模型专业冻结与 `luyun-demo` 尚未完成。
+`luyun-int` 的问答、Embedding 和 Reranker 当前均使用固定版 vLLM 0.18.0 工程候选，通过独立 loopback Provider 接入；Ollama 只保留为明示备用。候选模型专业冻结与 `luyun-demo` 尚未完成。
 
 ## 当前实现 vs 目标架构
 
@@ -73,7 +73,7 @@ flowchart LR
 | Skills | 六个样板 Skill 统一运行、版本与降级契约 | 专家冻结的完整阶段 1 目录、正式额度与质量门禁 |
 | Memory | 偏好 + 班情 + 钉选 + 显式界面确认 + 审计/清除/导出 | 保留/删除 SLA、授权共享模板（阶段 2–3） |
 | 模型服务 | 逻辑模型名 + Provider Adapter + 固定 vLLM/模型资产登记 | 完整能力路由、Provider 一致性和专业选型门禁 |
-| 教学成果 | 高中议题式结构化生成、非评分诊断、版本差异、Word 导出技术样板 | 专家回归后的纵向样板和其他学段扩展 |
+| 教学成果 | 高中议题式结构化生成、非评分诊断、版本差异、`word-standard-v2` 结构化 Word 导出技术样板 | 专家回归后的纵向样板和其他学段扩展 |
 | 身份 | 本地 JWT 登录（过渡） | 校验思政课平台签发的 claims，本仓不做注册/KYC（计划 §2.6） |
 | 多智能体 / 多模态 | 未开始 | 阶段 4 门禁式交付，Agent 只能调用 Skills 注册表 |
 
