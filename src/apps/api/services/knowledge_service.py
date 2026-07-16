@@ -5,19 +5,23 @@ import hashlib
 import io
 import re
 import zipfile
-from collections.abc import Iterable
 from datetime import UTC, datetime
 from xml.etree import ElementTree
 
 from minio import Minio
 from pypdf import PdfReader
-from sqlalchemy import delete, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.api.config import settings
 from src.apps.api.dependencies import AsyncSessionLocal
 from src.apps.api.logging_config import logger
-from src.apps.api.models import KnowledgeChunk, KnowledgeDocument, SkillRun, TaskRun
+from src.apps.api.models import KnowledgeChunk, KnowledgeDocument, SkillRun, TaskRun, User
+from src.apps.api.schemas.workbench import (
+    BasisCitation,
+    RetrieveBasisInput,
+    RetrieveBasisOutput,
+)
 from src.apps.api.services.project_service import get_owned_project
 
 SUPPORTED_SUFFIXES = {".txt", ".md", ".pdf", ".docx"}
@@ -203,76 +207,88 @@ async def recover_document_tasks() -> None:
             asyncio.create_task(process_document_task(task.id, document_id))
 
 
-def _terms(text: str) -> set[str]:
-    normalized = re.sub(r"\s+", "", text.lower())
-    latin = set(re.findall(r"[a-z0-9]{2,}", normalized))
-    chinese = re.findall(r"[\u4e00-\u9fff]+", normalized)
-    bigrams = {word[index : index + 2] for word in chinese for index in range(len(word) - 1)}
-    return latin | bigrams
+RETRIEVAL_MODE = "lexical_trgm"
+_ILIKE_ESCAPE = "\\"
 
 
-def _rank(
-    query: str,
-    rows: Iterable[tuple[KnowledgeChunk, KnowledgeDocument]],
-) -> list[tuple[float, KnowledgeChunk, KnowledgeDocument]]:
-    query_terms = _terms(query)
-    ranked: list[tuple[float, KnowledgeChunk, KnowledgeDocument]] = []
-    for chunk, document in rows:
-        chunk_terms = _terms(chunk.content)
-        overlap = len(query_terms & chunk_terms)
-        if overlap == 0:
-            continue
-        score = overlap / max(1, len(query_terms))
-        ranked.append((score, chunk, document))
-    ranked.sort(key=lambda item: item[0], reverse=True)
-    return ranked
+def _ilike_pattern(query: str) -> str:
+    escaped = (
+        query.replace(_ILIKE_ESCAPE, _ILIKE_ESCAPE * 2).replace("%", r"\%").replace("_", r"\_")
+    )
+    return f"%{escaped}%"
 
 
-async def retrieve_basis(
+async def search_chunks(
     db: AsyncSession,
     *,
     project_id: int,
     user_id: int,
     query: str,
     limit: int,
-) -> tuple[SkillRun, list[dict]]:
-    """执行唯一对外检索 Skill，并保存完整运行审计。"""
-    await get_owned_project(db, project_id, user_id)
-    run = SkillRun(
-        user_id=user_id,
-        project_id=project_id,
-        skill_id="skill.retrieve_basis",
-        skill_version="1.0.0",
-        status="running",
-        input_payload={"query": query, "limit": limit},
+) -> list[dict]:
+    """库内词法检索：pg_trgm 相似度排序 + 子串兜底。
+
+    排序与阈值过滤在 PostgreSQL 内完成；
+    2–3 字短查询走 ILIKE 子串兜底；
+    向量混合检索待 D0 选型后接入。
+    """
+    score = func.greatest(
+        func.word_similarity(query, KnowledgeChunk.content),
+        case(
+            (
+                KnowledgeChunk.content.ilike(_ilike_pattern(query), escape=_ILIKE_ESCAPE),
+                0.9,
+            ),
+            else_=0.0,
+        ),
     )
-    db.add(run)
-    await db.flush()
     result = await db.execute(
-        select(KnowledgeChunk, KnowledgeDocument)
+        select(KnowledgeChunk, KnowledgeDocument, score.label("relevance"))
         .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id)
         .where(
             KnowledgeDocument.project_id == project_id,
             KnowledgeDocument.owner_id == user_id,
             KnowledgeDocument.status == "ready",
             KnowledgeDocument.review_status == "approved",
+            score >= settings.RETRIEVE_MIN_RELEVANCE,
         )
-        .limit(2000)
+        .order_by(score.desc(), KnowledgeChunk.id)
+        .limit(limit)
     )
-    ranked = _rank(query, result.tuples().all())[:limit]
-    citations = [
+    return [
         {
             "document_id": document.id,
             "filename": document.filename,
             "chunk_id": chunk.id,
             "location_label": chunk.location_label,
             "content": chunk.content,
-            "relevance": round(score, 4),
+            "relevance": round(float(relevance), 4),
         }
-        for score, chunk, document in ranked
+        for chunk, document, relevance in result.tuples().all()
     ]
-    run.status = "completed"
-    run.output_payload = {"citation_count": len(citations), "insufficient_basis": not citations}
-    await db.commit()
-    await db.refresh(run)
-    return run, citations
+
+
+async def retrieve_basis_handler(
+    db: AsyncSession,
+    user: User,
+    payload: RetrieveBasisInput,
+    run: SkillRun,
+) -> RetrieveBasisOutput:
+    """`skill.retrieve_basis` 执行体：项目权限校验 + 库内可信检索。
+
+    SkillRun 生命周期、输入校验与 Memory 注入审计由 skill_runtime 统一承担。
+    """
+    await get_owned_project(db, payload.project_id, user.id)
+    run.project_id = payload.project_id
+    citations = await search_chunks(
+        db,
+        project_id=payload.project_id,
+        user_id=user.id,
+        query=payload.query,
+        limit=payload.limit,
+    )
+    return RetrieveBasisOutput(
+        insufficient_basis=not citations,
+        retrieval_mode=RETRIEVAL_MODE,
+        citations=[BasisCitation(**citation) for citation in citations],
+    )

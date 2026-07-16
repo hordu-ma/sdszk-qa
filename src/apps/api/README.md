@@ -50,7 +50,8 @@ api/
 - `routes/chat.py`
   - SSE 流式问答（核心链路，`POST /api/chat`）
 - `routes/workbench.py`
-  - 教学项目/版本、资料上传与审核、任务列表和 `retrieve_basis`
+  - 教学项目/版本、资料上传与审核、任务列表、Skill 列表与 `retrieve_basis`
+  - Memory 端点：偏好读写、班情档案增删查、导出与一键清除
   - 资料审核仅限 `reviewer`/`admin` 角色，阶段 1A 审核范围为全库（可审任意用户资料）；组织级隔离按计划 WP2.5 在阶段 2 引入
 
 ## 服务层（services）
@@ -58,9 +59,11 @@ api/
 - `chat_orchestration.py`：提示词、会话上下文和 token 估算。
 - `model_gateway.py`：最小 ModelClient、Ollama/OpenAI 兼容调用、统一错误和调用审计。
 - `project_service.py`：教学项目和版本操作。
-- `knowledge_service.py`：资料解析、任务恢复、审核过滤和依据检索。
-- **边界：** 当前不是完整 Skills/Memory/ModelGateway 运行时；`retrieve_basis` 是阶段 1A 的单 Skill 基线，检索仍为可审计词项匹配，尚未完成向量 + Reranker 混合检索。
-- **禁止：** 实现教师/学生总分评分排名模块（与产品“诊断非评分”原则冲突）；`tests/test_no_scoring_paths.py` 对 API 面与领域模型做防护断言。
+- `knowledge_service.py`：资料解析、任务恢复、审核过滤和 pg_trgm 库内词法检索（`search_chunks` + `retrieve_basis_handler`）。
+- `skill_runtime.py`：Skill 注册表、权限与 Schema 校验、Memory 注入审计和 SkillRun 生命周期；`run_skill` 是唯一 Skill 执行入口。
+- `memory_service.py`：偏好、班情档案、一键清除与导出。
+- **边界：** 当前 Skills/Memory 为最小基线，仅 `skill.retrieve_basis`（v1.1.0）达到基线成熟度；其余阶段 1 Skills 的 Schema 待阶段 0《产品 Skills 目录 v1》冻结后注册。配额/降级策略字段已登记但未启用执行；向量 + Reranker 混合检索待 D0 选型。Memory 注入仅接受用户显式传入的 `memory_refs`，不做任何自动注入。
+- **禁止：** 实现教师/学生总分评分排名模块（与产品“诊断非评分”原则冲突）；`tests/test_no_scoring_paths.py` 对 API 面与领域模型做防护断言，`skill_runtime.register_skill` 拒绝评分类 skill_id。
 
 ## 工具层（utils）
 
@@ -77,6 +80,8 @@ api/
 - `teaching_projects` / `project_versions`：项目与版本
 - `knowledge_documents` / `knowledge_chunks`：资料与片段
 - `task_runs` / `skill_runs` / `model_call_audits`：任务、Skill 与模型调用留痕
+- `skill_definitions`：注册 Skill 的版本、Schema、权限与停用开关
+- `user_preferences` / `class_context_profiles` / `memory_injection_audits`：Memory 对象与注入审计
 
 ## 调用链路
 

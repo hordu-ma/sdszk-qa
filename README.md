@@ -14,13 +14,15 @@
 - 问答消息全链路可审计
 - Teaching Project / Version、知识资料、任务运行、SkillRun 和模型调用审计基础对象
 - 问答编排服务层与最小 ModelClient（逻辑模型名、Provider 标识、超时和调用审计）
-- 资料上传、后台解析、审核门禁和 `retrieve_basis` 可追溯检索基线
+- 资料上传、后台解析、审核门禁和 `retrieve_basis` 库内词法检索（pg_trgm 相似度 + 资料不足阈值）
+- 产品 Skills 运行时最小集（SkillDefinition 注册表、权限与 Schema 校验、SkillRun 审计、停用开关）
+- 核心用户 Memory 最小集（偏好、班情档案、显式 `memory_refs` 注入审计、一键清除与导出）
 - 桌面优先工作台基础页（项目、版本、资料、任务与依据检索）
 - `base-spark` 的 `luyun-int` 集成栈及 Virtus/Tailscale HTTPS 验证链路
 - 种子案例一致性校验（`make validate-cases`）与"无评分/排名 API"防护测试基线
 
 > 当前代码**不包含评分/排名模块**；目标产品的教学诊断同样不以教师总分或排名为默认输出。
-> 当前只完成阶段 1A 的首个可部署增量，并不等于阶段 1 或 G1 完成。完整 Skills 注册/权限运行时、Memory、混合向量检索与 Reranker、纵向样板、Word 导出、固定版本 vLLM 和 `luyun-demo` 晋级仍未完成。
+> 当前只完成阶段 1A 增量，并不等于阶段 1 或 G1 完成。Skills 运行时与 Memory 已有最小基线（仅 `retrieve_basis` 达到基线成熟度；其余阶段 1 Skills 的 Schema 待阶段 0 目录冻结后注册），向量 + Reranker 混合检索、注入确认 UX、配额/降级策略配置化、纵向样板、Word 导出、固定版本 vLLM 和 `luyun-demo` 晋级仍未完成。
 
 ### 当前阶段状态（2026-07-15）
 
@@ -83,7 +85,8 @@
 - 对话：`POST /api/chat`（SSE）
 - 工作台：`/api/workbench/projects`、`/api/workbench/tasks`
 - 知识资料：`/api/workbench/projects/{project_id}/documents`、`/api/workbench/documents/{document_id}/review`
-- 依据检索：`POST /api/workbench/skills/retrieve-basis`
+- Skills：`GET /api/workbench/skills`、`POST /api/workbench/skills/retrieve-basis`（支持显式 `memory_refs` 注入）
+- Memory：`/api/workbench/memory/preference`、`/api/workbench/memory/class-profiles`、`/api/workbench/memory/export`、`POST /api/workbench/memory/clear`
 
 ## 开发与部署
 
@@ -135,10 +138,11 @@ make validate-cases
 - audit_logs（用户行为）
 - teaching_projects / project_versions（项目和版本）
 - knowledge_documents / knowledge_chunks（资料、审核状态和检索片段）
-- task_runs / skill_runs / model_call_audits（任务、Skill 和模型调用）
+- task_runs / skill_runs / model_call_audits（任务、Skill 和模型调用；skill_runs 含 input_hash、memory_refs、error_code）
+- skill_definitions（注册 Skill 的版本、Schema、权限与停用状态）
+- user_preferences / class_context_profiles / memory_injection_audits（Memory 对象与注入审计）
 
 ## 目标可审计数据（计划）
 
-- 完整 SkillDefinition 与 SkillRun 权限/配额/失败策略（当前仅有 `retrieve_basis` 运行留痕）
-- Memory 注入与清除审计
+- SkillDefinition 配额/失败降级策略的配置化执行（当前字段已登记，策略未启用）
 - 教学成果版本与引用链

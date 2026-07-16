@@ -81,10 +81,18 @@ class UploadAccepted(BaseModel):
     task: TaskResponse
 
 
+class MemoryRef(BaseModel):
+    """显式 Memory 注入引用；仅用户确认传入的引用可被解析（计划 §2.5.2）。"""
+
+    memory_type: str = Field(pattern="^(user_preference|class_context_profile)$")
+    memory_id: int
+
+
 class RetrieveBasisRequest(BaseModel):
     project_id: int
     query: str = Field(min_length=2, max_length=500)
     limit: int = Field(default=5, ge=1, le=10)
+    memory_refs: list[MemoryRef] = Field(default_factory=list, max_length=10)
 
 
 class BasisCitation(BaseModel):
@@ -96,9 +104,85 @@ class BasisCitation(BaseModel):
     relevance: float
 
 
+class RetrieveBasisInput(BaseModel):
+    """`skill.retrieve_basis` 的输入 Schema（Skill 契约，不含运行时字段）。"""
+
+    project_id: int
+    query: str = Field(min_length=2, max_length=500)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class RetrieveBasisOutput(BaseModel):
+    """`skill.retrieve_basis` 的输出 Schema（Skill 契约）。"""
+
+    insufficient_basis: bool
+    retrieval_mode: str
+    citations: list[BasisCitation]
+
+
 class RetrieveBasisResponse(BaseModel):
     skill_run_id: int
     skill_id: str = "skill.retrieve_basis"
-    skill_version: str = "1.0.0"
+    skill_version: str
     insufficient_basis: bool
+    retrieval_mode: str
     citations: list[BasisCitation]
+
+
+class SkillInfo(BaseModel):
+    """注册 Skill 的对外描述（运维与工作台可见性）。"""
+
+    skill_id: str
+    skill_version: str
+    name: str
+    status: str
+    execution_mode: str
+    maturity: str
+    required_roles: list[str]
+
+
+class UserPreferenceUpdate(BaseModel):
+    default_stage: str | None = Field(default=None, max_length=50)
+    default_course_type: str | None = Field(default=None, max_length=50)
+    textbook_version: str | None = Field(default=None, max_length=100)
+    export_template: str | None = Field(default=None, max_length=100)
+    extra: dict = Field(default_factory=dict)
+
+
+class UserPreferenceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    default_stage: str | None
+    default_course_type: str | None
+    textbook_version: str | None
+    export_template: str | None
+    extra: dict
+    updated_at: datetime
+
+
+class ClassProfileCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    context: dict = Field(default_factory=dict)
+
+
+class ClassProfileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    context: dict
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemoryExportResponse(BaseModel):
+    """个人记忆清单导出（计划 WP1.3c：可导出、可清除）。"""
+
+    preference: UserPreferenceResponse | None
+    class_profiles: list[ClassProfileResponse]
+
+
+class MemoryClearResponse(BaseModel):
+    cleared_preference: bool
+    cleared_class_profiles: int

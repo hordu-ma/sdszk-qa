@@ -1328,6 +1328,12 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 
 **实施状态（2026-07-15）：阶段 1A 进行中。** 已完成首个可部署增量：Teaching Project/Version 基础对象、服务层抽离、最小 ModelClient、应用内资料任务、审核门禁、`retrieve_basis` 词项检索基线、工作台基础页、`luyun-int` 部署及 Virtus/Tailscale 登录与 SSE 验证。尚未完成向量 + Reranker 混合检索、完整 Skills 运行时、Memory、纵向样板/导出、固定版本 vLLM、`luyun-demo` 同镜像晋级及 G1 评测，因此不得标记 1A、阶段 1 或 G1 完成。
 
+**实施记录（2026-07-16）：** 按 §5.4.1 第 5–7 步交付以下增量：
+（a）`retrieve_basis` 检索从应用内词项匹配升级为 PostgreSQL `pg_trgm` 库内词法检索（相似度排序、短查询子串兜底、资料不足阈值 `RETRIEVE_MIN_RELEVANCE`）；向量 + Reranker 混合检索仍待 D0 模型选型后接入。
+（b）产品 Skills 运行时最小集：SkillDefinition 注册表（含 §2.5.1 契约字段与成熟度登记）、统一 `run_skill` 执行入口（权限、输入输出 Schema 校验、input_hash、错误码、运行留痕）、数据库 status 停用开关；当前仅注册 `skill.retrieve_basis` v1.1.0（基线成熟度），其余阶段 1 Skills 的 Schema 待阶段 0《产品 Skills 目录 v1》冻结后注册，不在代码内代替专家发明契约。
+（c）核心用户 Memory 最小集：UserPreference、ClassContextProfile、MemoryInjectionAudit，显式 `memory_refs` 注入（含归属校验与快照审计）、一键清除、个人记忆清单导出；清除后引用不可再注入新 SkillRun（已回归验证）。注入确认 UX、配额/降级策略配置化执行仍未完成。
+上述增量不改变"1A、阶段 1、G1 未完成"的结论。
+
 ### 10.2 工作包
 
 #### WP1.1 教学成果领域对象

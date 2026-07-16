@@ -127,7 +127,7 @@ class TaskRun(Base, TimestampMixin):
 
 
 class SkillRun(Base, TimestampMixin):
-    """受控产品 Skill 的输入、输出和版本审计。"""
+    """受控产品 Skill 的输入、输出和版本审计（计划 §2.5.1 SkillRun 契约）。"""
 
     __tablename__ = "skill_runs"
 
@@ -141,9 +141,14 @@ class SkillRun(Base, TimestampMixin):
     skill_id: Mapped[str] = mapped_column(String(100), index=True)
     skill_version: Mapped[str] = mapped_column(String(30))
     status: Mapped[str] = mapped_column(String(30), index=True)
+    input_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    memory_refs: Mapped[list] = mapped_column(JSON, default=list)
     input_payload: Mapped[dict] = mapped_column(JSON, default=dict)
     output_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
 class ModelCallAudit(Base):

@@ -6,8 +6,10 @@
 from .audit_logs import AuditLog
 from .base import Base, TimestampMixin, to_dict
 from .cases import Case
+from .memory import ClassContextProfile, MemoryInjectionAudit, UserPreference
 from .messages import Message
 from .sessions import Session
+from .skills import SkillDefinition
 from .users import User
 from .workbench import (
     KnowledgeChunk,
@@ -34,5 +36,9 @@ __all__ = [
     "KnowledgeChunk",
     "TaskRun",
     "SkillRun",
+    "SkillDefinition",
     "ModelCallAudit",
+    "UserPreference",
+    "ClassContextProfile",
+    "MemoryInjectionAudit",
 ]

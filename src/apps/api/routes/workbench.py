@@ -11,17 +11,24 @@ from src.apps.api.config import settings
 from src.apps.api.dependencies import CurrentUser, DbSession
 from src.apps.api.models import KnowledgeDocument, ProjectVersion, TaskRun, TeachingProject
 from src.apps.api.schemas.workbench import (
-    BasisCitation,
+    ClassProfileCreate,
+    ClassProfileResponse,
     DocumentResponse,
     DocumentReviewRequest,
+    MemoryClearResponse,
+    MemoryExportResponse,
     ProjectCreate,
     ProjectResponse,
     ProjectVersionCreate,
     ProjectVersionResponse,
+    RetrieveBasisOutput,
     RetrieveBasisRequest,
     RetrieveBasisResponse,
+    SkillInfo,
     TaskResponse,
     UploadAccepted,
+    UserPreferenceResponse,
+    UserPreferenceUpdate,
 )
 from src.apps.api.services.audit import write_audit_log
 from src.apps.api.services.knowledge_service import (
@@ -29,9 +36,17 @@ from src.apps.api.services.knowledge_service import (
     checksum,
     process_document_task,
     put_object,
-    retrieve_basis,
+)
+from src.apps.api.services.memory_service import (
+    clear_memory,
+    create_class_profile,
+    delete_class_profile,
+    get_preference,
+    list_class_profiles,
+    upsert_preference,
 )
 from src.apps.api.services.project_service import create_version, get_owned_project
+from src.apps.api.services.skill_runtime import SKILL_REGISTRY, ensure_definition, run_skill
 
 router = APIRouter()
 
@@ -238,23 +253,170 @@ async def review_document(
     return DocumentResponse.model_validate(document)
 
 
+@router.get("/skills", response_model=list[SkillInfo])
+async def list_skills(db: DbSession, current_user: CurrentUser) -> list[SkillInfo]:
+    """列出注册 Skills 及成熟度；status 以数据库运维开关为准。"""
+    del current_user
+    items: list[SkillInfo] = []
+    for skill in SKILL_REGISTRY.values():
+        definition = await ensure_definition(db, skill)
+        items.append(
+            SkillInfo(
+                skill_id=skill.skill_id,
+                skill_version=skill.skill_version,
+                name=skill.name,
+                status=definition.status,
+                execution_mode=skill.execution_mode,
+                maturity=skill.maturity,
+                required_roles=list(skill.required_roles),
+            )
+        )
+    await db.commit()
+    return items
+
+
 @router.post("/skills/retrieve-basis", response_model=RetrieveBasisResponse)
 async def run_retrieve_basis(
     data: RetrieveBasisRequest,
     db: DbSession,
     current_user: CurrentUser,
 ) -> RetrieveBasisResponse:
-    run, citations = await retrieve_basis(
+    run, output = await run_skill(
         db,
-        project_id=data.project_id,
-        user_id=current_user.id,
-        query=data.query,
-        limit=data.limit,
+        skill_id="skill.retrieve_basis",
+        user=current_user,
+        payload=data.model_dump(exclude={"memory_refs"}),
+        memory_refs=data.memory_refs,
     )
+    assert isinstance(output, RetrieveBasisOutput)
     return RetrieveBasisResponse(
         skill_run_id=run.id,
-        insufficient_basis=not citations,
-        citations=[BasisCitation(**citation) for citation in citations],
+        skill_version=run.skill_version,
+        insufficient_basis=output.insufficient_basis,
+        retrieval_mode=output.retrieval_mode,
+        citations=output.citations,
+    )
+
+
+@router.get("/memory/preference", response_model=UserPreferenceResponse | None)
+async def read_preference(
+    db: DbSession, current_user: CurrentUser
+) -> UserPreferenceResponse | None:
+    preference = await get_preference(db, current_user.id)
+    if preference is None:
+        return None
+    return UserPreferenceResponse.model_validate(preference)
+
+
+@router.put("/memory/preference", response_model=UserPreferenceResponse)
+async def write_preference(
+    request: Request,
+    data: UserPreferenceUpdate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> UserPreferenceResponse:
+    preference = await upsert_preference(db, current_user.id, data)
+    await write_audit_log(
+        db,
+        request,
+        "update_user_preference",
+        current_user.id,
+        "user_preference",
+        str(preference.id),
+    )
+    await db.commit()
+    await db.refresh(preference)
+    return UserPreferenceResponse.model_validate(preference)
+
+
+@router.get("/memory/class-profiles", response_model=list[ClassProfileResponse])
+async def read_class_profiles(
+    db: DbSession, current_user: CurrentUser
+) -> list[ClassProfileResponse]:
+    profiles = await list_class_profiles(db, current_user.id)
+    return [ClassProfileResponse.model_validate(item) for item in profiles]
+
+
+@router.post(
+    "/memory/class-profiles",
+    response_model=ClassProfileResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_class_profile(
+    request: Request,
+    data: ClassProfileCreate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ClassProfileResponse:
+    profile = await create_class_profile(db, current_user.id, data)
+    await write_audit_log(
+        db,
+        request,
+        "create_class_context_profile",
+        current_user.id,
+        "class_context_profile",
+        str(profile.id),
+    )
+    await db.commit()
+    await db.refresh(profile)
+    return ClassProfileResponse.model_validate(profile)
+
+
+@router.delete("/memory/class-profiles/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_class_profile(
+    request: Request,
+    profile_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> None:
+    deleted = await delete_class_profile(db, current_user.id, profile_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="班情档案不存在")
+    await write_audit_log(
+        db,
+        request,
+        "delete_class_context_profile",
+        current_user.id,
+        "class_context_profile",
+        str(profile_id),
+    )
+    await db.commit()
+
+
+@router.get("/memory/export", response_model=MemoryExportResponse)
+async def export_memory(db: DbSession, current_user: CurrentUser) -> MemoryExportResponse:
+    """导出个人记忆清单（计划 WP1.3c）。"""
+    preference = await get_preference(db, current_user.id)
+    profiles = await list_class_profiles(db, current_user.id)
+    return MemoryExportResponse(
+        preference=(
+            UserPreferenceResponse.model_validate(preference) if preference else None
+        ),
+        class_profiles=[ClassProfileResponse.model_validate(item) for item in profiles],
+    )
+
+
+@router.post("/memory/clear", response_model=MemoryClearResponse)
+async def clear_all_memory(
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> MemoryClearResponse:
+    """一键清除本人全部 Memory；清除后的引用不可再注入新 SkillRun。"""
+    cleared_preference, cleared_profiles = await clear_memory(db, current_user.id)
+    await write_audit_log(
+        db,
+        request,
+        "clear_user_memory",
+        current_user.id,
+        "user_memory",
+        str(current_user.id),
+        {"cleared_preference": cleared_preference, "cleared_class_profiles": cleared_profiles},
+    )
+    await db.commit()
+    return MemoryClearResponse(
+        cleared_preference=cleared_preference,
+        cleared_class_profiles=cleared_profiles,
     )
 
 

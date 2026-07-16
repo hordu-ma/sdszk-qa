@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     KNOWLEDGE_CHUNK_SIZE: int = 800
     KNOWLEDGE_CHUNK_OVERLAP: int = 100
     MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024
+    # retrieve_basis 词法检索（pg_trgm word_similarity）最低相关度；
+    # 低于该值视为资料不足。经中文样例标定：短语命中约 0.4–0.67，
+    # 自然问句约 0.25，无关内容为 0。
+    RETRIEVE_MIN_RELEVANCE: float = 0.15
 
     # JWT 配置
     JWT_SECRET: str = Field(..., min_length=1)

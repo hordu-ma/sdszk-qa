@@ -3,8 +3,15 @@ from __future__ import annotations
 import io
 import zipfile
 
-from src.apps.api.models import KnowledgeChunk, KnowledgeDocument
-from src.apps.api.services.knowledge_service import _rank, chunk_text, extract_text
+import pytest
+
+from src.apps.api.services.knowledge_service import _ilike_pattern, chunk_text, extract_text
+from src.apps.api.services.skill_runtime import (
+    SKILL_REGISTRY,
+    RegisteredSkill,
+    input_hash,
+    register_skill,
+)
 
 
 def test_extract_text_supports_markdown() -> None:
@@ -31,26 +38,34 @@ def test_chunk_text_keeps_content() -> None:
     assert "教学目标" in "".join(chunks)
 
 
-def test_rank_only_returns_supported_basis() -> None:
-    document = KnowledgeDocument(
-        project_id=1,
-        owner_id=1,
-        filename="basis.md",
-        content_type="text/markdown",
-        object_key="test/basis.md",
-        checksum_sha256="0" * 64,
-    )
-    relevant = KnowledgeChunk(
-        document_id=1,
-        chunk_index=0,
-        content="家国情怀教学目标需要对应学习任务和评价证据",
-        location_label="分块 1",
-    )
-    unrelated = KnowledgeChunk(
-        document_id=1,
-        chunk_index=1,
-        content="课堂设备使用说明",
-        location_label="分块 2",
-    )
-    ranked = _rank("家国情怀教学目标", [(relevant, document), (unrelated, document)])
-    assert [item[1] for item in ranked] == [relevant]
+def test_ilike_pattern_escapes_wildcards() -> None:
+    assert _ilike_pattern("50%目标_测试") == r"%50\%目标\_测试%"
+    assert _ilike_pattern("反斜杠\\") == "%反斜杠\\\\%"
+
+
+def test_input_hash_is_order_stable() -> None:
+    assert input_hash({"a": 1, "b": "文"}) == input_hash({"b": "文", "a": 1})
+    assert input_hash({"a": 1}) != input_hash({"a": 2})
+
+
+def test_registry_registers_retrieve_basis_baseline() -> None:
+    skill = SKILL_REGISTRY["skill.retrieve_basis"]
+    assert skill.skill_version == "1.1.0"
+    assert skill.maturity == "baseline"
+    assert skill.required_roles == ()
+
+
+def test_registry_rejects_scoring_skills() -> None:
+    template = SKILL_REGISTRY["skill.retrieve_basis"]
+    with pytest.raises(ValueError, match="评分/排名"):
+        register_skill(
+            RegisteredSkill(
+                skill_id="skill.teacher_score",
+                skill_version="0.0.1",
+                name="非法评分",
+                input_model=template.input_model,
+                output_model=template.output_model,
+                handler=template.handler,
+            )
+        )
+    assert "skill.teacher_score" not in SKILL_REGISTRY

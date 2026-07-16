@@ -227,7 +227,9 @@ Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当
 
 两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。
 
-阶段 1A 已实现 `luyun-int` Compose、loopback Web 入口、ModelClient/Provider 标识、项目/资料/任务和 `retrieve_basis`。2026-07-15 已从 Virtus 经 Tailscale HTTPS 验证登录和 SSE 问答。`luyun-demo` 晋级、固定版本 vLLM、Memory 和完整纵向样板仍未完成，不得对外宣称完成。
+阶段 1A 已实现 `luyun-int` Compose、loopback Web 入口、ModelClient/Provider 标识、项目/资料/任务、`retrieve_basis` 库内词法检索、产品 Skills 运行时最小集和核心用户 Memory 最小集。2026-07-15 已从 Virtus 经 Tailscale HTTPS 验证登录和 SSE 问答。`luyun-demo` 晋级、固定版本 vLLM、向量混合检索和完整纵向样板仍未完成，不得对外宣称完成。
+
+> 迁移 `f7b8c9d0e123` 起依赖 PostgreSQL 标准 contrib 扩展 `pg_trgm`（迁移内 `CREATE EXTENSION IF NOT EXISTS` 自动创建，要求数据库用户具备创建扩展权限；官方 postgres 镜像的 `POSTGRES_USER` 默认满足）。
 
 ### Base-Spark 阶段 1A 集成环境
 

@@ -5,18 +5,29 @@ from uuid import uuid4
 import bcrypt
 import httpx
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select, text
 
 from src.apps.api.dependencies import AsyncSessionLocal, engine
 from src.apps.api.main import app
-from src.apps.api.models import TeachingProject, User
+from src.apps.api.models import (
+    MemoryInjectionAudit,
+    SkillRun,
+    TeachingProject,
+    User,
+)
+
+
+async def _ensure_schema() -> None:
+    """建表并启用库内检索所需扩展（CI 全新数据库场景）。"""
+    async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+        await conn.run_sync(User.metadata.create_all)
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
 async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyPatch) -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(User.metadata.create_all)
+    await _ensure_schema()
 
     username = f"workbench_{uuid4().hex[:8]}"
     password = "password123"
@@ -89,6 +100,8 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             )
             assert retrieval.status_code == 200
             assert retrieval.json()["insufficient_basis"] is False
+            assert retrieval.json()["retrieval_mode"] == "lexical_trgm"
+            assert retrieval.json()["skill_version"] == "1.1.0"
             assert retrieval.json()["citations"][0]["filename"] == "basis.md"
 
             tasks = await client.get(
@@ -111,8 +124,7 @@ async def test_review_requires_reviewer_role_and_allows_cross_user(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """教师本人不能审核自己资料；审核员可审核他人资料（阶段 1A 全库范围）。"""
-    async with engine.begin() as conn:
-        await conn.run_sync(User.metadata.create_all)
+    await _ensure_schema()
 
     password = "password123"
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -194,4 +206,121 @@ async def test_review_requires_reviewer_role_and_allows_cross_user(
                 delete(TeachingProject).where(TeachingProject.owner_id == teacher_id)
             )
             await db.execute(delete(User).where(User.id.in_([teacher_id, reviewer_id])))
+            await db.commit()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_memory_lifecycle_injection_and_clear() -> None:
+    """Memory 写入 → 显式注入并留审计 → 清除 → 已删引用不可再注入。"""
+    await _ensure_schema()
+
+    username = f"memory_{uuid4().hex[:8]}"
+    password = "password123"
+    user = User(
+        username=username,
+        hashed_password=bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+        full_name="记忆集成测试",
+        role="teacher",
+        is_active=True,
+    )
+    async with AsyncSessionLocal() as db:
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        user_id = user.id
+
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            login = await client.post(
+                "/api/auth/login", json={"username": username, "password": password}
+            )
+            headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+            skills = await client.get("/api/workbench/skills", headers=headers)
+            assert skills.status_code == 200
+            assert [item["skill_id"] for item in skills.json()] == ["skill.retrieve_basis"]
+            assert skills.json()[0]["status"] == "enabled"
+
+            preference = await client.put(
+                "/api/workbench/memory/preference",
+                json={"default_stage": "初中", "default_course_type": "案例式"},
+                headers=headers,
+            )
+            assert preference.status_code == 200
+
+            profile = await client.post(
+                "/api/workbench/memory/class-profiles",
+                json={"name": "初二3班", "context": {"class_size": 46, "devices": "多媒体"}},
+                headers=headers,
+            )
+            assert profile.status_code == 201
+            profile_id = profile.json()["id"]
+
+            project = await client.post(
+                "/api/workbench/projects",
+                json={"title": "记忆注入样板", "stage": "初中", "course_type": "案例式"},
+                headers=headers,
+            )
+            project_id = project.json()["id"]
+
+            memory_refs = [{"memory_type": "class_context_profile", "memory_id": profile_id}]
+            retrieval = await client.post(
+                "/api/workbench/skills/retrieve-basis",
+                json={
+                    "project_id": project_id,
+                    "query": "法治教育目标",
+                    "memory_refs": memory_refs,
+                },
+                headers=headers,
+            )
+            assert retrieval.status_code == 200
+            assert retrieval.json()["insufficient_basis"] is True
+            skill_run_id = retrieval.json()["skill_run_id"]
+
+            async with AsyncSessionLocal() as db:
+                run = await db.get(SkillRun, skill_run_id)
+                assert run is not None
+                assert run.status == "completed"
+                assert run.input_hash
+                assert run.memory_refs == [
+                    {"memory_type": "class_context_profile", "memory_id": profile_id}
+                ]
+                audits = await db.execute(
+                    select(MemoryInjectionAudit).where(
+                        MemoryInjectionAudit.skill_run_id == skill_run_id
+                    )
+                )
+                audit_rows = list(audits.scalars())
+                assert len(audit_rows) == 1
+                assert audit_rows[0].snapshot["name"] == "初二3班"
+
+            export = await client.get("/api/workbench/memory/export", headers=headers)
+            assert export.json()["preference"]["default_stage"] == "初中"
+            assert len(export.json()["class_profiles"]) == 1
+
+            cleared = await client.post("/api/workbench/memory/clear", headers=headers)
+            assert cleared.json() == {
+                "cleared_preference": True,
+                "cleared_class_profiles": 1,
+            }
+
+            rejected = await client.post(
+                "/api/workbench/skills/retrieve-basis",
+                json={
+                    "project_id": project_id,
+                    "query": "法治教育目标",
+                    "memory_refs": memory_refs,
+                },
+                headers=headers,
+            )
+            assert rejected.status_code == 422
+            assert rejected.json()["error_code"] == "memory_ref_not_found"
+    finally:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(TeachingProject).where(TeachingProject.owner_id == user_id)
+            )
+            await db.execute(delete(User).where(User.id == user_id))
             await db.commit()

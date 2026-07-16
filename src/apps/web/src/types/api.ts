@@ -142,6 +142,7 @@ export interface RetrieveBasisResponse {
   skill_id: string;
   skill_version: string;
   insufficient_basis: boolean;
+  retrieval_mode: string;
   citations: BasisCitation[];
 }
 
