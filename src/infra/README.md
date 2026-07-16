@@ -227,20 +227,22 @@ Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当
 
 两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。
 
-阶段 1A 已实现 `luyun-int` Compose、loopback Web 入口、ModelClient/Provider 标识、项目/资料/任务、`retrieve_basis` 库内词法检索、产品 Skills 运行时最小集和核心用户 Memory 最小集。2026-07-15 已从 Virtus 经 Tailscale HTTPS 验证登录和 SSE 问答。`luyun-demo` 晋级、固定版本 vLLM、向量混合检索和完整纵向样板仍未完成，不得对外宣称完成。
+阶段 1A 已实现 `luyun-int` Compose、loopback Web 入口、ModelClient/Provider 标识、项目/资料/任务、`retrieve_basis` 库内词法检索、产品 Skills 运行时最小集和核心用户 Memory 最小集。2026-07-16 已将增量镜像部署到 `luyun-int`，并完成迁移、备份、端到端功能、重启持久化、真实 SSE 与镜像回滚/恢复验收。`luyun-demo` 晋级、固定版本 vLLM、向量混合检索和完整纵向样板仍未完成，不得对外宣称完成。
 
 > 迁移 `f7b8c9d0e123` 起依赖 PostgreSQL 标准 contrib 扩展 `pg_trgm`（迁移内 `CREATE EXTENSION IF NOT EXISTS` 自动创建，要求数据库用户具备创建扩展权限；官方 postgres 镜像的 `POSTGRES_USER` 默认满足）。
 
 ### Base-Spark 阶段 1A 集成环境
 
-敏感变量必须保存在仓库外，例如 `/home/pgx/.config/luyun-sizheng/int.env`。该文件是**重新构建或重新创建容器**的前置条件，不要提交到 Git。首次部署或发布新镜像的顺序：
+敏感变量必须保存在仓库外。Base-Spark 当前使用 `/home/pgx/luyun-sizheng-int.env`（权限 `0600`）；Snap 版 Docker Compose 无法读取 `/home/pgx/.config/` 下的运行文件，不要把 env 移回该目录。该文件是**重新构建或重新创建容器**的前置条件，不要提交到 Git。首次部署或发布新镜像的顺序：
 
 ```bash
-docker compose --project-name luyun-int --env-file /home/pgx/.config/luyun-sizheng/int.env -f src/infra/compose/base-spark.yml build
-docker compose --project-name luyun-int --env-file /home/pgx/.config/luyun-sizheng/int.env -f src/infra/compose/base-spark.yml run --rm api uv run alembic -c src/apps/api/alembic.ini upgrade head
-docker compose --project-name luyun-int --env-file /home/pgx/.config/luyun-sizheng/int.env -f src/infra/compose/base-spark.yml up -d
-docker compose --project-name luyun-int --env-file /home/pgx/.config/luyun-sizheng/int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
+docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml build
+docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml run --rm --no-deps -w /app/src/apps/api api uv run alembic upgrade head
+docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml up -d
+docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
+
+2026-07-16 验收基线：镜像 `stage1a-20260716-7f9e9b2`，迁移 `f7b8c9d0e123 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260716-112947/`。数据库迁移已经过 up/down/up，并已实测回滚至 `stage1a-20260715` 后再恢复新镜像。
 
 当前已有容器的日常启用不需要重建，也不需要再次执行 seed：
 
@@ -299,6 +301,8 @@ Serve 只向同一 Tailnet 提供 HTTPS，不启用 Funnel，也不直接暴露 
    ```
 
 4. 在已登录同一 Tailnet 的 Virtus 浏览器访问 <https://base-spark.tail84088a.ts.net/>，完成登录、工作台和 SSE 问答冒烟。
+
+2026-07-16 记录：Serve 已按上述命令恢复，Base-Spark 的 Tailnet HTTPS `/healthz` 返回 `ok`，Virtus 的 `tailscale ping` 为直连在线。当前 Base-Spark 无 Virtus SSH 凭据，因此本轮新增页面功能仍需在 Virtus 浏览器中人工复核，不得将本机 HTTPS 健康检查表述为已完成跨机界面验收。
 
 #### 每次停用
 

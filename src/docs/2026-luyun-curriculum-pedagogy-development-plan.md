@@ -94,7 +94,7 @@
 
 ### 1.1 当前已实现能力
 
-截至 2026-07-15，项目已从思政场景问答 MVP 前进到“问答兼容链路 + 阶段 1A 首个可部署增量”，具备：
+截至 2026-07-16，项目已从思政场景问答 MVP 前进到“问答兼容链路 + 阶段 1A 可部署增量”，具备：
 
 - 本地账号登录、JWT 鉴权。
 - 固定主题与自定义主题。
@@ -105,7 +105,9 @@
 - PostgreSQL、MinIO、vLLM 和 A/B 双机部署底座。
 - Teaching Project / Version、Knowledge Document / Chunk、TaskRun、SkillRun 和 ModelCallAudit 基础对象及迁移。
 - 问答编排服务层、最小 ModelClient（逻辑模型名、Provider 标识、超时、错误映射和调用审计）。
-- 资料上传、后台解析、审核门禁、可追溯词项检索和 `retrieve_basis` 单 Skill 基线。
+- 资料上传、后台解析、审核门禁、`pg_trgm` 库内词法检索和可追溯引用。
+- 产品 Skills 运行时最小集：统一执行入口、Schema/权限校验、停用开关和运行留痕；当前注册 `skill.retrieve_basis` v1.1.0。
+- 核心用户 Memory 最小集：账户偏好、班情档案、显式引用注入审计、导出和一键清除。
 - 项目、版本、资料、任务和依据检索的桌面优先工作台基础页。
 - `base-spark` 的 `luyun-int` 集成 Compose、loopback 服务边界和 Tailscale Serve HTTPS；已从 `virtus` 验证登录与 SSE 问答。
 
@@ -119,8 +121,8 @@
 - 课程层、单元层、课时层的完整结构化教学成果（当前只有项目/版本骨架）。
 - 教学设计编辑、局部重生成、版本对比和 Word 导出。
 - 基于专家规则和原文证据的教学设计诊断。
-- 完整产品 Skills 注册表、输入输出 Schema、权限、配额和失败策略（当前仅 `retrieve_basis` 留痕基线）。
-- 核心用户 Memory（偏好、班情档案、模板钉选、注入确认与删除）。
+- 完整阶段 1 产品 Skills 注册表、配额和失败策略（当前仅 `retrieve_basis` v1.1.0 达到基线成熟度）。
+- Memory 注入确认 UX、模板钉选、保留/删除 SLA 与生成类 Skills 联动（偏好、班情、导出、清除和注入审计最小集已实现）。
 - 独立 Worker/队列、共享缓存、通用幂等、失败恢复和高峰降级（当前仅应用内后台资料任务、取消/重试和重启恢复基线）。
 - 模型、提示词、规则、知识库、Skill 和成果版本的完整统一追溯（当前已有部分对象与调用审计）。
 - 专家评测集、发布回归门禁和教师采用反馈。
@@ -1037,20 +1039,20 @@ G1 的候选构成如下：
 
 ### 7.5 投标演示环境现状快照
 
-以下状态为 2026-07-15 的只读核验结果，实施前必须重新检查：
+以下状态为 2026-07-16 的核验结果，后续实施前仍必须重新检查：
 
 | 项目 | 当前状态 | 对计划的影响 |
 | --- | --- | --- |
 | `base-spark` | Tailscale 在线，MagicDNS 为 `base-spark.tail84088a.ts.net` | 可作为投标演示主机 |
-| `virtus` | 与 `base-spark` 处于同一 Tailnet；2026-07-15 已完成真实浏览器登录和 SSE 问答验证 | 可作为研发验收终端；完整纵向样板与现场投屏彩排仍待后续版本验证 |
-| Tailscale Serve | 已启用 `https://base-spark.tail84088a.ts.net/` → `http://127.0.0.1:8088`；2026-07-15 从 `virtus` 验证登录和 SSE 问答 | Serve 技术链路已完成；持续核验 ACL/Grant 仅覆盖指定 Tailnet 身份，保持 Funnel 关闭 |
+| `virtus` | 与 `base-spark` 处于同一 Tailnet；2026-07-15 已完成真实浏览器登录和 SSE 问答验证；2026-07-16 `tailscale ping` 直连在线 | 可作为研发验收终端；本轮无 Virtus SSH 凭据，新增功能仍需在该机浏览器做人工界面复核 |
+| Tailscale Serve | 2026-07-16 已重新启用 `https://base-spark.tail84088a.ts.net/` → `http://127.0.0.1:8088`，并从 `base-spark` 通过 HTTPS `/healthz` | Serve 技术链路已完成；持续核验 ACL/Grant 仅覆盖指定 Tailnet 身份，保持 Funnel 关闭 |
 | 计算资源 | `aarch64`、NVIDIA GB10、约 121 GiB 内存、约 769 GiB 可用磁盘 | 具备单人/小并发演示基础；vLLM arm64 镜像、目标模型、多 Agent、多模态和训练容量仍须专项验证 |
 | vLLM | 项目生产编排以 vLLM 为基线，但 `base-spark` 尚未部署和验证目标 vLLM 服务 | D0 必须完成固定版本镜像、目标模型、Chat Template、SSE、结构化输出、上下文、并发和重启验证 |
 | Ollama 本地模型 | 已有 `qwen3.5:27b` 和 `gemma4` | 只作为前期开发、vLLM 验证期间的过渡 Provider 和明确标注的备用；现有 tag 不能代替正式模型资产登记 |
 | OpenClaw | 日常控制面独立运行并使用本地模型 | 不进入鲁韵调用链路，不复用 Operator Token、会话、渠道、Workspace 或工具权限 |
 | 当前短请求样本 | 经现有 Ollama/OpenClaw 链路的单次冷路径约 28.49 秒、预热后约 2.46 秒；两路短请求约 2.67/4.43 秒 | 仅证明当前短问答初步可行，不是 vLLM、长教案、多 Agent 或视频任务的容量证据 |
 | 宿主端口与网络 | `9000/9001` 已被其他容器占用，`172.29.0.0/24` 属于其他项目网络 | 现有 `dev.yml` 不能直接用于演示；必须采用专用 Compose 项目、网络、卷和端口预检 |
-| 双环境基础 | `luyun-int` 已部署且容器健康；`luyun-demo` 尚未建立 | 继续建设独立稳定数据/Secret、同镜像发布门禁和版本晋级机制；不得把集成环境冒充稳定演示环境 |
+| 双环境基础 | `luyun-int` 已部署 `stage1a-20260716-7f9e9b2` 且容器健康，迁移为 `f7b8c9d0e123 (head)`；`luyun-demo` 尚未建立 | 继续建设独立稳定数据/Secret、同镜像发布门禁和版本晋级机制；不得把集成环境冒充稳定演示环境 |
 
 当前项目 API 已通过最小 ModelClient 使用逻辑模型名、Provider 标识和 Provider 模型 ID，支持 Ollama 原生流式接口或 OpenAI 兼容接口。Provider 能力登记、认证隔离、任务路由和一致性回归仍未完成；“能返回文本”不等于模型服务已经统一，该差距仍须通过完整 ModelGateway 和 Provider Adapter 解决。
 
@@ -1099,7 +1101,7 @@ flowchart LR
 | D3 演示保障和彩排 | 3–5 个工作日 | vLLM 预热、并发/长连接测试、监控、故障注入、Ollama 明示降级、版本冻结和两次完整彩排 | T-7 首次彩排、T-2 版本冻结、T-1 恢复演练和预热完成 |
 | D4 按节点持续部署 | 贯穿阶段 1–4 | 每个双周迭代或可验收纵向增量先部署 `luyun-int`；通过自动测试、专业回归、迁移、`virtus` 冒烟和回滚检查后，将同一镜像晋级 `luyun-demo` | 每个开发节点均有部署记录；每个 G1–G4 保留不可变镜像、模型清单、数据快照、黄金脚本、验收记录和录屏 |
 
-实施状态（2026-07-15）：D2 的 Serve/MagicDNS、Virtus 浏览器登录和 SSE 问答技术链路已验证；D1 只完成 `luyun-int` 单环境基线；D0 固定版本 vLLM、D1 `luyun-demo`、D2 完整阶段 1 脚本与 ACL/Grant 验收、D3 彩排保障均未完成。
+实施状态（2026-07-16）：D2 的 Serve/MagicDNS、Virtus 浏览器登录和 SSE 问答技术链路已验证，本轮 Serve 重启后 HTTPS 健康检查通过；D1 完成 `luyun-int` 单环境增量部署、备份、迁移往返、重启持久化和镜像回滚/恢复基线；D0 固定版本 vLLM、D1 `luyun-demo`、D2 完整阶段 1 脚本与 ACL/Grant 验收、D3 彩排保障均未完成。
 
 D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的串行总和。D0 的镜像/端口盘点、故事线和 Tailnet 审批可并行，D2 的权限准备可与 D1 后半段重叠；但 D3 必须在可部署版本和跨设备链路稳定后执行。按此安排，2–3 周交付可访问技术基线，3–5 周交付可投标彩排基线；若投标日期早于 3 周，必须缩减现场实时能力并明确采用 D-L2/D-L3，不以取消恢复和彩排测试换取工期。
 
@@ -1315,13 +1317,15 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 - **1A 可信平台骨架（4–5 周）：** WP1.1–WP1.4 的最小闭环，重点验收 Teaching Project、ModelClient、异步任务、RAG、`retrieve_basis`、版本追溯和可部署基线。
 - **1B 纵向业务样板（5–7 周）：** 打通“查依据—备课—诊断—导出”四类用户任务入口；内部可由 2.5.1 的多个 Skill 组合，但不要求八个 Skill 都形成独立页面或同等成熟度。完成最小 Memory、桌面工作台、Word 导出、专家回归和双环境晋级后进入 G1。
 
-实施状态（2026-07-15）：**阶段 1A 进行中。** 已完成首个可部署增量：Teaching Project/Version 基础对象、服务层抽离、最小 ModelClient、应用内资料任务、审核门禁、`retrieve_basis` 词项检索基线、工作台基础页、`luyun-int` 部署及 Virtus/Tailscale 登录与 SSE 验证。尚未完成向量 + Reranker 混合检索、完整 Skills 运行时、Memory、纵向样板/导出、固定版本 vLLM、`luyun-demo` 同镜像晋级及 G1 评测，因此不得标记 1A、阶段 1 或 G1 完成。
+实施状态（2026-07-16）：**阶段 1A 进行中。** 已完成并部署当前增量：Teaching Project/Version 基础对象、服务层抽离、最小 ModelClient、应用内资料任务、审核门禁、`pg_trgm` 词法检索与引用、Skills 运行时最小集、Memory 最小集、工作台基础页和 `luyun-int` 部署。问答登录与 SSE 已验证，本轮另完成迁移往返、数据备份、镜像回滚/恢复和 Tailscale HTTPS 验收。尚未完成向量 + Reranker 混合检索、其余阶段 1 Skills、Memory 确认 UX、纵向样板/导出、固定版本 vLLM、`luyun-demo` 同镜像晋级及 G1 评测，因此不得标记 1A、阶段 1 或 G1 完成。
 
 实施记录（2026-07-16）：按 §5.4.1 第 5–7 步交付以下增量：
 （a）`retrieve_basis` 检索从应用内词项匹配升级为 PostgreSQL `pg_trgm` 库内词法检索（相似度排序、短查询子串兜底、资料不足阈值 `RETRIEVE_MIN_RELEVANCE`）；向量 + Reranker 混合检索仍待 D0 模型选型后接入。
 （b）产品 Skills 运行时最小集：SkillDefinition 注册表（含 §2.5.1 契约字段与成熟度登记）、统一 `run_skill` 执行入口（权限、输入输出 Schema 校验、input_hash、错误码、运行留痕）、数据库 status 停用开关；当前仅注册 `skill.retrieve_basis` v1.1.0（基线成熟度），其余阶段 1 Skills 的 Schema 待阶段 0《产品 Skills 目录 v1》冻结后注册，不在代码内代替专家发明契约。
 （c）核心用户 Memory 最小集：UserPreference、ClassContextProfile、MemoryInjectionAudit，显式 `memory_refs` 注入（含归属校验与快照审计）、一键清除、个人记忆清单导出；清除后引用不可再注入新 SkillRun（已回归验证）。注入确认 UX、配额/降级策略配置化执行仍未完成。
 上述增量不改变“1A、阶段 1、G1 未完成”的结论。
+
+部署验收记录（2026-07-16）：`luyun-int` 已切换至 `stage1a-20260716-7f9e9b2`，数据库为 `f7b8c9d0e123 (head)`。已通过登录/Skill 清单、Memory 写入—导出—清除、资料解析任务、审核、引用检索、应用重启持久化和真实 Ollama SSE 验收；Alembic 已通过 up/down/up，旧镜像回滚与新镜像恢复均成功。Tailscale Serve 已恢复 HTTPS 映射。
 
 ### 10.2 工作包
 
