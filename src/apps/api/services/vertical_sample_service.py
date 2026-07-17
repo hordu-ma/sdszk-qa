@@ -21,7 +21,6 @@ from src.apps.api.schemas.workbench import (
     DesignBlueprintOutput,
     DiagnoseArtifactInput,
     DiagnoseArtifactOutput,
-    DiagnosisItem,
     ExportArtifactInput,
     ExportArtifactOutput,
     GenerateSectionInput,
@@ -29,6 +28,7 @@ from src.apps.api.schemas.workbench import (
     VersionDiffResponse,
     VersionDiffSection,
 )
+from src.apps.api.services.diagnostic_rules import evaluate_diagnostic_rules
 from src.apps.api.services.knowledge_service import checksum, put_object, search_chunks
 from src.apps.api.services.project_service import create_version, get_owned_project
 
@@ -205,33 +205,14 @@ async def diagnose_artifact_handler(
     alignment = _require_section(source.content, "alignment_card", "请先完成课程依据对齐卡")
     blueprint = _require_section(source.content, "design_blueprint", "请先完成教学蓝图")
     design = _require_section(source.content, "lesson_design", "请先生成课时设计")
-    checks = [
-        DiagnosisItem(
-            dimension="依据可追溯",
-            status="aligned" if alignment.get("citations") else "needs_attention",
-            evidence=f"引用片段 {len(alignment.get('citations', []))} 条",
-            suggestion="补充并审核权威资料后重新运行对齐卡"
-            if not alignment.get("citations")
-            else "保留引用卡并在导出前复核有效期",
-        ),
-        DiagnosisItem(
-            dimension="目标—证据一致",
-            status="aligned"
-            if blueprint.get("objectives") and blueprint.get("evidence")
-            else "needs_attention",
-            evidence="蓝图同时包含目标与可观察证据",
-            suggestion="逐项目标补充对应证据" if not blueprint.get("evidence") else "保持一一对应",
-        ),
-        DiagnosisItem(
-            dimension="任务可实施",
-            status="aligned" if design.get("activities") else "needs_attention",
-            evidence=f"课时活动 {len(design.get('activities', []))} 个",
-            suggestion="补充分工、时长和教师支架"
-            if not design.get("activities")
-            else "试教后记录调整原因",
-        ),
-    ]
-    blocking = [item.dimension for item in checks if item.status == "needs_attention"]
+    # 诊断维度由规则字典 v2 驱动（services/diagnostic_rules.py），新增维度只需注册规则。
+    checks, blocking = evaluate_diagnostic_rules(
+        {
+            "alignment_card": alignment,
+            "design_blueprint": blueprint,
+            "lesson_design": design,
+        }
+    )
     draft = {
         "conclusion": "可进入教师确认" if not blocking else "需补充关键证据后再确认",
         "items": [item.model_dump() for item in checks],

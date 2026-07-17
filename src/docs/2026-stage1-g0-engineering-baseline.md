@@ -70,6 +70,8 @@
 
 诊断输出只允许：`dimension`、`status`、`evidence`、`suggestion`。禁止任何总分、百分制、排名和教师能力结论。
 
+实施记录（2026-07-17，内部代理决策，自助 §0.5 优先级 4）：上述三维已从 `diagnose_artifact_handler` 内联逻辑抽离为**可配置诊断规则字典 v2（内部版）**，入口 `src/apps/api/services/diagnostic_rules.py`。每条 `DiagnosticRule` 声明 `rule_id`、维度、依赖样板小节、达标判定、证据与改进建议；新增维度只需 `register_diagnostic_rule` 注册，无需改动诊断编排。规则字典严守非评分约束：只产出 `aligned/needs_attention`，注册入口对评分/排名类词元（与 `tests/test_no_scoring_paths.py` 同口径）和重复注册做防护拦截，回归见 `tests/test_diagnostic_rules.py`。三维内容与适用范围仍待专家确认（补签清单，见《模拟信息替换台账》§2），本记录不改变 G0/G1 状态。
+
 ## 5. 检索与模型工程决策
 
 当前完整检索链为 PostgreSQL `pg_trgm` + pgvector 余弦候选召回，再经 vLLM Reranker 重排，模式名为 `hybrid_trgm_pgvector_reranker`。Embedding/Reranker 不可用、或项目没有当前模型 revision 的语义向量（`semantic_index_missing`）时，显式降级为 `hybrid_trgm_char_vector`，不得以语义模式返回纯词法结果；两条链均保留审核过滤、资料有效期过滤（过期/未生效资料不进入检索）和资料不足阈值。

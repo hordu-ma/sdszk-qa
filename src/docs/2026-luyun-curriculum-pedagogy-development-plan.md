@@ -1423,6 +1423,8 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 
 （d）部署验收：`luyun-int` 部署 `stage1-selfserve-rag-20260717-r1`，迁移通过独立测试库 `k1 → m2 → k1 → m2` 往返；双数据集在真实语义链下 64/64 与 140/140；Reranker 停机显式降级无 5xx；回滚至上一镜像 + 数据库降级后健康，恢复当前版本与部署后快照成功。以同一 API/Web 镜像摘要晋级 `luyun-demo`，双环境通过 Tailnet HTTPS、真实 vLLM SSE、引用定位与资料不足判定验证。发布前备份 `/home/pgx/backups/luyun-sizheng/20260717-stage1-selfserve-rag-predeploy/`。内部金标与内部阈值均为 `internal_authored` 工程产物，不代表专家金标；本记录不改变阶段/G 门状态。
 
+工程实施记录（2026-07-17，第八增量，自助开发 §0.5 优先级 4：诊断规则字典 v2 内部版）：把纵向样板三个工程诊断维度（依据可追溯、目标—证据一致、任务可实施）从 `diagnose_artifact_handler` 内联逻辑抽离为可配置规则字典，入口 `src/apps/api/services/diagnostic_rules.py`。每条 `DiagnosticRule` 声明 `rule_id`、维度、依赖样板小节、达标判定、可观察证据与改进建议，并可标记是否阻断；新增维度只需 `register_diagnostic_rule` 注册，诊断编排不再改动。规则字典严守 §16.1 非评分约束：只产 `aligned/needs_attention`，注册入口对评分/排名类词元（与 `tests/test_no_scoring_paths.py` 同口径）与重复注册做防护拦截。新增 `tests/test_diagnostic_rules.py` 覆盖默认三维判定、blocking 汇总、可扩展注册与防护拦截；`diagnose_artifact_handler` 输出 Schema 不变、行为等价（blocking 仍按维度名汇总）；ruff + basedpyright + 43 例非集成 pytest 全绿。三维内容与适用范围仍为待专家确认的补签项（《阶段 1 模拟信息替换台账》§2 教学结构/诊断行），本记录不改变阶段 1A/1B、G0、G1 未完成的结论。下一步转入 §0.5 优先级 5（工作台体验：专业编辑、可用性走查、无障碍）。
+
 ### 10.2 工作包
 
 #### WP1.1 教学成果领域对象

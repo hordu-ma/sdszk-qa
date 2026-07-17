@@ -22,7 +22,7 @@
 | 可信资料 | 8 份自造 Markdown 资料 | `seed_demo.py`、MinIO `synthetic/stage1/` | 导入已授权原件，登记版本、有效期、责任人；不得覆盖模拟原件 | 解析、审核、引用定位、资料不足 |
 | 工程案例 | 8 个主题 × 8 个问题，共 64 例 | `stage1-synthetic-g0` v1 | 新建 `customer_provided` 或 `expert_authored` 数据集版本；禁止修改冻结集 | 冻结哈希、逐案例结果、发布清单 |
 | 专家金标 | 治理工具已实现，内部金标 v0（`stage1-internal-gold`，140 例，`internal_authored`）已走通双评/仲裁全流程；仍没有真实专家金标 | `evaluation_case_reviews`、案例金标状态、评测治理工作台、`seed_internal_gold.py` | 批量导入真实案例；两位专家独立复核，分歧由第三人仲裁；移除全部占位标记 | 双专家一致性、仲裁独立性、专业阈值、一票否决项 |
-| 教学结构/诊断 | 三个工程诊断维度 | 工程冻结基线、Skill 输出 Schema | 专家确认规则字典和适用范围 | 非评分防护、诊断证据与建议回归 |
+| 教学结构/诊断 | 三个工程诊断维度（规则字典 v2 内部版承载，`services/diagnostic_rules.py`） | 工程冻结基线、Skill 输出 Schema、`diagnostic_rules.py` | 专家确认规则字典条目和适用范围 | 非评分防护、诊断证据与建议回归 |
 | Word 模板 | `word-standard-v2` | 导出 Skill/模板版本 | 提供客户标准模板、必填栏目和视觉规范 | DOCX 完整性、LibreOffice/WPS 打开检查 |
 | 模型资产 | 固定 vLLM 工程候选 | Compose、模型资产表、发布清单 | 完成专业质量、上下文、并发和容量 Go/No-Go | 同数据集 Provider 回归、模型 revision 冻结 |
 | 账号与身份 | `demo_teacher`、`demo_admin` | 仓库外 env、`seed_demo.py` | 换成思政课平台 claims 与正式角色映射 | 登录、RBAC、跨用户/组织隔离、审计 |
