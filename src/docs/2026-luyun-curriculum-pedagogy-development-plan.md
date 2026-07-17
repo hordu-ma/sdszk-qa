@@ -1057,7 +1057,7 @@ G1 的候选构成如下：
 | OpenClaw | 日常控制面独立运行并使用本地模型 | 不进入鲁韵调用链路，不复用 Operator Token、会话、渠道、Workspace 或工具权限 |
 | 当前短请求样本 | 经现有 Ollama/OpenClaw 链路的单次冷路径约 28.49 秒、预热后约 2.46 秒；两路短请求约 2.67/4.43 秒 | 仅证明当前短问答初步可行，不是 vLLM、长教案、多 Agent 或视频任务的容量证据 |
 | 宿主端口与网络 | `9000/9001` 已被其他容器占用，`172.29.0.0/24` 属于其他项目网络 | 现有 `dev.yml` 不能直接用于演示；必须采用专用 Compose 项目、网络、卷和端口预检 |
-| 双环境基础 | `luyun-int`/`luyun-demo` 已部署 `stage1-synthetic-gate-20260717-r1` 同一 API/Web 镜像，迁移为 `j0e1f2a3b456 (head)`；两套 PostgreSQL、MinIO、vLLM 端口、卷和 Secret 隔离且健康 | 已形成模拟工程晋级基线；真实资料、专家回归、ACL/Grant 与 Virtus 人工验收前不得标记为正式专业演示版本 |
+| 双环境基础 | `luyun-int`/`luyun-demo` 已部署 `stage1-gold-review-20260717-r1` 同一 API/Web 镜像，迁移为 `k1f2a3b4c567 (head)`；两套 PostgreSQL、MinIO、vLLM 端口、卷和 Secret 隔离且健康 | 已形成模拟工程晋级和金标治理工具基线；真实资料、专家回归、ACL/Grant 与 Virtus 人工验收前不得标记为正式专业演示版本 |
 
 当前项目 API 已通过最小 ModelClient 使用逻辑模型名、Provider 标识和 Provider 模型 ID，支持 Ollama 原生流式接口或 OpenAI 兼容接口。Provider 能力登记、认证隔离、任务路由和一致性回归仍未完成；“能返回文本”不等于模型服务已经统一，该差距仍须通过完整 ModelGateway 和 Provider Adapter 解决。
 
@@ -1384,7 +1384,7 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 
 （c）`synthetic` 案例拒绝进入专家复核；`case_metadata.placeholder=true` 的占位案例即使完成复核也阻止正式冻结。非模拟数据集只有在来源审核通过、无占位案例且逐例达到共识或仲裁后才能冻结，继续禁止用工程 fixture 冒充真实金标。
 
-（d）代码迁移为 `k1f2a3b4c567`，已在独立 PostgreSQL 17 + pgvector 测试库完成 `j0 → k1 → j0 → k1` 和双评/分歧/独立仲裁集成验证；本增量尚未部署到 `luyun-int`/`luyun-demo`，运行环境仍保持第五增量的 `j0e1f2a3b456`，不改变阶段/G 门状态。
+（d）应用镜像 `stage1-gold-review-20260717-r1` 和迁移 `k1f2a3b4c567` 已部署到 `luyun-int`，完成 `j0 → k1 → j0 → k1` Schema 往返、上一应用镜像回滚和当前镜像恢复后，以同一 API/Web 镜像摘要晋级 `luyun-demo`。双环境通过健康检查、Tailnet HTTPS、真实 vLLM SSE、双评共识、分歧与独立仲裁、冻结运行、占位案例防冻结和 Chromium 登录页渲染验证；发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260717-stage1-gold-review-predeploy/`。临时验证数据已清理；该部署不等于获得真实专家金标，不改变阶段/G 门状态。
 
 ### 10.2 工作包
 

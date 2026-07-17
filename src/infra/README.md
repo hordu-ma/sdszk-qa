@@ -242,9 +242,9 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
 
-2026-07-17 当前发布候选：应用镜像 `stage1-synthetic-gate-20260717-r1`，迁移 `j0e1f2a3b456 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260717-stage1-synthetic-gate-predeploy/`。迁移已在独立测试库通过 `i9d0e1f2a345 → j0e1f2a3b456 → i9d0e1f2a345 → j0e1f2a3b456`；`luyun-int` 已验证旧应用镜像回滚和当前镜像恢复。固定模型资产如下，均为工程候选，不代表专业选型：
+2026-07-17 当前发布候选：应用镜像 `stage1-gold-review-20260717-r1`，迁移 `k1f2a3b4c567 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260717-stage1-gold-review-predeploy/`。迁移已在独立测试库和 `luyun-int` 通过 `j0e1f2a3b456 → k1f2a3b4c567 → j0e1f2a3b456 → k1f2a3b4c567`；`luyun-int` 已验证上一应用镜像回滚和当前镜像恢复，随后以同一 API/Web 镜像摘要晋级 `luyun-demo`。双环境已验证健康检查、真实 vLLM SSE、双评共识、分歧仲裁、冻结运行及占位案例防冻结；固定模型资产如下，均为工程候选，不代表专业选型：
 
-本轮回滚：将仓库外 env 的 `RELEASE_TAG` 改回 `stage1-browser-fixes-20260716-r1` 并重新创建 API/Web；旧应用可在 `j0` 数据库上运行。若必须完整回退 Schema，先停止新应用，将数据库降到 `i9d0e1f2a345`，再启动旧镜像；数据损坏时从上述发布前备份恢复 PostgreSQL/MinIO。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
+本轮回滚：将仓库外 env 的 `RELEASE_TAG` 改回 `stage1-synthetic-gate-20260717-r1`，停止当前 API，将数据库降到 `j0e1f2a3b456`，再重新创建上一 API/Web；恢复当前版本时按相反顺序升级到 `k1f2a3b4c567`。数据损坏时从上述发布前备份恢复 PostgreSQL/MinIO。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
 
 | 类型 | 资产 | 固定 revision | 服务名 / loopback |
 | --- | --- | --- | --- |
