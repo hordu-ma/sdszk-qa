@@ -42,11 +42,31 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
         role="admin",
         is_active=True,
     )
+    reviewer_username = f"reviewer_{uuid4().hex[:8]}"
+    reviewer = User(
+        username=reviewer_username,
+        hashed_password=bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+        full_name="专家复核集成测试",
+        role="reviewer",
+        is_active=True,
+    )
+    arbitrator_username = f"arbitrator_{uuid4().hex[:8]}"
+    arbitrator = User(
+        username=arbitrator_username,
+        hashed_password=bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+        full_name="专家仲裁集成测试",
+        role="reviewer",
+        is_active=True,
+    )
     async with AsyncSessionLocal() as db:
-        db.add(user)
+        db.add_all([user, reviewer, arbitrator])
         await db.commit()
         await db.refresh(user)
+        await db.refresh(reviewer)
+        await db.refresh(arbitrator)
         user_id = user.id
+        reviewer_id = reviewer.id
+        arbitrator_id = arbitrator.id
 
     source = "课程标准指出家国情怀教学目标应与学习任务和评价证据保持一致。".encode()
 
@@ -71,6 +91,20 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
                 "/api/auth/login", json={"username": username, "password": password}
             )
             headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+            reviewer_login = await client.post(
+                "/api/auth/login",
+                json={"username": reviewer_username, "password": password},
+            )
+            reviewer_headers = {
+                "Authorization": f"Bearer {reviewer_login.json()['access_token']}"
+            }
+            arbitrator_login = await client.post(
+                "/api/auth/login",
+                json={"username": arbitrator_username, "password": password},
+            )
+            arbitrator_headers = {
+                "Authorization": f"Bearer {arbitrator_login.json()['access_token']}"
+            }
             project_response = await client.post(
                 "/api/workbench/projects",
                 json={"title": "家国情怀样板", "stage": "高中", "course_type": "议题式"},
@@ -158,6 +192,17 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
                 headers=headers,
             )
             assert evaluation_case.status_code == 201
+            rejected_gold_review = await client.post(
+                f"/api/workbench/evaluation/cases/{evaluation_case.json()['id']}/reviews",
+                json={
+                    "review_kind": "independent",
+                    "expected_document_ids": [document_id],
+                    "rationale": "模拟案例不得进入专家金标流程",
+                },
+                headers=headers,
+            )
+            assert rejected_gold_review.status_code == 409
+            assert rejected_gold_review.json()["error_code"] == "synthetic_case_not_reviewable"
             frozen = await client.post(
                 f"/api/workbench/evaluation/datasets/{dataset_id}/freeze",
                 headers=headers,
@@ -226,6 +271,132 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             assert reviewed_dataset.status_code == 200
             assert reviewed_dataset.json()["review_status"] == "approved"
             assert reviewed_dataset.json()["reviewed_by"] == user_id
+
+            bulk_import = await client.post(
+                f"/api/workbench/evaluation/datasets/{customer_dataset.json()['id']}/cases/import",
+                json={
+                    "cases": [
+                        {
+                            "case_key": "expert-consensus",
+                            "query": "家国情怀教学目标",
+                            "expected_document_ids": [document_id],
+                            "case_metadata": {"source_reference": "integration-test"},
+                        },
+                        {
+                            "case_key": "expert-arbitration",
+                            "query": "评价证据如何对应目标",
+                            "expected_document_ids": [document_id],
+                            "case_metadata": {"source_reference": "integration-test"},
+                        },
+                    ]
+                },
+                headers=headers,
+            )
+            assert bulk_import.status_code == 201
+            imported_cases = bulk_import.json()
+            assert [item["gold_status"] for item in imported_cases] == ["pending", "pending"]
+            review_queue = await client.get(
+                "/api/workbench/evaluation/review-queue", headers=reviewer_headers
+            )
+            assert customer_dataset.json()["id"] in {
+                item["id"] for item in review_queue.json()
+            }
+            reviewer_cases = await client.get(
+                f"/api/workbench/evaluation/datasets/{customer_dataset.json()['id']}/cases",
+                headers=reviewer_headers,
+            )
+            assert reviewer_cases.status_code == 200
+            assert len(reviewer_cases.json()) == 2
+            premature_freeze = await client.post(
+                f"/api/workbench/evaluation/datasets/{customer_dataset.json()['id']}/freeze",
+                headers=headers,
+            )
+            assert premature_freeze.status_code == 409
+            assert premature_freeze.json()["error_code"] == "evaluation_gold_not_ready"
+
+            consensus_case_id = imported_cases[0]["id"]
+            for review_headers in (headers, reviewer_headers):
+                review = await client.post(
+                    f"/api/workbench/evaluation/cases/{consensus_case_id}/reviews",
+                    json={
+                        "review_kind": "independent",
+                        "expected_document_ids": [document_id],
+                        "critical_error_tags": ["fabricated_citation"],
+                        "rationale": "依据文档与问题匹配",
+                    },
+                    headers=review_headers,
+                )
+                assert review.status_code == 201
+
+            arbitration_case_id = imported_cases[1]["id"]
+            first_review = await client.post(
+                f"/api/workbench/evaluation/cases/{arbitration_case_id}/reviews",
+                json={
+                    "review_kind": "independent",
+                    "expected_document_ids": [document_id],
+                    "rationale": "存在直接依据",
+                },
+                headers=headers,
+            )
+            assert first_review.status_code == 201
+            second_review = await client.post(
+                f"/api/workbench/evaluation/cases/{arbitration_case_id}/reviews",
+                json={
+                    "review_kind": "independent",
+                    "expected_insufficient_basis": True,
+                    "rationale": "第二位专家认为依据不足",
+                },
+                headers=reviewer_headers,
+            )
+            assert second_review.status_code == 201
+            disputed_cases = await client.get(
+                f"/api/workbench/evaluation/datasets/{customer_dataset.json()['id']}/cases",
+                headers=headers,
+            )
+            disputed_case = next(
+                item for item in disputed_cases.json() if item["id"] == arbitration_case_id
+            )
+            assert disputed_case["gold_status"] == "disputed"
+            rejected_arbitration = await client.post(
+                f"/api/workbench/evaluation/cases/{arbitration_case_id}/reviews",
+                json={
+                    "review_kind": "arbitration",
+                    "expected_document_ids": [document_id],
+                    "rationale": "仲裁确认该资料可直接支持结论",
+                },
+                headers=headers,
+            )
+            assert rejected_arbitration.status_code == 409
+            assert (
+                rejected_arbitration.json()["error_code"]
+                == "evaluation_arbitrator_not_independent"
+            )
+            arbitration = await client.post(
+                f"/api/workbench/evaluation/cases/{arbitration_case_id}/reviews",
+                json={
+                    "review_kind": "arbitration",
+                    "expected_document_ids": [document_id],
+                    "rationale": "独立仲裁确认该资料可直接支持结论",
+                },
+                headers=arbitrator_headers,
+            )
+            assert arbitration.status_code == 201
+
+            formal_report = await client.get(
+                f"/api/workbench/evaluation/datasets/{customer_dataset.json()['id']}/report",
+                headers=headers,
+            )
+            assert formal_report.status_code == 200
+            assert formal_report.json()["gold_status_counts"] == {
+                "arbitrated": 1,
+                "consensus": 1,
+            }
+            assert formal_report.json()["ready_for_freeze"] is True
+            formal_frozen = await client.post(
+                f"/api/workbench/evaluation/datasets/{customer_dataset.json()['id']}/freeze",
+                headers=headers,
+            )
+            assert formal_frozen.status_code == 200
 
             alignment = await client.post(
                 "/api/workbench/skills/alignment-card",
@@ -305,6 +476,8 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             )
             del projects
             await db.execute(delete(User).where(User.id == user_id))
+            await db.execute(delete(User).where(User.id == reviewer_id))
+            await db.execute(delete(User).where(User.id == arbitrator_id))
             await db.commit()
 
 
@@ -362,6 +535,10 @@ async def test_review_requires_reviewer_role_and_allows_cross_user(
 
             teacher_headers = await _login(teacher.username)
             reviewer_headers = await _login(reviewer.username)
+            denied_queue = await client.get(
+                "/api/workbench/evaluation/review-queue", headers=teacher_headers
+            )
+            assert denied_queue.status_code == 403
 
             project = await client.post(
                 "/api/workbench/projects",

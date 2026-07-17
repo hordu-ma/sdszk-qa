@@ -199,6 +199,7 @@ class EvaluationDatasetResponse(BaseModel):
 
     id: int
     project_id: int
+    owner_id: int
     dataset_key: str
     version_number: int
     name: str
@@ -223,6 +224,10 @@ class EvaluationCaseCreate(BaseModel):
     case_metadata: dict = Field(default_factory=dict)
 
 
+class EvaluationCaseBulkImport(BaseModel):
+    cases: list[EvaluationCaseCreate] = Field(min_length=1, max_length=200)
+
+
 class EvaluationCaseResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -233,6 +238,29 @@ class EvaluationCaseResponse(BaseModel):
     expected_document_ids: list[int]
     expected_insufficient_basis: bool
     case_metadata: dict
+    gold_status: str
+    created_at: datetime
+
+
+class EvaluationCaseReviewCreate(BaseModel):
+    review_kind: Literal["independent", "arbitration"] = "independent"
+    expected_document_ids: list[int] = Field(default_factory=list, max_length=20)
+    expected_insufficient_basis: bool = False
+    critical_error_tags: list[str] = Field(default_factory=list, max_length=20)
+    rationale: str = Field(min_length=2, max_length=4000)
+
+
+class EvaluationCaseReviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    case_id: int
+    reviewer_id: int
+    review_kind: str
+    expected_document_ids: list[int]
+    expected_insufficient_basis: bool
+    critical_error_tags: list[str]
+    rationale: str
     created_at: datetime
 
 
@@ -265,6 +293,28 @@ class EvaluationCaseResultResponse(BaseModel):
     error_message: str | None
     latency_ms: int | None
     created_at: datetime
+
+
+class EvaluationLatestRunSummary(BaseModel):
+    id: int
+    status: str
+    total_cases: int
+    matched_cases: int
+    failed_cases: int
+    error_cases: int
+    dataset_hash: str
+
+
+class EvaluationDatasetReportResponse(BaseModel):
+    dataset_id: int
+    data_origin: str
+    review_status: str
+    dataset_status: str
+    total_cases: int
+    placeholder_cases: int
+    gold_status_counts: dict[str, int]
+    ready_for_freeze: bool
+    latest_run: EvaluationLatestRunSummary | None
 
 
 class UserPreferenceUpdate(BaseModel):

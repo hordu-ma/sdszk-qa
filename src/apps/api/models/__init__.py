@@ -9,6 +9,7 @@ from .cases import Case
 from .evaluation import (
     EvaluationCase,
     EvaluationCaseResult,
+    EvaluationCaseReview,
     EvaluationDataset,
     EvaluationRun,
     ModelAsset,
@@ -61,6 +62,7 @@ __all__ = [
     "ModelAsset",
     "EvaluationDataset",
     "EvaluationCase",
+    "EvaluationCaseReview",
     "EvaluationRun",
     "EvaluationCaseResult",
 ]

@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 问答 MVP | 可用 | 登录、主题、会话、历史、SSE 流式问答 |
 | 阶段 1A | 工程底座可用，整体未验收 | `luyun-int` 已固定使用 vLLM 主链，语义 RAG、来源标记和版本化工程评测已实现；候选模型与完整 G0 外部签字未冻结 |
-| 阶段 1B / G1 | 模拟工程闭环完成，未通过 G1 | 高中议题式闭环、64 个模拟案例回归和同镜像稳定环境晋级已实现；专家金标评测未完成 |
+| 阶段 1B / G1 | 模拟工程闭环和金标治理工具可用，未通过 G1 | 高中议题式闭环、64 个模拟案例回归、双评/仲裁门禁和同镜像稳定环境晋级已实现；真实专家金标评测未完成 |
 | Base-Spark 接入 | 双环境链路已通 | `luyun-int` 与 `luyun-demo` 独立运行并通过 Tailnet HTTPS 访问；ACL 授权由 Tailnet 管理侧负责 |
 
 ### 已实现能力
@@ -30,6 +30,7 @@
 - 知识索引版本：Embedding/Reranker 仓库、revision、维度和配置哈希可追溯；新索引完整构建后才原子激活
 - 版本化工程评测：数据集按 key/version 冻结，内容 SHA256 不可变；运行绑定应用、vLLM、模型 revision、检索参数和 Skill 版本发布清单
 - 评测来源门禁：数据集显式区分 `synthetic`、`customer_provided`、`expert_authored`；模拟数据不能被审核成正式专家集
+- 金标治理：支持最多 200 例批量导入、审核员正式集复核队列、两位不同审核人独立复核、分歧时由第三人仲裁、占位案例阻止冻结，以及金标状态/最近运行汇总报告；只有数据集所有者可导入、冻结和运行
 - Skills 运行时：统一权限、Schema、运行审计、停用与降级契约；已注册查依据、对齐卡、蓝图、分块生成、形成性诊断和导出六个 Skill
 - Memory：账户偏好、班情档案、项目/模板钉选；每次注入必须由用户在界面显式勾选，支持导出；一键清除前显示对象数量和不可撤销确认
 - 异步任务：排队、进度、取消、重试，应用重启后自动恢复
@@ -47,7 +48,7 @@
 
 ### 尚未完成（主要项）
 
-专家审核的完整阶段 1 Skill/规则目录、专家金标 120–160 个案例及专业阈值、候选模型正式选型、Virtus 人工验收和 G0/G1 外部签字。当前三个模型是工程兼容性候选，64 个案例是模拟工程集；两者都不代表专业验收。完整清单见主开发计划 §1.2。
+专家审核的完整阶段 1 Skill/规则目录、真实专家金标 120–160 个案例及专业阈值、候选模型正式选型、Virtus 人工验收和 G0/G1 外部签字。金标双评/仲裁工具已经实现，但当前三个模型仍是工程兼容性候选，64 个案例仍是模拟工程集；都不代表专业验收。完整清单见主开发计划 §1.2。
 
 ## 系统组成
 
@@ -75,7 +76,7 @@
 - Memory：`/api/workbench/memory/preference`、`class-profiles`、`pinned-items`、`export`、`clear`
 - 版本/导出：`/api/workbench/projects/{id}/versions`、`versions/diff`、`/api/workbench/exports/{id}/download`
 - 模型/索引：`/api/workbench/runtime/model-assets`、`/api/workbench/projects/{id}/knowledge-indexes`
-- 工程评测：`/api/workbench/evaluation/datasets`、`/api/workbench/evaluation/runs/{id}/results`
+- 工程/金标评测：`/api/workbench/evaluation/datasets`、`/api/workbench/evaluation/datasets/{id}/cases/import`、`/api/workbench/evaluation/cases/{id}/reviews`、`/api/workbench/evaluation/datasets/{id}/report`、`/api/workbench/evaluation/runs/{id}/results`
 
 ## 快速开始
 
@@ -133,4 +134,4 @@ make test-integration    # 集成测试
 - 运行留痕：task_runs、skill_runs（含 input_hash、memory_refs、error_code）、model_call_audits
 - Skills 与 Memory：skill_definitions、user_preferences、class_context_profiles、pinned_memory_items、memory_injection_audits
 - 导出：artifact_exports（关联项目、版本、SkillRun、模板和校验和）
-- 模型与评测：model_assets、evaluation_datasets/cases/runs/case_results（冻结哈希与发布清单）
+- 模型与评测：model_assets、evaluation_datasets/cases/case_reviews/runs/case_results（双评/仲裁、冻结哈希与发布清单）

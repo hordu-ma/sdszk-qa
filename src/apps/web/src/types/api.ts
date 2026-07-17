@@ -179,6 +179,91 @@ export interface PinnedItem {
   updated_at: string;
 }
 
+export type EvaluationDataOrigin =
+  | "synthetic"
+  | "customer_provided"
+  | "expert_authored";
+
+export interface EvaluationDataset {
+  id: number;
+  project_id: number;
+  owner_id: number;
+  dataset_key: string;
+  version_number: number;
+  name: string;
+  description: string | null;
+  data_origin: EvaluationDataOrigin;
+  review_status: string;
+  review_note: string | null;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  status: "draft" | "frozen";
+  content_hash: string | null;
+  case_count: number;
+  frozen_at: string | null;
+  created_at: string;
+}
+
+export interface EvaluationCase {
+  id: number;
+  dataset_id: number;
+  case_key: string;
+  query: string;
+  expected_document_ids: number[];
+  expected_insufficient_basis: boolean;
+  case_metadata: Record<string, unknown>;
+  gold_status:
+    | "not_applicable"
+    | "pending"
+    | "single_review"
+    | "consensus"
+    | "disputed"
+    | "arbitrated";
+  created_at: string;
+}
+
+export interface EvaluationCaseInput {
+  case_key: string;
+  query: string;
+  expected_document_ids?: number[];
+  expected_insufficient_basis?: boolean;
+  case_metadata?: Record<string, unknown>;
+}
+
+export interface EvaluationCaseReview {
+  id: number;
+  case_id: number;
+  reviewer_id: number;
+  review_kind: "independent" | "arbitration";
+  expected_document_ids: number[];
+  expected_insufficient_basis: boolean;
+  critical_error_tags: string[];
+  rationale: string;
+  created_at: string;
+}
+
+export interface EvaluationLatestRunSummary {
+  id: number;
+  status: string;
+  total_cases: number;
+  matched_cases: number;
+  failed_cases: number;
+  error_cases: number;
+  dataset_hash: string;
+}
+
+export interface EvaluationDatasetReport {
+  dataset_id: number;
+  data_origin: EvaluationDataOrigin;
+  review_status: string;
+  dataset_status: string;
+  total_cases: number;
+  placeholder_cases: number;
+  gold_status_counts: Record<string, number>;
+  ready_for_freeze: boolean;
+  latest_run: EvaluationLatestRunSummary | null;
+}
+
 export interface ProjectVersion {
   id: number;
   project_id: number;

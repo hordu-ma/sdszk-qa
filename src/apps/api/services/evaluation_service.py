@@ -3,7 +3,9 @@
 import hashlib
 import json
 import time
+from collections import Counter
 from datetime import UTC, datetime
+from typing import TypedDict
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,7 @@ from src.apps.api.exceptions import BusinessError
 from src.apps.api.models import (
     EvaluationCase,
     EvaluationCaseResult,
+    EvaluationCaseReview,
     EvaluationDataset,
     EvaluationRun,
     KnowledgeDocument,
@@ -24,6 +27,14 @@ from src.apps.api.services.project_service import get_owned_project
 
 def _utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+class EvaluationCaseInput(TypedDict):
+    case_key: str
+    query: str
+    expected_document_ids: list[int]
+    expected_insufficient_basis: bool
+    case_metadata: dict
 
 
 async def create_dataset(
@@ -113,6 +124,24 @@ async def get_owned_dataset(
     return dataset
 
 
+async def get_accessible_dataset(
+    db: AsyncSession, *, dataset_id: int, user: User
+) -> EvaluationDataset:
+    result = await db.execute(
+        select(EvaluationDataset).where(EvaluationDataset.id == dataset_id)
+    )
+    dataset = result.scalar_one_or_none()
+    if dataset is None:
+        raise BusinessError("评测数据集不存在", status_code=404, error_code="dataset_not_found")
+    if dataset.owner_id != user.id and user.role not in {"admin", "reviewer"}:
+        raise BusinessError(
+            "无权查看该评测数据集",
+            status_code=403,
+            error_code="evaluation_review_forbidden",
+        )
+    return dataset
+
+
 async def add_case(
     db: AsyncSession,
     *,
@@ -124,6 +153,50 @@ async def add_case(
     expected_insufficient_basis: bool,
     case_metadata: dict,
 ) -> EvaluationCase:
+    cases = await add_cases_bulk(
+        db,
+        user=user,
+        dataset_id=dataset_id,
+        case_inputs=[
+            {
+                "case_key": case_key,
+                "query": query,
+                "expected_document_ids": expected_document_ids,
+                "expected_insufficient_basis": expected_insufficient_basis,
+                "case_metadata": case_metadata,
+            }
+        ],
+    )
+    return cases[0]
+
+
+async def _validate_document_ids(
+    db: AsyncSession, *, dataset: EvaluationDataset, document_ids: set[int]
+) -> None:
+    if not document_ids:
+        return
+    documents = await db.execute(
+        select(KnowledgeDocument.id).where(
+            KnowledgeDocument.id.in_(document_ids),
+            KnowledgeDocument.project_id == dataset.project_id,
+            KnowledgeDocument.owner_id == dataset.owner_id,
+        )
+    )
+    if set(documents.scalars()) != document_ids:
+        raise BusinessError(
+            "预期资料不属于当前项目",
+            status_code=422,
+            error_code="evaluation_document_invalid",
+        )
+
+
+async def add_cases_bulk(
+    db: AsyncSession,
+    *,
+    user: User,
+    dataset_id: int,
+    case_inputs: list[EvaluationCaseInput],
+) -> list[EvaluationCase]:
     dataset = await get_owned_dataset(db, dataset_id, user.id)
     if dataset.status != "draft":
         raise BusinessError(
@@ -131,33 +204,58 @@ async def add_case(
             status_code=409,
             error_code="dataset_frozen",
         )
-    if expected_document_ids:
-        documents = await db.execute(
-            select(KnowledgeDocument.id).where(
-                KnowledgeDocument.id.in_(expected_document_ids),
-                KnowledgeDocument.project_id == dataset.project_id,
-                KnowledgeDocument.owner_id == user.id,
-            )
+    case_keys = [item["case_key"] for item in case_inputs]
+    if len(case_keys) != len(set(case_keys)):
+        raise BusinessError(
+            "批量导入中存在重复 case_key",
+            status_code=409,
+            error_code="evaluation_case_duplicate",
         )
-        if set(documents.scalars()) != set(expected_document_ids):
-            raise BusinessError(
-                "预期资料不属于当前项目",
-                status_code=422,
-                error_code="evaluation_document_invalid",
-            )
-    case = EvaluationCase(
-        dataset_id=dataset.id,
-        case_key=case_key,
-        query=query,
-        expected_document_ids=expected_document_ids,
-        expected_insufficient_basis=expected_insufficient_basis,
-        case_metadata=case_metadata,
+    existing = await db.execute(
+        select(EvaluationCase.case_key).where(
+            EvaluationCase.dataset_id == dataset.id,
+            EvaluationCase.case_key.in_(case_keys),
+        )
     )
-    db.add(case)
-    dataset.case_count += 1
+    if existing.first() is not None:
+        raise BusinessError(
+            "case_key 已存在",
+            status_code=409,
+            error_code="evaluation_case_duplicate",
+        )
+    for item in case_inputs:
+        if item["expected_document_ids"] and item["expected_insufficient_basis"]:
+            raise BusinessError(
+                "资料不足案例不能同时指定预期文档",
+                status_code=422,
+                error_code="evaluation_gold_conflict",
+            )
+    document_ids = {
+        document_id
+        for item in case_inputs
+        for document_id in item["expected_document_ids"]
+    }
+    await _validate_document_ids(db, dataset=dataset, document_ids=document_ids)
+    cases = [
+        EvaluationCase(
+            dataset_id=dataset.id,
+            case_key=item["case_key"],
+            query=item["query"],
+            expected_document_ids=item["expected_document_ids"],
+            expected_insufficient_basis=item["expected_insufficient_basis"],
+            case_metadata=item["case_metadata"],
+            gold_status=(
+                "not_applicable" if dataset.data_origin == "synthetic" else "pending"
+            ),
+        )
+        for item in case_inputs
+    ]
+    db.add_all(cases)
+    dataset.case_count += len(cases)
     await db.commit()
-    await db.refresh(case)
-    return case
+    for case_item in cases:
+        await db.refresh(case_item)
+    return cases
 
 
 async def _dataset_cases(db: AsyncSession, dataset_id: int) -> list[EvaluationCase]:
@@ -177,6 +275,7 @@ def _content_hash(cases: list[EvaluationCase]) -> str:
             "expected_document_ids": item.expected_document_ids,
             "expected_insufficient_basis": item.expected_insufficient_basis,
             "case_metadata": item.case_metadata,
+            "gold_status": item.gold_status,
         }
         for item in cases
     ]
@@ -195,6 +294,16 @@ async def freeze_dataset(
         raise BusinessError(
             "空数据集不可冻结", status_code=422, error_code="dataset_empty"
         )
+    if dataset.data_origin != "synthetic":
+        ready_statuses = {"consensus", "arbitrated"}
+        if dataset.review_status != "approved" or any(
+            item.gold_status not in ready_statuses for item in cases
+        ) or any(item.case_metadata.get("placeholder") is True for item in cases):
+            raise BusinessError(
+                "正式数据集须审核通过、移除占位案例且全部案例完成双评共识或仲裁后才能冻结",
+                status_code=409,
+                error_code="evaluation_gold_not_ready",
+            )
     dataset.status = "frozen"
     dataset.case_count = len(cases)
     dataset.content_hash = _content_hash(cases)
@@ -217,6 +326,241 @@ async def list_datasets(
         .order_by(EvaluationDataset.dataset_key, EvaluationDataset.version_number.desc())
     )
     return list(result.scalars())
+
+
+async def list_review_queue(db: AsyncSession, *, reviewer: User) -> list[EvaluationDataset]:
+    if reviewer.role not in {"admin", "reviewer"}:
+        raise BusinessError(
+            "只有审核员或管理员可以查看复核队列",
+            status_code=403,
+            error_code="evaluation_review_forbidden",
+        )
+    result = await db.execute(
+        select(EvaluationDataset)
+        .where(
+            EvaluationDataset.data_origin != "synthetic",
+            EvaluationDataset.status == "draft",
+        )
+        .order_by(EvaluationDataset.created_at, EvaluationDataset.id)
+    )
+    return list(result.scalars())
+
+
+async def list_dataset_cases(
+    db: AsyncSession, *, dataset_id: int, user: User
+) -> list[EvaluationCase]:
+    await get_accessible_dataset(db, dataset_id=dataset_id, user=user)
+    return await _dataset_cases(db, dataset_id)
+
+
+def _review_signature(
+    review: EvaluationCaseReview,
+) -> tuple[tuple[int, ...], bool, tuple[str, ...]]:
+    return (
+        tuple(sorted(review.expected_document_ids)),
+        review.expected_insufficient_basis,
+        tuple(sorted(review.critical_error_tags)),
+    )
+
+
+def _apply_gold(case_item: EvaluationCase, review: EvaluationCaseReview, status: str) -> None:
+    case_item.expected_document_ids = sorted(set(review.expected_document_ids))
+    case_item.expected_insufficient_basis = review.expected_insufficient_basis
+    case_item.case_metadata = {
+        **case_item.case_metadata,
+        "gold": {
+            "critical_error_tags": sorted(set(review.critical_error_tags)),
+            "resolved_by": status,
+        },
+    }
+    case_item.gold_status = status
+
+
+async def submit_case_review(
+    db: AsyncSession,
+    *,
+    case_id: int,
+    reviewer: User,
+    review_kind: str,
+    expected_document_ids: list[int],
+    expected_insufficient_basis: bool,
+    critical_error_tags: list[str],
+    rationale: str,
+) -> EvaluationCaseReview:
+    if reviewer.role not in {"admin", "reviewer"}:
+        raise BusinessError(
+            "只有审核员或管理员可以提交专家金标复核",
+            status_code=403,
+            error_code="evaluation_review_forbidden",
+        )
+    result = await db.execute(
+        select(EvaluationCase, EvaluationDataset)
+        .join(EvaluationDataset, EvaluationDataset.id == EvaluationCase.dataset_id)
+        .where(EvaluationCase.id == case_id)
+    )
+    row = result.one_or_none()
+    if row is None:
+        raise BusinessError(
+            "评测案例不存在", status_code=404, error_code="evaluation_case_not_found"
+        )
+    case_item, dataset = row
+    if dataset.data_origin == "synthetic":
+        raise BusinessError(
+            "模拟案例不进入专家金标流程",
+            status_code=409,
+            error_code="synthetic_case_not_reviewable",
+        )
+    if dataset.status != "draft":
+        raise BusinessError(
+            "冻结数据集不可新增复核记录",
+            status_code=409,
+            error_code="dataset_frozen",
+        )
+    if expected_document_ids and expected_insufficient_basis:
+        raise BusinessError(
+            "资料不足案例不能同时指定预期文档",
+            status_code=422,
+            error_code="evaluation_gold_conflict",
+        )
+    await _validate_document_ids(
+        db, dataset=dataset, document_ids=set(expected_document_ids)
+    )
+    reviews_result = await db.execute(
+        select(EvaluationCaseReview)
+        .where(EvaluationCaseReview.case_id == case_id)
+        .order_by(EvaluationCaseReview.id)
+    )
+    reviews = list(reviews_result.scalars())
+    independent = [item for item in reviews if item.review_kind == "independent"]
+    arbitration = [item for item in reviews if item.review_kind == "arbitration"]
+    if review_kind == "independent":
+        if any(item.reviewer_id == reviewer.id for item in independent):
+            raise BusinessError(
+                "同一审核人不能重复提交独立复核",
+                status_code=409,
+                error_code="evaluation_review_duplicate",
+            )
+        if len(independent) >= 2:
+            raise BusinessError(
+                "独立复核已满两份，请按状态进入仲裁",
+                status_code=409,
+                error_code="evaluation_review_limit",
+            )
+    else:
+        if case_item.gold_status != "disputed" or len(independent) != 2 or arbitration:
+            raise BusinessError(
+                "仅双评存在分歧且尚未仲裁的案例可以提交仲裁",
+                status_code=409,
+                error_code="evaluation_arbitration_not_ready",
+            )
+        if any(item.reviewer_id == reviewer.id for item in independent):
+            raise BusinessError(
+                "仲裁人不能同时是前两位独立复核人",
+                status_code=409,
+                error_code="evaluation_arbitrator_not_independent",
+            )
+    review = EvaluationCaseReview(
+        case_id=case_item.id,
+        reviewer_id=reviewer.id,
+        review_kind=review_kind,
+        expected_document_ids=sorted(set(expected_document_ids)),
+        expected_insufficient_basis=expected_insufficient_basis,
+        critical_error_tags=sorted(set(critical_error_tags)),
+        rationale=rationale,
+    )
+    db.add(review)
+    await db.flush()
+    if review_kind == "arbitration":
+        _apply_gold(case_item, review, "arbitrated")
+    elif not independent:
+        case_item.gold_status = "single_review"
+    else:
+        first_review = independent[0]
+        if _review_signature(first_review) == _review_signature(review):
+            _apply_gold(case_item, review, "consensus")
+        else:
+            case_item.gold_status = "disputed"
+    await db.commit()
+    await db.refresh(review)
+    return review
+
+
+async def list_case_reviews(
+    db: AsyncSession, *, case_id: int, user: User
+) -> list[EvaluationCaseReview]:
+    case_result = await db.execute(
+        select(EvaluationCase, EvaluationDataset)
+        .join(EvaluationDataset, EvaluationDataset.id == EvaluationCase.dataset_id)
+        .where(EvaluationCase.id == case_id)
+    )
+    row = case_result.one_or_none()
+    if row is None:
+        raise BusinessError(
+            "评测案例不存在", status_code=404, error_code="evaluation_case_not_found"
+        )
+    _, dataset = row
+    if dataset.owner_id != user.id and user.role not in {"admin", "reviewer"}:
+        raise BusinessError(
+            "无权查看该案例复核记录",
+            status_code=403,
+            error_code="evaluation_review_forbidden",
+        )
+    result = await db.execute(
+        select(EvaluationCaseReview)
+        .where(EvaluationCaseReview.case_id == case_id)
+        .order_by(EvaluationCaseReview.id)
+    )
+    return list(result.scalars())
+
+
+async def dataset_report(
+    db: AsyncSession, *, dataset_id: int, user: User
+) -> dict:
+    dataset = await get_accessible_dataset(db, dataset_id=dataset_id, user=user)
+    cases = await _dataset_cases(db, dataset.id)
+    gold_counts = Counter(item.gold_status for item in cases)
+    latest_run_result = await db.execute(
+        select(EvaluationRun)
+        .where(EvaluationRun.dataset_id == dataset.id)
+        .order_by(EvaluationRun.id.desc())
+        .limit(1)
+    )
+    latest_run = latest_run_result.scalar_one_or_none()
+    ready_statuses = {"consensus", "arbitrated"}
+    placeholder_cases = sum(
+        item.case_metadata.get("placeholder") is True for item in cases
+    )
+    ready_for_freeze = bool(cases) and (
+        dataset.data_origin == "synthetic"
+        or (
+            dataset.review_status == "approved"
+            and placeholder_cases == 0
+            and all(item.gold_status in ready_statuses for item in cases)
+        )
+    )
+    return {
+        "dataset_id": dataset.id,
+        "data_origin": dataset.data_origin,
+        "review_status": dataset.review_status,
+        "dataset_status": dataset.status,
+        "total_cases": len(cases),
+        "placeholder_cases": placeholder_cases,
+        "gold_status_counts": dict(sorted(gold_counts.items())),
+        "ready_for_freeze": ready_for_freeze,
+        "latest_run": (
+            None
+            if latest_run is None
+            else {
+                "id": latest_run.id,
+                "status": latest_run.status,
+                "total_cases": latest_run.total_cases,
+                "matched_cases": latest_run.matched_cases,
+                "failed_cases": latest_run.failed_cases,
+                "error_cases": latest_run.error_cases,
+                "dataset_hash": latest_run.dataset_hash,
+            }
+        ),
+    }
 
 
 async def run_dataset(

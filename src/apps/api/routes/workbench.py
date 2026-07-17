@@ -42,10 +42,14 @@ from src.apps.api.schemas.workbench import (
     DiagnoseArtifactResponse,
     DocumentResponse,
     DocumentReviewRequest,
+    EvaluationCaseBulkImport,
     EvaluationCaseCreate,
     EvaluationCaseResponse,
     EvaluationCaseResultResponse,
+    EvaluationCaseReviewCreate,
+    EvaluationCaseReviewResponse,
     EvaluationDatasetCreate,
+    EvaluationDatasetReportResponse,
     EvaluationDatasetResponse,
     EvaluationDatasetReviewRequest,
     EvaluationRunResponse,
@@ -77,14 +81,21 @@ from src.apps.api.schemas.workbench import (
 )
 from src.apps.api.services.audit import write_audit_log
 from src.apps.api.services.evaluation_service import (
+    EvaluationCaseInput,
     add_case,
+    add_cases_bulk,
     create_dataset,
+    dataset_report,
     freeze_dataset,
     get_owned_run,
+    list_case_reviews,
+    list_dataset_cases,
     list_datasets,
+    list_review_queue,
     list_run_results,
     review_dataset,
     run_dataset,
+    submit_case_review,
 )
 from src.apps.api.services.knowledge_service import (
     SUPPORTED_SUFFIXES,
@@ -862,6 +873,16 @@ async def list_evaluation_datasets(
     return [EvaluationDatasetResponse.model_validate(item) for item in datasets]
 
 
+@router.get(
+    "/evaluation/review-queue", response_model=list[EvaluationDatasetResponse]
+)
+async def get_evaluation_review_queue(
+    db: DbSession, current_user: CurrentUser
+) -> list[EvaluationDatasetResponse]:
+    datasets = await list_review_queue(db, reviewer=current_user)
+    return [EvaluationDatasetResponse.model_validate(item) for item in datasets]
+
+
 @router.post(
     "/evaluation/datasets/{dataset_id}/cases",
     response_model=EvaluationCaseResponse,
@@ -884,6 +905,114 @@ async def create_evaluation_case(
         case_metadata=payload.case_metadata,
     )
     return EvaluationCaseResponse.model_validate(case_item)
+
+
+@router.post(
+    "/evaluation/datasets/{dataset_id}/cases/import",
+    response_model=list[EvaluationCaseResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_evaluation_cases(
+    dataset_id: int,
+    payload: EvaluationCaseBulkImport,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> list[EvaluationCaseResponse]:
+    cases = await add_cases_bulk(
+        db,
+        user=current_user,
+        dataset_id=dataset_id,
+        case_inputs=[
+            EvaluationCaseInput(
+                case_key=item.case_key,
+                query=item.query,
+                expected_document_ids=item.expected_document_ids,
+                expected_insufficient_basis=item.expected_insufficient_basis,
+                case_metadata=item.case_metadata,
+            )
+            for item in payload.cases
+        ],
+    )
+    await write_audit_log(
+        db,
+        request,
+        "import_evaluation_cases",
+        current_user.id,
+        "evaluation_dataset",
+        str(dataset_id),
+        {"case_count": len(cases), "case_keys": [item.case_key for item in cases]},
+    )
+    await db.commit()
+    return [EvaluationCaseResponse.model_validate(item) for item in cases]
+
+
+@router.get(
+    "/evaluation/datasets/{dataset_id}/cases",
+    response_model=list[EvaluationCaseResponse],
+)
+async def get_evaluation_cases(
+    dataset_id: int, db: DbSession, current_user: CurrentUser
+) -> list[EvaluationCaseResponse]:
+    cases = await list_dataset_cases(db, dataset_id=dataset_id, user=current_user)
+    return [EvaluationCaseResponse.model_validate(item) for item in cases]
+
+
+@router.post(
+    "/evaluation/cases/{case_id}/reviews",
+    response_model=EvaluationCaseReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_evaluation_case_review(
+    case_id: int,
+    payload: EvaluationCaseReviewCreate,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> EvaluationCaseReviewResponse:
+    review = await submit_case_review(
+        db,
+        case_id=case_id,
+        reviewer=current_user,
+        review_kind=payload.review_kind,
+        expected_document_ids=payload.expected_document_ids,
+        expected_insufficient_basis=payload.expected_insufficient_basis,
+        critical_error_tags=payload.critical_error_tags,
+        rationale=payload.rationale,
+    )
+    await write_audit_log(
+        db,
+        request,
+        "create_evaluation_case_review",
+        current_user.id,
+        "evaluation_case",
+        str(case_id),
+        {"review_kind": review.review_kind},
+    )
+    await db.commit()
+    return EvaluationCaseReviewResponse.model_validate(review)
+
+
+@router.get(
+    "/evaluation/cases/{case_id}/reviews",
+    response_model=list[EvaluationCaseReviewResponse],
+)
+async def get_evaluation_case_reviews(
+    case_id: int, db: DbSession, current_user: CurrentUser
+) -> list[EvaluationCaseReviewResponse]:
+    reviews = await list_case_reviews(db, case_id=case_id, user=current_user)
+    return [EvaluationCaseReviewResponse.model_validate(item) for item in reviews]
+
+
+@router.get(
+    "/evaluation/datasets/{dataset_id}/report",
+    response_model=EvaluationDatasetReportResponse,
+)
+async def get_evaluation_dataset_report(
+    dataset_id: int, db: DbSession, current_user: CurrentUser
+) -> EvaluationDatasetReportResponse:
+    report = await dataset_report(db, dataset_id=dataset_id, user=current_user)
+    return EvaluationDatasetReportResponse.model_validate(report)
 
 
 @router.post(

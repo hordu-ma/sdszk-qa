@@ -7,6 +7,7 @@ import {
   compareVersions,
   createAlignmentCard,
   createClassProfile,
+  createEvaluationDataset,
   createProject,
   createDesignBlueprint,
   deleteClassProfile,
@@ -14,25 +15,39 @@ import {
   diagnoseArtifact,
   downloadExport,
   exportArtifact,
+  freezeEvaluationDataset,
   generateSection,
+  getEvaluationDatasetReport,
   getModelStatus,
   getPreference,
   listClassProfiles,
   listDocuments,
+  listEvaluationCases,
+  listEvaluationDatasets,
+  listEvaluationReviewQueue,
   listPinnedItems,
   listProjectVersions,
   listProjects,
   listTasks,
   pinProject,
+  importEvaluationCases,
   reviewDocument,
+  reviewEvaluationDataset,
   retrieveBasis,
   retryTask,
+  runEvaluationDataset,
   savePreference,
+  submitEvaluationCaseReview,
   uploadDocument,
 } from "../api/workbench";
 import type {
   BasisCitation,
   ClassProfile,
+  EvaluationCase,
+  EvaluationCaseInput,
+  EvaluationDataOrigin,
+  EvaluationDataset,
+  EvaluationDatasetReport,
   KnowledgeDocument,
   MemoryRef,
   ModelStatus,
@@ -60,6 +75,10 @@ const pinnedItems = ref<PinnedItem[]>([]);
 const versions = ref<ProjectVersion[]>([]);
 const latestStep = ref<SkillStepResponse | null>(null);
 const versionDiff = ref<VersionDiff | null>(null);
+const evaluationDatasets = ref<EvaluationDataset[]>([]);
+const selectedEvaluationDatasetId = ref<number | null>(null);
+const evaluationCases = ref<EvaluationCase[]>([]);
+const evaluationReport = ref<EvaluationDatasetReport | null>(null);
 const loading = ref(false);
 const query = ref("");
 const newProject = ref({ title: "", stage: "高中", course_type: "议题式" });
@@ -78,10 +97,40 @@ const sampleForm = ref({
   basis_query: "家国情怀教学目标与评价证据",
 });
 const diffForm = ref({ from: 1, to: 1 });
+const evaluationDatasetForm = ref({
+  dataset_key: "stage1-expert-gold",
+  name: "阶段 1 专家金标集",
+  description: "待真实资料和专家复核替换；工程开发期间不得作为正式验收结论。",
+  data_origin: "expert_authored" as EvaluationDataOrigin,
+});
+const evaluationReviewNote = ref("已核对数据来源；专业结论仍以案例双评和仲裁记录为准。");
+const evaluationImportText = ref(JSON.stringify([
+  {
+    case_key: "expert-case-001",
+    query: "请替换为专家确认的问题",
+    expected_document_ids: [],
+    expected_insufficient_basis: true,
+    case_metadata: { placeholder: true },
+  },
+], null, 2));
+const selectedEvaluationCaseId = ref<number | null>(null);
+const goldReviewForm = ref({
+  review_kind: "independent" as "independent" | "arbitration",
+  expected_document_ids: "",
+  expected_insufficient_basis: true,
+  critical_error_tags: "",
+  rationale: "",
+});
 let timer: number | undefined;
 
 const selectedProject = computed(() =>
   projects.value.find((item) => item.id === selectedProjectId.value),
+);
+const selectedEvaluationDataset = computed(() =>
+  evaluationDatasets.value.find((item) => item.id === selectedEvaluationDatasetId.value),
+);
+const ownsSelectedEvaluationDataset = computed(
+  () => selectedEvaluationDataset.value?.owner_id === userStore.userInfo?.id,
 );
 const latestVersionContent = computed<Record<string, unknown>>(
   () => versions.value[0]?.content || {},
@@ -128,6 +177,43 @@ async function refreshProjectData() {
   if (latestVersion && earliestVersion) {
     diffForm.value.to = latestVersion.version_number;
     diffForm.value.from = earliestVersion.version_number;
+  }
+}
+
+async function refreshEvaluationDatasets() {
+  if (!selectedProjectId.value) {
+    evaluationDatasets.value = [];
+    selectedEvaluationDatasetId.value = null;
+    return;
+  }
+  const ownedDatasets = await listEvaluationDatasets(selectedProjectId.value);
+  const reviewQueue = canReview.value ? await listEvaluationReviewQueue() : [];
+  evaluationDatasets.value = [
+    ...ownedDatasets,
+    ...reviewQueue.filter(
+      (queued) => !ownedDatasets.some((owned) => owned.id === queued.id),
+    ),
+  ];
+  if (!evaluationDatasets.value.some((item) => item.id === selectedEvaluationDatasetId.value)) {
+    selectedEvaluationDatasetId.value = evaluationDatasets.value[0]?.id || null;
+  }
+}
+
+async function refreshEvaluationDetails() {
+  if (!selectedEvaluationDatasetId.value) {
+    evaluationCases.value = [];
+    evaluationReport.value = null;
+    selectedEvaluationCaseId.value = null;
+    return;
+  }
+  const [cases, report] = await Promise.all([
+    listEvaluationCases(selectedEvaluationDatasetId.value),
+    getEvaluationDatasetReport(selectedEvaluationDatasetId.value),
+  ]);
+  evaluationCases.value = cases;
+  evaluationReport.value = report;
+  if (!cases.some((item) => item.id === selectedEvaluationCaseId.value)) {
+    selectedEvaluationCaseId.value = cases[0]?.id || null;
   }
 }
 
@@ -358,18 +444,112 @@ async function handleRetry(taskId: number) {
   await refreshProjectData();
 }
 
+async function handleCreateEvaluationDataset() {
+  if (!selectedProjectId.value) return;
+  loading.value = true;
+  try {
+    const dataset = await createEvaluationDataset({
+      project_id: selectedProjectId.value,
+      ...evaluationDatasetForm.value,
+      description: evaluationDatasetForm.value.description || null,
+    });
+    await refreshEvaluationDatasets();
+    selectedEvaluationDatasetId.value = dataset.id;
+    showSuccessToast("评测数据集新版本已创建");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function handleImportEvaluationCases() {
+  if (!selectedEvaluationDatasetId.value) return;
+  try {
+    const parsed: unknown = JSON.parse(evaluationImportText.value);
+    if (!Array.isArray(parsed) || !parsed.length) throw new Error("empty");
+    await importEvaluationCases(
+      selectedEvaluationDatasetId.value,
+      parsed as EvaluationCaseInput[],
+    );
+    await refreshEvaluationDetails();
+    showSuccessToast("案例已批量导入；正式集仍需双专家复核");
+  } catch {
+    showFailToast("导入失败，请检查 JSON、case_key 和预期资料 ID");
+  }
+}
+
+async function handleReviewEvaluationDataset(status: "approved" | "rejected") {
+  if (!selectedEvaluationDatasetId.value || evaluationReviewNote.value.trim().length < 2) {
+    showFailToast("请填写数据集审核意见");
+    return;
+  }
+  await reviewEvaluationDataset(
+    selectedEvaluationDatasetId.value,
+    status,
+    evaluationReviewNote.value.trim(),
+  );
+  await Promise.all([refreshEvaluationDatasets(), refreshEvaluationDetails()]);
+  showSuccessToast(status === "approved" ? "数据集来源审核已通过" : "数据集已退回");
+}
+
+function parseNumberList(value: string): number[] {
+  return [...new Set(value.split(",").map((item) => Number(item.trim())).filter(Number.isInteger))];
+}
+
+async function handleSubmitGoldReview() {
+  if (!selectedEvaluationCaseId.value || goldReviewForm.value.rationale.trim().length < 2) {
+    showFailToast("请选择案例并填写复核依据");
+    return;
+  }
+  await submitEvaluationCaseReview(selectedEvaluationCaseId.value, {
+    review_kind: goldReviewForm.value.review_kind,
+    expected_document_ids: parseNumberList(goldReviewForm.value.expected_document_ids),
+    expected_insufficient_basis: goldReviewForm.value.expected_insufficient_basis,
+    critical_error_tags: goldReviewForm.value.critical_error_tags
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+    rationale: goldReviewForm.value.rationale.trim(),
+  });
+  goldReviewForm.value.rationale = "";
+  await refreshEvaluationDetails();
+  showSuccessToast("复核记录已写入；系统已重新计算金标状态");
+}
+
+async function handleFreezeEvaluationDataset() {
+  if (!selectedEvaluationDatasetId.value) return;
+  await freezeEvaluationDataset(selectedEvaluationDatasetId.value);
+  await Promise.all([refreshEvaluationDatasets(), refreshEvaluationDetails()]);
+  showSuccessToast("评测数据集已冻结");
+}
+
+async function handleRunEvaluationDataset() {
+  if (!selectedEvaluationDatasetId.value) return;
+  loading.value = true;
+  try {
+    await runEvaluationDataset(selectedEvaluationDatasetId.value);
+    await refreshEvaluationDetails();
+    showSuccessToast("回归运行完成");
+  } finally {
+    loading.value = false;
+  }
+}
+
 watch(selectedProjectId, async () => {
   citations.value = [];
   latestStep.value = null;
   versionDiff.value = null;
   await refreshProjectData();
+  await refreshEvaluationDatasets();
 });
+
+watch(selectedEvaluationDatasetId, refreshEvaluationDetails);
 
 onMounted(async () => {
   try {
     modelStatus.value = await getModelStatus();
     await Promise.all([refreshProjects(), refreshMemory()]);
     await refreshProjectData();
+    await refreshEvaluationDatasets();
     timer = window.setInterval(refreshProjectData, 3000);
   } catch {
     showFailToast("工作台加载失败");
@@ -586,6 +766,120 @@ onBeforeUnmount(() => {
           <p v-if="!versionDiff.changed_sections.length" class="empty">两个版本没有结构化差异。</p>
         </div>
       </article>
+
+      <article class="panel full-panel evaluation-panel">
+        <div class="panel-title">
+          <div>
+            <h2>8. G1 评测治理（工程就绪）</h2>
+            <p>正式数据集必须完成来源审核、双专家独立复核；有分歧时完成仲裁后才能冻结。</p>
+          </div>
+          <span v-if="evaluationReport" :class="['status', evaluationReport.ready_for_freeze ? 'approved' : 'pending']">
+            {{ evaluationReport.ready_for_freeze ? "可冻结" : "金标未就绪" }}
+          </span>
+        </div>
+
+        <div class="evaluation-grid">
+          <section>
+            <h3>数据集版本</h3>
+            <div class="stack-form">
+              <input v-model="evaluationDatasetForm.dataset_key" placeholder="dataset_key" />
+              <input v-model="evaluationDatasetForm.name" placeholder="数据集名称" />
+              <select v-model="evaluationDatasetForm.data_origin">
+                <option value="synthetic">synthetic · 仅工程回归</option>
+                <option value="customer_provided">customer_provided · 客户提供</option>
+                <option value="expert_authored">expert_authored · 专家编制</option>
+              </select>
+              <textarea v-model="evaluationDatasetForm.description" rows="3" placeholder="来源和用途说明" />
+              <button :disabled="!selectedProjectId || loading" @click="handleCreateEvaluationDataset">创建新版本</button>
+            </div>
+            <div class="dataset-list">
+              <button
+                v-for="dataset in evaluationDatasets"
+                :key="dataset.id"
+                :class="['dataset-button', { active: dataset.id === selectedEvaluationDatasetId }]"
+                @click="selectedEvaluationDatasetId = dataset.id"
+              >
+                <strong>{{ dataset.name }} · v{{ dataset.version_number }}</strong>
+                <small>{{ dataset.data_origin }} / {{ dataset.review_status }} / {{ dataset.status }} / owner #{{ dataset.owner_id }}</small>
+              </button>
+              <p v-if="!evaluationDatasets.length" class="empty">当前项目还没有评测数据集。</p>
+            </div>
+          </section>
+
+          <section>
+            <h3>批量案例导入</h3>
+            <p class="hint">接受 JSON 数组；占位案例必须保留 <code>placeholder: true</code>，不得作为专业验收数据。</p>
+            <textarea v-model="evaluationImportText" class="json-input" rows="13" :disabled="!ownsSelectedEvaluationDataset || selectedEvaluationDataset?.status === 'frozen'" />
+            <button :disabled="!selectedEvaluationDatasetId || !ownsSelectedEvaluationDataset || selectedEvaluationDataset?.status === 'frozen'" @click="handleImportEvaluationCases">批量导入</button>
+          </section>
+
+          <section>
+            <h3>来源审核与门禁</h3>
+            <textarea v-model="evaluationReviewNote" rows="4" placeholder="审核意见" />
+            <div class="pipeline-actions">
+              <button
+                v-if="canReview && selectedEvaluationDataset?.data_origin !== 'synthetic'"
+                :disabled="!selectedEvaluationDatasetId"
+                @click="handleReviewEvaluationDataset('approved')"
+              >来源审核通过</button>
+              <button
+                v-if="canReview && selectedEvaluationDataset?.data_origin !== 'synthetic'"
+                class="danger-button"
+                :disabled="!selectedEvaluationDatasetId"
+                @click="handleReviewEvaluationDataset('rejected')"
+              >退回</button>
+              <button
+                :disabled="!ownsSelectedEvaluationDataset || !evaluationReport?.ready_for_freeze || selectedEvaluationDataset?.status === 'frozen'"
+                @click="handleFreezeEvaluationDataset"
+              >冻结数据集</button>
+              <button
+                :disabled="loading || !ownsSelectedEvaluationDataset || selectedEvaluationDataset?.status !== 'frozen'"
+                @click="handleRunEvaluationDataset"
+              >运行回归</button>
+            </div>
+            <dl v-if="evaluationReport" class="report-summary">
+              <div><dt>案例数</dt><dd>{{ evaluationReport.total_cases }}</dd></div>
+              <div><dt>待替换占位案例</dt><dd>{{ evaluationReport.placeholder_cases }}</dd></div>
+              <div><dt>金标状态</dt><dd>{{ evaluationReport.gold_status_counts }}</dd></div>
+              <div v-if="evaluationReport.latest_run">
+                <dt>最近运行</dt>
+                <dd>
+                  {{ evaluationReport.latest_run.matched_cases }} matched /
+                  {{ evaluationReport.latest_run.failed_cases }} failed /
+                  {{ evaluationReport.latest_run.error_cases }} error
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+
+        <section class="gold-review-section">
+          <h3>案例金标双评与仲裁</h3>
+          <div class="case-tabs">
+            <button
+              v-for="caseItem in evaluationCases"
+              :key="caseItem.id"
+              :class="[{ active: caseItem.id === selectedEvaluationCaseId }, `gold-${caseItem.gold_status}`]"
+              @click="selectedEvaluationCaseId = caseItem.id"
+            >
+              {{ caseItem.case_key }} · {{ caseItem.gold_status }}
+            </button>
+          </div>
+          <div v-if="selectedEvaluationCaseId && selectedEvaluationDataset?.data_origin !== 'synthetic'" class="gold-review-form">
+            <select v-model="goldReviewForm.review_kind" :disabled="!canReview">
+              <option value="independent">独立复核</option>
+              <option value="arbitration">分歧仲裁</option>
+            </select>
+            <input v-model="goldReviewForm.expected_document_ids" :disabled="goldReviewForm.expected_insufficient_basis || !canReview" placeholder="预期资料 ID，逗号分隔" />
+            <label class="check-row"><input v-model="goldReviewForm.expected_insufficient_basis" type="checkbox" :disabled="!canReview" />资料不足</label>
+            <input v-model="goldReviewForm.critical_error_tags" :disabled="!canReview" placeholder="一票否决标签，逗号分隔" />
+            <textarea v-model="goldReviewForm.rationale" rows="3" :disabled="!canReview" placeholder="复核依据或仲裁理由" />
+            <button :disabled="!canReview || selectedEvaluationDataset?.status === 'frozen'" @click="handleSubmitGoldReview">提交不可变复核记录</button>
+          </div>
+          <p v-else-if="selectedEvaluationDataset?.data_origin === 'synthetic'" class="synthetic-inline">模拟案例只用于工程回归，禁止提交专家金标。</p>
+          <p v-else class="empty">导入案例后可开始双专家独立复核。</p>
+        </section>
+      </article>
     </section>
   </main>
 </template>
@@ -605,5 +899,6 @@ onBeforeUnmount(() => {
 .document-actions { display: flex !important; align-items: center; gap: 6px !important; }.document-actions button { padding: 5px 8px; font-size: 12px; }.status.approved { background: #dcf5e8; color: #17633f; }.status.pending { background: #fff0ce; color: #875b0b; }.status.disabled, .status.rejected { background: #edf0ed; color: #657068; }
 .retrieve-panel { min-height: 350px; }.citation-list { display: grid; gap: 10px; margin-top: 16px; }.citation { border-left: 4px solid #4c8d77; background: #f5f8f6; padding: 14px; border-radius: 8px; }.citation header span { color: #6b756e; font-size: 12px; }.citation p { white-space: pre-wrap; line-height: 1.65; margin: 10px 0 0; color: #36443a; }.task-actions { display: flex; gap: 7px; align-items: center; }.task-actions button { padding: 5px 9px; font-size: 12px; }.empty { color: #7b857e; font-size: 13px; }
 .memory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }.memory-grid section { border: 1px solid #e4e9e5; border-radius: 12px; padding: 16px; }.stack-form { display: grid; gap: 8px; }.stack-form input, .sample-inputs input, .diff-controls select { border: 1px solid #cfd8d1; border-radius: 9px; padding: 9px 10px; }.memory-actions, .pipeline-actions, .diff-controls { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-top: 12px; }.check-row, .memory-item { display: flex; gap: 8px; align-items: center; }.memory-item { border-top: 1px solid #edf0ed; padding: 9px 0; }.memory-item span { display: grid; gap: 2px; flex: 1; }.memory-item small { color: #778179; }.memory-item button { padding: 5px 8px; font-size: 12px; }.danger-button { background: #9d3926 !important; }.hint, .workflow-progress { color: #637068; }.workflow-progress { font-size: 13px; margin: 10px 0 0; }.sample-inputs { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 9px; }.step-result { margin-top: 16px; border: 1px solid #d7e1da; border-radius: 10px; overflow: hidden; }.step-result header { display: flex; justify-content: space-between; background: #edf3ef; padding: 10px 12px; }.step-result pre, .diff-list pre { white-space: pre-wrap; overflow: auto; font-size: 12px; line-height: 1.5; padding: 12px; margin: 0; background: #f8faf8; }.diff-controls label { display: flex; gap: 6px; align-items: center; }.diff-list { display: grid; gap: 12px; margin-top: 16px; }.diff-list article { border: 1px solid #e1e7e2; border-radius: 10px; padding: 12px; }.diff-list article > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
-@media (max-width: 850px) { .workbench-page { padding: 14px; }.hero { align-items: stretch; flex-direction: column; padding: 24px; }.grid { grid-template-columns: 1fr; }.projects-panel, .full-panel { grid-column: auto; }.form-row, .search-row { flex-direction: column; }.provider { min-width: 0; }.memory-grid, .sample-inputs, .diff-list article > div { grid-template-columns: 1fr; } }
+.evaluation-grid { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 16px; }.evaluation-grid > section, .gold-review-section { border: 1px solid #e1e7e2; border-radius: 12px; padding: 16px; }.evaluation-panel textarea, .evaluation-panel select, .evaluation-panel input { width: 100%; box-sizing: border-box; border: 1px solid #cfd8d1; border-radius: 9px; padding: 9px 10px; background: white; color: #172019; }.json-input { margin-bottom: 10px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }.dataset-list, .case-tabs { display: grid; gap: 7px; margin-top: 12px; }.dataset-button { display: grid; gap: 3px; text-align: left; background: #edf3ef !important; color: #285143 !important; }.dataset-button.active, .case-tabs button.active { background: #173f35 !important; color: white !important; }.dataset-button small { opacity: .78; }.report-summary { display: grid; gap: 7px; margin: 14px 0 0; }.report-summary div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #edf0ed; padding-top: 7px; }.report-summary dt { color: #637068; }.report-summary dd { margin: 0; text-align: right; overflow-wrap: anywhere; }.gold-review-section { margin-top: 16px; }.case-tabs { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }.case-tabs button { background: #edf3ef; color: #285143; }.gold-review-form { display: grid; grid-template-columns: 160px 1fr 120px 1fr; gap: 9px; align-items: center; margin-top: 12px; }.gold-review-form textarea, .gold-review-form button { grid-column: 1 / -1; }.synthetic-inline { color: #875b0b; background: #fff6df; border-radius: 9px; padding: 10px; }
+@media (max-width: 850px) { .workbench-page { padding: 14px; }.hero { align-items: stretch; flex-direction: column; padding: 24px; }.grid { grid-template-columns: 1fr; }.projects-panel, .full-panel { grid-column: auto; }.form-row, .search-row { flex-direction: column; }.provider { min-width: 0; }.memory-grid, .sample-inputs, .diff-list article > div, .evaluation-grid, .gold-review-form { grid-template-columns: 1fr; } }
 </style>

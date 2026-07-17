@@ -87,6 +87,37 @@ class EvaluationCase(Base, TimestampMixin):
     expected_document_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     expected_insufficient_basis: Mapped[bool] = mapped_column(default=False)
     case_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    gold_status: Mapped[str] = mapped_column(
+        String(30), default="not_applicable", index=True
+    )
+
+
+class EvaluationCaseReview(Base):
+    """专家对单个正式案例的独立复核或仲裁记录。"""
+
+    __tablename__ = "evaluation_case_reviews"
+    __table_args__ = (
+        UniqueConstraint(
+            "case_id",
+            "reviewer_id",
+            "review_kind",
+            name="uq_eval_case_reviewer_kind",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey("evaluation_cases.id", ondelete="CASCADE"), index=True
+    )
+    reviewer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )
+    review_kind: Mapped[str] = mapped_column(String(30), index=True)
+    expected_document_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    expected_insufficient_basis: Mapped[bool] = mapped_column(default=False)
+    critical_error_tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    rationale: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(server_default="now()")
 
 
 class EvaluationRun(Base, TimestampMixin):

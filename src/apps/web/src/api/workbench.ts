@@ -3,6 +3,12 @@ import type {
   KnowledgeDocument,
   ClassProfile,
   ExportArtifactResponse,
+  EvaluationCase,
+  EvaluationCaseInput,
+  EvaluationCaseReview,
+  EvaluationDataOrigin,
+  EvaluationDataset,
+  EvaluationDatasetReport,
   MemoryRef,
   ModelStatus,
   PinnedItem,
@@ -187,4 +193,80 @@ export function downloadExport(downloadUrl: string) {
   return request.get<unknown, Blob>(downloadUrl.replace(/^\/api/, ""), {
     responseType: "blob",
   });
+}
+
+export function listEvaluationDatasets(projectId: number) {
+  return request.get<unknown, EvaluationDataset[]>("/workbench/evaluation/datasets", {
+    params: { project_id: projectId },
+  });
+}
+
+export function listEvaluationReviewQueue() {
+  return request.get<unknown, EvaluationDataset[]>("/workbench/evaluation/review-queue");
+}
+
+export function createEvaluationDataset(data: {
+  project_id: number;
+  dataset_key: string;
+  name: string;
+  description: string | null;
+  data_origin: EvaluationDataOrigin;
+}) {
+  return request.post<unknown, EvaluationDataset>("/workbench/evaluation/datasets", data);
+}
+
+export function reviewEvaluationDataset(
+  datasetId: number,
+  reviewStatus: "approved" | "rejected",
+  reviewNote: string,
+) {
+  return request.post<unknown, EvaluationDataset>(
+    `/workbench/evaluation/datasets/${datasetId}/review`,
+    { review_status: reviewStatus, review_note: reviewNote },
+  );
+}
+
+export function importEvaluationCases(datasetId: number, cases: EvaluationCaseInput[]) {
+  return request.post<unknown, EvaluationCase[]>(
+    `/workbench/evaluation/datasets/${datasetId}/cases/import`,
+    { cases },
+  );
+}
+
+export function listEvaluationCases(datasetId: number) {
+  return request.get<unknown, EvaluationCase[]>(
+    `/workbench/evaluation/datasets/${datasetId}/cases`,
+  );
+}
+
+export function submitEvaluationCaseReview(
+  caseId: number,
+  data: {
+    review_kind: "independent" | "arbitration";
+    expected_document_ids: number[];
+    expected_insufficient_basis: boolean;
+    critical_error_tags: string[];
+    rationale: string;
+  },
+) {
+  return request.post<unknown, EvaluationCaseReview>(
+    `/workbench/evaluation/cases/${caseId}/reviews`,
+    data,
+  );
+}
+
+export function getEvaluationDatasetReport(datasetId: number) {
+  return request.get<unknown, EvaluationDatasetReport>(
+    `/workbench/evaluation/datasets/${datasetId}/report`,
+  );
+}
+
+export function freezeEvaluationDataset(datasetId: number) {
+  return request.post<unknown, EvaluationDataset>(
+    `/workbench/evaluation/datasets/${datasetId}/freeze`,
+  );
+}
+
+export function runEvaluationDataset(datasetId: number) {
+  return request.post(`/workbench/evaluation/datasets/${datasetId}/runs`);
 }

@@ -85,6 +85,9 @@
 - 单案例只记录 expected document/资料不足是否命中、检索模式、延迟和错误；汇总为 matched/failed/error 技术计数。
 - 当前框架不含专家金标，不设置专业通过阈值，也不输出教师/学生总分、等级或排名。
 - 评测集记录 `data_origin`、外部审核状态/意见/审核人/时间；`synthetic` 审核状态固定为 `not_applicable`。
+- 正式来源评测集支持一次批量导入 1–200 个案例；每例记录 `pending/single_review/consensus/disputed/arbitrated` 金标状态。
+- 两位不同审核人提交独立复核；预期资料、资料不足结论和一票否决标签完全一致时形成 `consensus`，否则进入 `disputed`，且只能由未参与前两次复核的第三人仲裁。
+- 标记 `case_metadata.placeholder=true` 的案例可用于工程开发，但会阻止正式数据集冻结；正式集还必须先通过来源审核并逐例达到 `consensus` 或 `arbitrated`。
 
 ## 6. 版本、导出与追溯
 
@@ -111,6 +114,7 @@ make harness-full
 5. 运行对齐卡、蓝图、课时设计、形成性诊断。
 6. 比较 v1 与最新版本，导出并打开 DOCX。
 7. 创建工程评测数据集和案例，冻结后确认不可修改，执行并核对发布清单与逐案例结果。
+   正式来源数据集还要验证批量导入、双评共识、分歧仲裁、占位案例防冻结和汇总报告。
 8. 停止 Reranker，确认检索显式降级且不返回 5xx；恢复服务后确认健康。
 9. 清除 Memory，确认旧引用不能用于新 SkillRun。
 10. 分别以 `demo_teacher` 和 `demo_admin` 验证教师不可审核、管理员可审核；确认失败任务显示服务端错误原因。
@@ -123,6 +127,13 @@ make harness-full
 - `luyun-demo` 通过六 Skill 主链、显式 Memory、版本、`word-standard-v2`、真实 vLLM SSE 和 Reranker 停机降级验证。
 - `luyun-int` 已验证回滚到 `stage1-browser-fixes-20260716-r1` 后健康，再恢复当前镜像；迁移已在独立测试库通过 `i9 → j0 → i9 → j0`。
 - Base-Spark 本机已通过 Tailnet `:8443` HTTPS 验证；新增模拟数据和双环境界面仍待 Virtus 人工复核。
+
+## 7.2 金标治理工具记录（2026-07-17）
+
+- 新增案例批量导入、审核员正式集复核队列、独立双评、第三人仲裁、金标状态汇总和最近运行报告；审核员可读取队列和提交复核，只有所有者可导入、冻结和运行，所有复核记录独立留痕。
+- `synthetic` 案例拒绝进入金标复核；`placeholder` 案例即使完成双评也不能冻结为正式数据集。
+- 迁移 `k1f2a3b4c567` 已在独立 PostgreSQL 17 + pgvector 测试库通过 `j0 → k1 → j0 → k1`；该代码增量尚未部署到 `luyun-int`/`luyun-demo`，运行环境仍保持上一发布记录。
+- 工程实现不等于已获得专家金标；120–160 个真实案例、专业阈值和外部签字仍待补。
 
 ## 8. 仍需外部签字的 G0 输入
 
