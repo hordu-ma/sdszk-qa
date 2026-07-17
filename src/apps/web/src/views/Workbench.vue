@@ -68,6 +68,7 @@ const selectedProjectId = ref<number | null>(null);
 const documents = ref<KnowledgeDocument[]>([]);
 const tasks = ref<TaskRun[]>([]);
 const citations = ref<BasisCitation[]>([]);
+const insufficiencyReason = ref<string | null>(null);
 const modelStatus = ref<ModelStatus | null>(null);
 const preference = ref<UserPreference | null>(null);
 const classProfiles = ref<ClassProfile[]>([]);
@@ -283,6 +284,7 @@ async function handleRetrieve() {
       selectedMemoryRefs.value,
     );
     citations.value = result.citations;
+    insufficiencyReason.value = result.insufficient_basis ? result.insufficiency_reason : null;
     if (result.insufficient_basis) showFailToast("当前资料不足，系统未生成虚假依据");
   } finally {
     loading.value = false;
@@ -536,6 +538,7 @@ async function handleRunEvaluationDataset() {
 
 watch(selectedProjectId, async () => {
   citations.value = [];
+  insufficiencyReason.value = null;
   latestStep.value = null;
   versionDiff.value = null;
   await refreshProjectData();
@@ -621,7 +624,11 @@ onBeforeUnmount(() => {
         </div>
         <div class="document-list">
           <div v-for="document in documents" :key="document.id" class="document-item">
-            <div><strong>{{ document.filename }}</strong><small>SHA256 {{ document.checksum_sha256.slice(0, 12) }}…</small></div>
+            <div>
+              <strong>{{ document.filename }}</strong>
+              <small>SHA256 {{ document.checksum_sha256.slice(0, 12) }}…</small>
+              <small v-if="document.valid_until">有效期至 {{ document.valid_until.slice(0, 10) }}</small>
+            </div>
             <div class="document-actions">
               <span :class="['status', document.status]">{{ document.status }}</span>
               <span :class="['status', document.review_status]">{{ document.review_status }}</span>
@@ -640,6 +647,9 @@ onBeforeUnmount(() => {
           <input v-model="query" placeholder="例如：家国情怀教学目标应如何设置？" @keyup.enter="handleRetrieve" />
           <button :disabled="!selectedProjectId || loading" @click="handleRetrieve">运行 retrieve_basis</button>
         </div>
+        <p v-if="insufficiencyReason === 'low_relevance' && citations.length" class="review-hint">
+          以下内容相关度不足，仅作低置信参考，不构成可靠依据。
+        </p>
         <div v-if="citations.length" class="citation-list">
           <article v-for="citation in citations" :key="citation.chunk_id" class="citation">
             <header><strong>{{ citation.filename }}</strong><span>{{ citation.location_label }} · {{ citation.relevance }}</span></header>
@@ -786,6 +796,7 @@ onBeforeUnmount(() => {
               <input v-model="evaluationDatasetForm.name" placeholder="数据集名称" />
               <select v-model="evaluationDatasetForm.data_origin">
                 <option value="synthetic">synthetic · 仅工程回归</option>
+                <option value="internal_authored">internal_authored · 内部自研（非专家数据）</option>
                 <option value="customer_provided">customer_provided · 客户提供</option>
                 <option value="expert_authored">expert_authored · 专家编制</option>
               </select>

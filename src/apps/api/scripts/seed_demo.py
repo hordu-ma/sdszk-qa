@@ -8,6 +8,7 @@ import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.apps.api.config import settings
 from src.apps.api.dependencies import AsyncSessionLocal
 from src.apps.api.models import (
     Case,
@@ -20,7 +21,7 @@ from src.apps.api.models import (
     User,
 )
 from src.apps.api.services.evaluation_service import freeze_dataset
-from src.apps.api.services.knowledge_service import put_object
+from src.apps.api.services.knowledge_service import put_object, rebuild_project_index
 
 SYNTHETIC_DISCLAIMER = "模拟数据，仅用于工程验证；不得作为专业验收结论。"
 SYNTHETIC_TOPICS = [
@@ -110,10 +111,26 @@ async def seed() -> None:
             }
         await db.commit()
         dataset = await _seed_synthetic_stage1(db, seeded_users["admin"])
+        semantic_note = "semantic index skipped: SEMANTIC_RAG_ENABLED=false"
+        if settings.SEMANTIC_RAG_ENABLED:
+            # 模拟语料必须有语义索引，否则旗舰回归只测词法链却报语义模式。
+            try:
+                index_version = await rebuild_project_index(
+                    db,
+                    project_id=dataset.project_id,
+                    user_id=seeded_users["admin"].id,
+                )
+                semantic_note = (
+                    f"semantic index v{index_version.version_number} active "
+                    f"({index_version.chunk_count} chunks)"
+                )
+            except Exception as exc:
+                semantic_note = f"semantic index degraded: {exc}"
     print(
         "demo users and synthetic stage 1 dataset ready: "
         + ", ".join(item["username"] for item in users)
         + f"; dataset={dataset.dataset_key} v{dataset.version_number} cases={dataset.case_count}"
+        + f"; {semantic_note}"
     )
 
 

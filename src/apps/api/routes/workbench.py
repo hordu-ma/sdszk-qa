@@ -1,5 +1,6 @@
 """阶段 1A 教学工作台路由。"""
 
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
@@ -9,6 +10,7 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     File,
+    Form,
     HTTPException,
     Request,
     Response,
@@ -225,6 +227,8 @@ async def upload_document(
     db: DbSession,
     current_user: CurrentUser,
     file: Annotated[UploadFile, File()],
+    valid_from: Annotated[datetime | None, Form()] = None,
+    valid_until: Annotated[datetime | None, Form()] = None,
 ) -> UploadAccepted:
     await get_owned_project(db, project_id, current_user.id)
     filename = Path(file.filename or "document.txt").name
@@ -252,6 +256,8 @@ async def upload_document(
 
     object_key = f"users/{current_user.id}/projects/{project_id}/{uuid4().hex}-{filename}"
     await put_object(object_key, data, file.content_type or "application/octet-stream")
+    if valid_from is not None and valid_until is not None and valid_from > valid_until:
+        raise HTTPException(status_code=422, detail="资料生效时间不能晚于失效时间")
     document = KnowledgeDocument(
         project_id=project_id,
         owner_id=current_user.id,
@@ -261,6 +267,8 @@ async def upload_document(
         checksum_sha256=digest,
         status="processing",
         review_status="pending",
+        valid_from=valid_from.replace(tzinfo=None) if valid_from else None,
+        valid_until=valid_until.replace(tzinfo=None) if valid_until else None,
     )
     db.add(document)
     await db.flush()
@@ -383,6 +391,7 @@ async def run_retrieve_basis(
         skill_run_id=run.id,
         skill_version=run.skill_version,
         insufficient_basis=output.insufficient_basis,
+        insufficiency_reason=output.insufficiency_reason,
         retrieval_mode=output.retrieval_mode,
         citations=output.citations,
     )

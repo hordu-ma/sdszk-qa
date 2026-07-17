@@ -9,13 +9,14 @@ import re
 import zipfile
 from collections import Counter
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from xml.etree import ElementTree
 
 from minio import Minio
 from pypdf import PdfReader
-from sqlalchemy import case, delete, func, select, update
+from sqlalchemy import case, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.api.config import settings
@@ -129,30 +130,93 @@ def extract_text(filename: str, data: bytes) -> str:
     return normalized
 
 
-def chunk_text(text: str) -> list[str]:
+@dataclass(frozen=True)
+class ChunkPiece:
+    """带页码/段落定位的分块；页码仅对 PDF 提取结果有值。"""
+
+    content: str
+    page_number: int | None
+    paragraph_start: int
+    paragraph_end: int
+
+    @property
+    def location_label(self) -> str:
+        paragraphs = (
+            f"段 {self.paragraph_start}"
+            if self.paragraph_start == self.paragraph_end
+            else f"段 {self.paragraph_start}-{self.paragraph_end}"
+        )
+        if self.page_number is not None:
+            return f"第 {self.page_number} 页 · {paragraphs}"
+        return paragraphs
+
+
+_PAGE_MARKER = re.compile(r"^\[第 (\d+) 页\]\s*")
+
+
+def chunk_document(text: str) -> list[ChunkPiece]:
+    """按段落打包分块，同时跟踪 PDF 页码与全文段落序号。"""
     size = settings.KNOWLEDGE_CHUNK_SIZE
     overlap = min(settings.KNOWLEDGE_CHUNK_OVERLAP, size // 2)
-    paragraphs = [item.strip() for item in re.split(r"\n{2,}", text) if item.strip()]
-    chunks: list[str] = []
-    current = ""
-    for paragraph in paragraphs:
-        if len(current) + len(paragraph) + 1 <= size:
-            current = f"{current}\n{paragraph}".strip()
+    paragraphs: list[tuple[str, int | None, int]] = []
+    current_page: int | None = None
+    paragraph_no = 0
+    for raw in re.split(r"\n{2,}", text):
+        item = raw.strip()
+        if not item:
             continue
-        if current:
-            chunks.append(current)
-        if len(paragraph) <= size:
-            current = paragraph
+        marker = _PAGE_MARKER.match(item)
+        if marker:
+            current_page = int(marker.group(1))
+            item = item[marker.end() :].strip()
+            if not item:
+                continue
+        paragraph_no += 1
+        paragraphs.append((item, current_page, paragraph_no))
+
+    pieces: list[ChunkPiece] = []
+    buffer: list[tuple[str, int | None, int]] = []
+
+    def flush() -> None:
+        if not buffer:
+            return
+        pieces.append(
+            ChunkPiece(
+                content="\n".join(entry[0] for entry in buffer),
+                page_number=buffer[0][1],
+                paragraph_start=buffer[0][2],
+                paragraph_end=buffer[-1][2],
+            )
+        )
+        buffer.clear()
+
+    for content, page, number in paragraphs:
+        buffered = sum(len(entry[0]) for entry in buffer) + len(buffer)
+        if buffer and (buffered + len(content) + 1 > size or buffer[0][1] != page):
+            # 尺寸超限或跨页都切块，保证页码定位不失真
+            flush()
+        if len(content) <= size:
+            buffer.append((content, page, number))
             continue
+        flush()
         start = 0
         step = max(1, size - overlap)
-        while start < len(paragraph):
-            chunks.append(paragraph[start : start + size])
+        while start < len(content):
+            pieces.append(
+                ChunkPiece(
+                    content=content[start : start + size],
+                    page_number=page,
+                    paragraph_start=number,
+                    paragraph_end=number,
+                )
+            )
             start += step
-        current = ""
-    if current:
-        chunks.append(current)
-    return chunks
+    flush()
+    return pieces
+
+
+def chunk_text(text: str) -> list[str]:
+    return [piece.content for piece in chunk_document(text)]
 
 
 async def process_document_task(task_id: int, document_id: int) -> None:
@@ -169,7 +233,7 @@ async def process_document_task(task_id: int, document_id: int) -> None:
         try:
             data = await get_object(document.object_key)
             text = await asyncio.to_thread(extract_text, document.filename, data)
-            chunks = chunk_text(text)
+            pieces = chunk_document(text)
             await db.refresh(task)
             if task.status == "cancelled":
                 return
@@ -180,10 +244,13 @@ async def process_document_task(task_id: int, document_id: int) -> None:
                 KnowledgeChunk(
                     document_id=document.id,
                     chunk_index=index,
-                    content=content,
-                    location_label=f"分块 {index + 1}",
+                    content=piece.content,
+                    location_label=piece.location_label,
+                    page_number=piece.page_number,
+                    paragraph_start=piece.paragraph_start,
+                    paragraph_end=piece.paragraph_end,
                 )
-                for index, content in enumerate(chunks)
+                for index, piece in enumerate(pieces)
             ]
             db.add_all(chunk_rows)
             await db.flush()
@@ -216,7 +283,7 @@ async def process_document_task(task_id: int, document_id: int) -> None:
             task.progress = 100
             task.output_payload = {
                 "document_id": document.id,
-                "chunk_count": len(chunks),
+                "chunk_count": len(pieces),
                 "semantic_status": semantic_status,
                 "semantic_error": semantic_error,
             }
@@ -374,6 +441,40 @@ def _ilike_pattern(query: str) -> str:
     return f"%{escaped}%"
 
 
+def _validity_conditions(now: datetime) -> tuple[Any, Any]:
+    """过期或未生效的资料不进入检索（资料有效期策略）。"""
+    return (
+        or_(KnowledgeDocument.valid_from.is_(None), KnowledgeDocument.valid_from <= now),
+        or_(KnowledgeDocument.valid_until.is_(None), KnowledgeDocument.valid_until >= now),
+    )
+
+
+def _citation_row(chunk: KnowledgeChunk, document: KnowledgeDocument, relevance: float) -> dict:
+    return {
+        "document_id": document.id,
+        "filename": document.filename,
+        "chunk_id": chunk.id,
+        "location_label": chunk.location_label,
+        "page_number": chunk.page_number,
+        "paragraph_start": chunk.paragraph_start,
+        "paragraph_end": chunk.paragraph_end,
+        "content": chunk.content,
+        "relevance": round(relevance, 4),
+    }
+
+
+def assess_insufficiency(citations: list[dict]) -> tuple[bool, str | None]:
+    """资料不足策略：没有候选，或最高相关度低于阈值，都视为资料不足。
+
+    低于阈值时仍返回候选内容，由界面明示为低置信参考，不冒充可靠依据。
+    """
+    if not citations:
+        return True, "no_candidates"
+    if float(citations[0]["relevance"]) < settings.RETRIEVE_INSUFFICIENT_TOP_RELEVANCE:
+        return True, "low_relevance"
+    return False, None
+
+
 async def search_chunks(
     db: AsyncSession,
     *,
@@ -393,6 +494,7 @@ async def search_chunks(
             else_=0.0,
         ),
     )
+    now = _utcnow()
     result = await db.execute(
         select(KnowledgeChunk, KnowledgeDocument, score.label("relevance"))
         .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id)
@@ -401,6 +503,7 @@ async def search_chunks(
             KnowledgeDocument.owner_id == user_id,
             KnowledgeDocument.status == "ready",
             KnowledgeDocument.review_status == "approved",
+            *_validity_conditions(now),
         )
         .order_by(score.desc(), KnowledgeChunk.id)
         .limit(settings.RETRIEVE_CANDIDATE_LIMIT)
@@ -432,16 +535,7 @@ async def search_chunks(
         )
         if relevance < settings.RETRIEVE_MIN_RELEVANCE:
             continue
-        ranked.append(
-            {
-                "document_id": document.id,
-                "filename": document.filename,
-                "chunk_id": chunk.id,
-                "location_label": chunk.location_label,
-                "content": chunk.content,
-                "relevance": round(relevance, 4),
-            }
-        )
+        ranked.append(_citation_row(chunk, document, relevance))
     ranked.sort(key=lambda item: (-float(item["relevance"]), int(item["chunk_id"])))
     return SearchResult(ranked[:limit], DEGRADED_RETRIEVAL_MODE, degraded_reason)
 
@@ -465,6 +559,7 @@ async def _semantic_search(
             KnowledgeDocument.owner_id == user_id,
             KnowledgeDocument.status == "ready",
             KnowledgeDocument.review_status == "approved",
+            *_validity_conditions(_utcnow()),
             KnowledgeChunk.embedding.is_not(None),
             KnowledgeChunk.embedding_model == settings.EMBEDDING_MODEL,
             KnowledgeChunk.embedding_revision == settings.EMBEDDING_REVISION,
@@ -472,6 +567,13 @@ async def _semantic_search(
         .order_by(distance, KnowledgeChunk.id)
         .limit(settings.RETRIEVE_CANDIDATE_LIMIT)
     )
+    semantic_rows = semantic_result.tuples().all()
+    if lexical_rows and not semantic_rows:
+        # 项目内没有任何符合当前模型/revision 的语义向量：pgvector 零贡献，
+        # 不得以语义模式返回结果，必须显式走降级链。
+        raise SemanticRetrievalError(
+            "项目缺少当前模型版本的语义索引（semantic_index_missing），请重建知识索引"
+        )
     candidates: dict[int, dict] = {}
     for chunk, document, lexical_relevance in lexical_rows:
         candidates[chunk.id] = {
@@ -480,7 +582,7 @@ async def _semantic_search(
             "lexical": float(lexical_relevance),
             "semantic": 0.0,
         }
-    for chunk, document, vector_distance in semantic_result.tuples().all():
+    for chunk, document, vector_distance in semantic_rows:
         item = candidates.setdefault(
             chunk.id,
             {"chunk": chunk, "document": document, "lexical": 0.0, "semantic": 0.0},
@@ -502,24 +604,13 @@ async def _semantic_search(
     rows: list[dict] = []
     for reranked_item in reranked:
         item = combined[reranked_item.index]
-        chunk = item["chunk"]
-        document = item["document"]
         relevance = 0.5 * (
             settings.RETRIEVE_LEXICAL_WEIGHT * float(item["lexical"])
             + settings.RETRIEVE_VECTOR_WEIGHT * float(item["semantic"])
         ) + 0.5 * reranked_item.relevance
         if relevance < settings.RETRIEVE_MIN_RELEVANCE:
             continue
-        rows.append(
-            {
-                "document_id": document.id,
-                "filename": document.filename,
-                "chunk_id": chunk.id,
-                "location_label": chunk.location_label,
-                "content": chunk.content,
-                "relevance": round(relevance, 4),
-            }
-        )
+        rows.append(_citation_row(item["chunk"], item["document"], relevance))
     return rows[:limit]
 
 
@@ -560,8 +651,10 @@ async def retrieve_basis_handler(
         query=payload.query,
         limit=payload.limit,
     )
+    insufficient, reason = assess_insufficiency(search_result.citations)
     return RetrieveBasisOutput(
-        insufficient_basis=not search_result.citations,
+        insufficient_basis=insufficient,
+        insufficiency_reason=reason,
         retrieval_mode=search_result.mode,
         citations=[BasisCitation(**citation) for citation in search_result.citations],
     )

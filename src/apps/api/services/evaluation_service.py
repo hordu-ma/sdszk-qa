@@ -20,7 +20,7 @@ from src.apps.api.models import (
     KnowledgeDocument,
     User,
 )
-from src.apps.api.services.knowledge_service import search_chunks
+from src.apps.api.services.knowledge_service import assess_insufficiency, search_chunks
 from src.apps.api.services.model_asset_service import release_manifest
 from src.apps.api.services.project_service import get_owned_project
 
@@ -598,7 +598,7 @@ async def run_dataset(
             returned_ids = list(
                 dict.fromkeys(int(item["document_id"]) for item in search_result.citations)
             )
-            insufficient = not search_result.citations
+            insufficient, _ = assess_insufficiency(search_result.citations)
             basis_check = insufficient == case_item.expected_insufficient_basis
             document_check = not case_item.expected_document_ids or bool(
                 set(returned_ids) & set(case_item.expected_document_ids)

@@ -53,6 +53,8 @@ class DocumentResponse(BaseModel):
     review_status: str
     version_number: int
     error_message: str | None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
     created_at: datetime
 
 
@@ -101,6 +103,9 @@ class BasisCitation(BaseModel):
     filename: str
     chunk_id: int
     location_label: str
+    page_number: int | None = None
+    paragraph_start: int | None = None
+    paragraph_end: int | None = None
     content: str
     relevance: float
 
@@ -117,6 +122,7 @@ class RetrieveBasisOutput(BaseModel):
     """`skill.retrieve_basis` 的输出 Schema（Skill 契约）。"""
 
     insufficient_basis: bool
+    insufficiency_reason: str | None = None
     retrieval_mode: str
     citations: list[BasisCitation]
 
@@ -126,6 +132,7 @@ class RetrieveBasisResponse(BaseModel):
     skill_id: str = "skill.retrieve_basis"
     skill_version: str
     insufficient_basis: bool
+    insufficiency_reason: str | None = None
     retrieval_mode: str
     citations: list[BasisCitation]
 
@@ -186,7 +193,9 @@ class EvaluationDatasetCreate(BaseModel):
     dataset_key: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9][a-z0-9_-]+$")
     name: str = Field(min_length=2, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
-    data_origin: Literal["synthetic", "customer_provided", "expert_authored"] = "synthetic"
+    data_origin: Literal[
+        "synthetic", "internal_authored", "customer_provided", "expert_authored"
+    ] = "synthetic"
 
 
 class EvaluationDatasetReviewRequest(BaseModel):

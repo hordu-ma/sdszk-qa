@@ -1,8 +1,8 @@
 # 阶段 1 工程冻结基线
 
-> 日期：2026-07-16
-> 状态：工程侧 v1，可执行；专家、客户、资料授权和正式模型选型签字待完成
-> 权威范围：产品范围、阶段与 G 门仍以《2026 鲁韵课程与教学论开发计划》为准
+> 日期：2026-07-17（v1 冻结日期 2026-07-16）
+> 状态：工程侧 v1，可执行；专家、客户、资料授权和正式模型选型签字待完成，已按主计划 §0.5 自助开发模式冻结为补签清单
+> 权威范围：产品范围、阶段与 G 门仍以《2026 鲁韵课程与教学论开发计划》为准；自助开发模式期间本文同时作为首批内部代理决策基线
 
 ## 1. 结论
 
@@ -24,7 +24,7 @@
 
 | skill_id | 当前版本 | 输入要点 | 输出要点 | 失败/降级策略 | 成熟度 |
 | --- | --- | --- | --- | --- | --- |
-| `skill.retrieve_basis` | 1.1.0 | project、查询、limit | 资料不足、检索模式、引用 | 无可靠依据时明确资料不足 | baseline |
+| `skill.retrieve_basis` | 1.2.0 | project、查询、limit | 资料不足（含原因）、检索模式、带页码/段落定位的引用 | 无候选或 top1 相关度 < 0.18 时明确资料不足；低置信候选明示为参考 | baseline |
 | `skill.alignment_card` | 1.0.0 | 主题、核心议题、依据查询 | 目标、依据摘要、引用、警告 | 资料不足时只产出待补依据草案 | vertical_sample |
 | `skill.design_blueprint` | 1.0.0 | project、课时分钟数 | 目标、证据、学习任务 | 缺少对齐卡时拒绝执行 | vertical_sample |
 | `skill.generate_section` | 1.0.0 | project、分块名称、教师指导 | 导入、活动、评价证据、教师提示 | 缺少蓝图时拒绝执行 | vertical_sample |
@@ -72,7 +72,9 @@
 
 ## 5. 检索与模型工程决策
 
-当前完整检索链为 PostgreSQL `pg_trgm` + pgvector 余弦候选召回，再经 vLLM Reranker 重排，模式名为 `hybrid_trgm_pgvector_reranker`。Embedding/Reranker 不可用时显式降级为 `hybrid_trgm_char_vector`；两条链均保留审核过滤和资料不足阈值。
+当前完整检索链为 PostgreSQL `pg_trgm` + pgvector 余弦候选召回，再经 vLLM Reranker 重排，模式名为 `hybrid_trgm_pgvector_reranker`。Embedding/Reranker 不可用、或项目没有当前模型 revision 的语义向量（`semantic_index_missing`）时，显式降级为 `hybrid_trgm_char_vector`，不得以语义模式返回纯词法结果；两条链均保留审核过滤、资料有效期过滤（过期/未生效资料不进入检索）和资料不足阈值。
+
+引用定位：分块记录段落区间与 PDF 页码（跨页强制切块），引用输出 `page_number`、`paragraph_start/end` 和人读标签。资料不足策略：无候选为 `no_candidates`；有候选但 top1 相关度低于 `RETRIEVE_INSUFFICIENT_TOP_RELEVANCE`（默认 0.18，内部标定见《内部阈值标定报告 v0》）为 `low_relevance`，界面明示低置信参考。评测运行与 Skill 使用同一策略函数。
 
 工程候选冻结为 vLLM `0.18.0` 镜像摘要、`Qwen/Qwen2.5-0.5B-Instruct`、`BAAI/bge-small-zh-v1.5`（512 维）和 `BAAI/bge-reranker-v2-m3` 的精确 Hugging Face revision。知识索引记录模型、revision、维度、配置哈希和状态；新版本完整写入后才激活，失败版本不替换上一有效索引。
 
@@ -135,7 +137,15 @@ make harness-full
 - `luyun-int`/`luyun-demo` 已部署 `stage1-gold-review-20260717-r1` 同一 API/Web 镜像摘要和迁移 `k1f2a3b4c567 (head)`；`luyun-int` 通过 `j0 → k1 → j0 → k1` Schema 往返及上一应用镜像回滚/恢复，双环境通过金标流程、占位门禁、真实 vLLM SSE、健康检查和登录页渲染验证。
 - 工程实现不等于已获得专家金标；120–160 个真实案例、专业阈值和外部签字仍待补。
 
-## 8. 仍需外部签字的 G0 输入
+## 7.3 自助开发第一增量记录（2026-07-17）
+
+- 历史 43/64 已取证：门禁开发期旧语料 + Reranker 意译低分被 0.15 阈值过滤所致；最终版 64 例集存在查询泄漏，降级为工程冒烟回归下限。
+- 修复：项目缺当前模型 revision 语义向量时显式降级（`semantic_index_missing`）；`seed_demo`/`seed_internal_gold` 构建并原子激活语义索引。
+- 内部金标 v0：`stage1-internal-gold` v1（`internal_authored`，140 例无泄漏），双评 132 共识 + 8 仲裁后冻结；双环境真实语义链 140/140，Top-1 命中 120/120，域外查询零误报。内部阈值与 M1-int 检索质量门见《内部阈值标定报告 v0》。
+- 引用精细化：段落/PDF 页码定位、资料有效期过滤、两级资料不足判定（`no_candidates`/`low_relevance`），`skill.retrieve_basis` v1.2.0，迁移 `m2a3b4c5d678`。
+- 发布 `stage1-selfserve-rag-20260717-r1` 已完成 `luyun-int` 验收、回滚/恢复演练和 `luyun-demo` 同镜像晋级。全部为内部工程产物，不构成专家验收，不改变阶段/G 门状态。
+
+## 8. 仍需外部签字的 G0 输入（补签清单）
 
 - 专家确认教学结构、三个诊断维度及后续规则字典。
 - 客户确认样板主题、对外话术、试点人员和 G1 阈值。
@@ -144,4 +154,6 @@ make harness-full
 - Embedding、Reranker、生成模型的专业冻结，以及长上下文/并发/容量 Go/No-Go。
 - ACL/Grant、身份声明、合规、RTO/RPO、红队和事故流程责任人。
 
-以上未签字前，结论保持：工程纵向样板可运行；阶段 1A、阶段 1B、G0、G1 均不得标记为整体完成。
+自 2026-07-17 起按主计划 §0.5 自助开发模式执行：以上条目冻结为补签清单，不阻塞工程开发；对应内部代理产物（本文各节基线、内部金标 v0、内部阈值、内部走查）纳入 M0-int/M1-int 内部验收，恢复外部参与后逐项提交复核。
+
+以上未签字前，结论保持：工程纵向样板可运行；阶段 1A、阶段 1B、G0、G1 均不得标记为整体完成；M-int 通过不等于 G 门通过。

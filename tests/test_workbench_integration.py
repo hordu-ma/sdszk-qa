@@ -144,7 +144,7 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             assert retrieval.status_code == 200
             assert retrieval.json()["insufficient_basis"] is False
             assert retrieval.json()["retrieval_mode"] == "hybrid_trgm_char_vector"
-            assert retrieval.json()["skill_version"] == "1.1.0"
+            assert retrieval.json()["skill_version"] == "1.2.0"
             assert retrieval.json()["citations"][0]["filename"] == "basis.md"
 
             model_assets = await client.get(
@@ -706,6 +706,176 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
             )
             assert rejected.status_code == 422
             assert rejected.json()["error_code"] == "memory_ref_not_found"
+    finally:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(TeachingProject).where(TeachingProject.owner_id == user_id)
+            )
+            await db.execute(delete(User).where(User.id == user_id))
+            await db.commit()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_expired_document_excluded_from_search() -> None:
+    """有效期已过的资料不得进入检索结果（资料有效期策略）。"""
+    await _ensure_schema()
+
+    from datetime import datetime, timedelta
+
+    from src.apps.api.models import KnowledgeChunk, KnowledgeDocument
+    from src.apps.api.services import knowledge_service
+
+    user = User(
+        username=f"validity_{uuid4().hex[:8]}",
+        hashed_password=bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode(),
+        full_name="资料有效期测试",
+        role="teacher",
+        is_active=True,
+    )
+    async with AsyncSessionLocal() as db:
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        user_id = user.id
+        project = TeachingProject(
+            owner_id=user_id,
+            title="资料有效期过滤",
+            stage="高中",
+            course_type="议题式",
+            status="draft",
+        )
+        db.add(project)
+        await db.flush()
+        expired = KnowledgeDocument(
+            project_id=project.id,
+            owner_id=user_id,
+            filename="expired.md",
+            content_type="text/markdown",
+            object_key=f"test/{uuid4().hex}",
+            checksum_sha256="0" * 64,
+            status="ready",
+            review_status="approved",
+            version_number=1,
+            valid_until=datetime.utcnow() - timedelta(days=1),
+        )
+        db.add(expired)
+        await db.flush()
+        db.add(
+            KnowledgeChunk(
+                document_id=expired.id,
+                chunk_index=0,
+                content="家国情怀教学目标应与学习任务保持一致。",
+                location_label="段 1",
+            )
+        )
+        await db.commit()
+        project_id = project.id
+
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await knowledge_service.search_chunks(
+                db,
+                project_id=project_id,
+                user_id=user_id,
+                query="家国情怀教学目标",
+                limit=5,
+            )
+        assert result.citations == []
+        insufficient, reason = knowledge_service.assess_insufficiency(result.citations)
+        assert insufficient is True
+        assert reason == "no_candidates"
+    finally:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(TeachingProject).where(TeachingProject.owner_id == user_id)
+            )
+            await db.execute(delete(User).where(User.id == user_id))
+            await db.commit()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_search_degrades_when_semantic_index_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """项目没有语义向量时必须显式降级，不得以语义模式返回结果。"""
+    await _ensure_schema()
+
+    from src.apps.api.models import KnowledgeChunk, KnowledgeDocument
+    from src.apps.api.services import knowledge_service
+
+    user = User(
+        username=f"semidx_{uuid4().hex[:8]}",
+        hashed_password=bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode(),
+        full_name="语义索引缺失降级测试",
+        role="teacher",
+        is_active=True,
+    )
+    async with AsyncSessionLocal() as db:
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        user_id = user.id
+        project = TeachingProject(
+            owner_id=user_id,
+            title="语义索引缺失降级",
+            stage="高中",
+            course_type="议题式",
+            status="draft",
+        )
+        db.add(project)
+        await db.flush()
+        document = KnowledgeDocument(
+            project_id=project.id,
+            owner_id=user_id,
+            filename="basis.md",
+            content_type="text/markdown",
+            object_key=f"test/{uuid4().hex}",
+            checksum_sha256="0" * 64,
+            status="ready",
+            review_status="approved",
+            version_number=1,
+        )
+        db.add(document)
+        await db.flush()
+        db.add(
+            KnowledgeChunk(
+                document_id=document.id,
+                chunk_index=0,
+                content="家国情怀教学目标应与学习任务和评价证据保持一致。",
+                location_label="分块 1",
+            )
+        )
+        await db.commit()
+        project_id = project.id
+
+    monkeypatch.setattr(knowledge_service.settings, "SEMANTIC_RAG_ENABLED", True)
+
+    async def _fake_embed(texts: list[str]) -> list[list[float]]:
+        vector = [0.0] * knowledge_service.settings.EMBEDDING_DIMENSIONS
+        vector[0] = 1.0
+        return [vector for _ in texts]
+
+    async def _fail_rerank(query: str, documents: list[str]) -> list:
+        del query, documents
+        raise AssertionError("语义索引缺失时不应调用 Reranker")
+
+    monkeypatch.setattr(knowledge_service, "embed_texts", _fake_embed)
+    monkeypatch.setattr(knowledge_service, "rerank", _fail_rerank)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await knowledge_service.search_chunks(
+                db,
+                project_id=project_id,
+                user_id=user_id,
+                query="家国情怀教学目标",
+                limit=5,
+            )
+        assert result.mode == knowledge_service.DEGRADED_RETRIEVAL_MODE
+        assert "semantic_index_missing" in (result.degraded_reason or "")
+        assert result.citations
     finally:
         async with AsyncSessionLocal() as db:
             await db.execute(

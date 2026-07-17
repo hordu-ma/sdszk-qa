@@ -283,7 +283,7 @@ async def run_skill(
 register_skill(
     RegisteredSkill(
         skill_id="skill.retrieve_basis",
-        skill_version="1.1.0",
+        skill_version="1.2.0",
         name="检索课标/教材/政策依据",
         input_model=RetrieveBasisInput,
         output_model=RetrieveBasisOutput,

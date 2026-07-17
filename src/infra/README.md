@@ -227,7 +227,7 @@ Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当
 
 两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。
 
-阶段 1 工程样板已形成“查依据—备课—诊断—导出”技术闭环，并完成 `luyun-int → luyun-demo` 同镜像模拟工程晋级。三类模型仍是工程候选资产，64 个案例是显式 `synthetic` 工程集；专家金标、正式模型选型、Virtus 新增功能人工验收和 G0/G1 外部签字尚未完成。
+阶段 1 工程样板已形成“查依据—备课—诊断—导出”技术闭环，并完成 `luyun-int → luyun-demo` 同镜像模拟工程晋级。三类模型仍是工程候选资产，64 个案例是显式 `synthetic` 工程冒烟集（正文含查询原文，不测质量），内部金标 `stage1-internal-gold`（140 例，`internal_authored`）是内部自研质量测量集；专家金标、正式模型选型、Virtus 新增功能人工验收和 G0/G1 外部签字尚未完成。
 
 > 迁移 `f7b8c9d0e123` 起依赖 `pg_trgm`，迁移 `i9d0e1f2a345` 起依赖 `vector`。Base-Spark 使用固定摘要的 `pgvector/pgvector:pg17-trixie`；迁移会执行 `CREATE EXTENSION IF NOT EXISTS`，数据库用户须具备创建扩展权限。
 
@@ -242,9 +242,9 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
 
-2026-07-17 当前发布候选：应用镜像 `stage1-gold-review-20260717-r1`，迁移 `k1f2a3b4c567 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260717-stage1-gold-review-predeploy/`。迁移已在独立测试库和 `luyun-int` 通过 `j0e1f2a3b456 → k1f2a3b4c567 → j0e1f2a3b456 → k1f2a3b4c567`；`luyun-int` 已验证上一应用镜像回滚和当前镜像恢复，随后以同一 API/Web 镜像摘要晋级 `luyun-demo`。双环境已验证健康检查、真实 vLLM SSE、双评共识、分歧仲裁、冻结运行及占位案例防冻结；固定模型资产如下，均为工程候选，不代表专业选型：
+2026-07-17 当前发布候选：应用镜像 `stage1-selfserve-rag-20260717-r1`，迁移 `m2a3b4c5d678 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260717-stage1-selfserve-rag-predeploy/`（含部署后快照 `int-postgres-postdeploy.dump`）。迁移已在独立测试库和 `luyun-int` 通过 `k1f2a3b4c567 → m2a3b4c5d678 → k1f2a3b4c567 → m2a3b4c5d678`；`luyun-int` 已验证回滚到 `stage1-gold-review-20260717-r1` + 数据库降级后健康，并从部署后快照恢复当前版本，随后以同一 API/Web 镜像摘要晋级 `luyun-demo`。部署时需依次执行 `seed_demo` 与 `seed_internal_gold`（两者会构建并激活语义索引）。双环境已验证健康检查、真实 vLLM SSE、64 例冒烟集与 140 例内部金标全量通过（真实语义链）、引用段落/页码定位、资料不足两级判定和 Reranker 停机显式降级；固定模型资产如下，均为工程候选，不代表专业选型：
 
-本轮回滚：将仓库外 env 的 `RELEASE_TAG` 改回 `stage1-synthetic-gate-20260717-r1`，停止当前 API，将数据库降到 `j0e1f2a3b456`，再重新创建上一 API/Web；恢复当前版本时按相反顺序升级到 `k1f2a3b4c567`。数据损坏时从上述发布前备份恢复 PostgreSQL/MinIO。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
+本轮回滚：将仓库外 env 的 `RELEASE_TAG` 改回 `stage1-gold-review-20260717-r1`，停止当前 API，将数据库降到 `k1f2a3b4c567`，再重新创建上一 API/Web；恢复当前版本时按相反顺序升级到 `m2a3b4c5d678`。数据损坏时从上述发布前备份恢复 PostgreSQL/MinIO。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
 
 | 类型 | 资产 | 固定 revision | 服务名 / loopback |
 | --- | --- | --- | --- |

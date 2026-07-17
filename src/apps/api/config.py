@@ -71,6 +71,8 @@ class Settings(BaseSettings):
     # 低于该值视为资料不足。经中文样例标定：短语命中约 0.4–0.67，
     # 自然问句约 0.25，无关内容为 0。
     RETRIEVE_MIN_RELEVANCE: float = 0.15
+    # 内部金标 v0 标定：域外查询最高分 < 0.15，正确文档最低分 0.194；取中间值留安全边际
+    RETRIEVE_INSUFFICIENT_TOP_RELEVANCE: float = 0.18
     RETRIEVE_CANDIDATE_LIMIT: int = 200
     RETRIEVE_LEXICAL_WEIGHT: float = 0.7
     RETRIEVE_VECTOR_WEIGHT: float = 0.3

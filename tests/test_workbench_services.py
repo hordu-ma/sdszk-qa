@@ -14,6 +14,8 @@ from src.apps.api.scripts.seed_demo import (
 from src.apps.api.services.knowledge_service import (
     _char_vector_similarity,
     _ilike_pattern,
+    assess_insufficiency,
+    chunk_document,
     chunk_text,
     extract_text,
 )
@@ -55,6 +57,38 @@ def test_chunk_text_keeps_content() -> None:
     assert "教学目标" in "".join(chunks)
 
 
+def test_chunk_document_tracks_paragraphs_and_pdf_pages() -> None:
+    source = "[第 1 页]\n课程标准总述。\n\n单元目标要求。\n\n[第 2 页]\n学习任务设计。"
+    pieces = chunk_document(source)
+    assert pieces
+    merged = "".join(piece.content for piece in pieces)
+    assert "[第 1 页]" not in merged
+    first = pieces[0]
+    assert first.page_number == 1
+    assert first.paragraph_start == 1
+    assert "第 1 页" in first.location_label
+    last = pieces[-1]
+    assert last.page_number == 2
+    assert last.paragraph_end == 3
+
+
+def test_chunk_document_without_pages_uses_paragraph_labels() -> None:
+    pieces = chunk_document("第一段依据。\n\n第二段目标。")
+    assert len(pieces) == 1
+    assert pieces[0].page_number is None
+    assert pieces[0].paragraph_start == 1
+    assert pieces[0].paragraph_end == 2
+    assert pieces[0].location_label == "段 1-2"
+
+
+def test_assess_insufficiency_policy() -> None:
+    assert assess_insufficiency([]) == (True, "no_candidates")
+    weak = [{"relevance": 0.16}]
+    assert assess_insufficiency(weak) == (True, "low_relevance")
+    solid = [{"relevance": 0.42}, {"relevance": 0.16}]
+    assert assess_insufficiency(solid) == (False, None)
+
+
 def test_ilike_pattern_escapes_wildcards() -> None:
     assert _ilike_pattern("50%目标_测试") == r"%50\%目标\_测试%"
     assert _ilike_pattern("反斜杠\\") == "%反斜杠\\\\%"
@@ -67,7 +101,7 @@ def test_input_hash_is_order_stable() -> None:
 
 def test_registry_registers_retrieve_basis_baseline() -> None:
     skill = SKILL_REGISTRY["skill.retrieve_basis"]
-    assert skill.skill_version == "1.1.0"
+    assert skill.skill_version == "1.2.0"
     assert skill.maturity == "baseline"
     assert skill.required_roles == ()
 

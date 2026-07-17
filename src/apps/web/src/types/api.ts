@@ -110,6 +110,8 @@ export interface KnowledgeDocument {
   review_status: string;
   version_number: number;
   error_message: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
   created_at: string;
 }
 
@@ -133,6 +135,9 @@ export interface BasisCitation {
   filename: string;
   chunk_id: number;
   location_label: string;
+  page_number: number | null;
+  paragraph_start: number | null;
+  paragraph_end: number | null;
   content: string;
   relevance: number;
 }
@@ -142,6 +147,7 @@ export interface RetrieveBasisResponse {
   skill_id: string;
   skill_version: string;
   insufficient_basis: boolean;
+  insufficiency_reason: string | null;
   retrieval_mode: string;
   citations: BasisCitation[];
 }
@@ -181,6 +187,7 @@ export interface PinnedItem {
 
 export type EvaluationDataOrigin =
   | "synthetic"
+  | "internal_authored"
   | "customer_provided"
   | "expert_authored";
 

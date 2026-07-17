@@ -72,6 +72,8 @@ class KnowledgeDocument(Base, TimestampMixin):
     review_status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
     version_number: Mapped[int] = mapped_column(default=1)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    valid_from: Mapped[datetime | None] = mapped_column(nullable=True)
+    valid_until: Mapped[datetime | None] = mapped_column(nullable=True, index=True)
 
     project: Mapped["TeachingProject"] = relationship(back_populates="documents")
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(
@@ -100,6 +102,9 @@ class KnowledgeChunk(Base):
     chunk_index: Mapped[int]
     content: Mapped[str] = mapped_column(Text)
     location_label: Mapped[str] = mapped_column(String(100))
+    page_number: Mapped[int | None] = mapped_column(nullable=True)
+    paragraph_start: Mapped[int | None] = mapped_column(nullable=True)
+    paragraph_end: Mapped[int | None] = mapped_column(nullable=True)
     index_version_id: Mapped[int | None] = mapped_column(
         ForeignKey("knowledge_index_versions.id", ondelete="SET NULL"),
         nullable=True,
