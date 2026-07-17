@@ -395,6 +395,11 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
+    <aside v-if="modelStatus?.content_mode === 'synthetic'" class="synthetic-notice">
+      <strong>工程模拟环境</strong>
+      <span>{{ modelStatus.content_disclaimer }}</span>
+    </aside>
+
     <nav class="top-links">
       <router-link to="/topics">问答入口</router-link>
       <router-link to="/sessions">历史会话</router-link>
@@ -591,6 +596,7 @@ onBeforeUnmount(() => {
 .hero h1 { margin: 4px 0 8px; font-size: 34px; }.hero p { margin: 0; color: #d9e8df; }.eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
 .provider { min-width: 260px; padding: 14px 16px; border: 1px solid #77a995; border-radius: 12px; display: grid; gap: 4px; }.provider span { font-size: 12px; color: #b9d4c8; }.provider.degraded { border-color: #e7af60; background: #4c3a1d; }
 .top-links { max-width: 1320px; margin: 14px auto; display: flex; gap: 10px; }.top-links a { color: #245b4c; background: white; border: 1px solid #d9dfd9; border-radius: 999px; padding: 8px 14px; }
+.synthetic-notice { max-width: 1290px; margin: 14px auto 0; padding: 12px 16px; border: 1px solid #e7af60; border-radius: 12px; background: #fff6df; color: #6f4a08; display: flex; gap: 10px; align-items: baseline; }.synthetic-notice span { font-size: 13px; }
 .grid { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; }.panel { background: white; border: 1px solid #dde4de; border-radius: 18px; padding: 24px; box-shadow: 0 8px 26px rgba(33, 57, 43, .06); }.projects-panel, .full-panel { grid-column: 1 / -1; }.panel h2 { margin: 0 0 16px; font-size: 19px; }.panel h3 { margin: 0 0 12px; font-size: 15px; }
 .form-row, .search-row { display: flex; gap: 10px; }.form-row input, .search-row input { flex: 1; }.form-row input, .form-row select, .search-row input { border: 1px solid #cfd8d1; border-radius: 10px; padding: 11px 12px; background: white; color: #172019; }.panel button, .upload-button { border: 0; border-radius: 10px; padding: 10px 14px; background: #286b58; color: white; cursor: pointer; font: inherit; }.panel button:disabled, .upload-button.disabled { opacity: .45; cursor: not-allowed; }
 .project-tabs { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }.project-tabs button { background: #edf3ef; color: #285143; }.project-tabs button.active { background: #173f35; color: white; }

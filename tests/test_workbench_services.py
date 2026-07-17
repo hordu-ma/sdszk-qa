@@ -6,7 +6,11 @@ import zipfile
 import pytest
 
 from src.apps.api.models import TeachingProject
-from src.apps.api.scripts.seed_demo import _demo_users
+from src.apps.api.scripts.seed_demo import (
+    SYNTHETIC_QUERY_PATTERNS,
+    SYNTHETIC_TOPICS,
+    _demo_users,
+)
 from src.apps.api.services.knowledge_service import (
     _char_vector_similarity,
     _ilike_pattern,
@@ -157,6 +161,18 @@ def test_demo_users_split_admin_and_teacher(monkeypatch: pytest.MonkeyPatch) -> 
         ("demo_teacher", "teacher"),
     ]
     assert {item["password"] for item in users} == {"shared-test-password"}
+
+
+def test_synthetic_stage1_seed_defines_64_replaceable_cases() -> None:
+    case_keys = {
+        f"synthetic-{topic_index:02d}-{query_index:02d}"
+        for topic_index, _ in enumerate(SYNTHETIC_TOPICS, 1)
+        for query_index, _ in enumerate(SYNTHETIC_QUERY_PATTERNS, 1)
+    }
+
+    assert len(SYNTHETIC_TOPICS) == 8
+    assert len(SYNTHETIC_QUERY_PATTERNS) == 8
+    assert len(case_keys) == 64
 
 
 def test_provider_adapters_parse_stream_contracts() -> None:

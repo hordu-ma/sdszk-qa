@@ -136,7 +136,18 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             )
             assert dataset.status_code == 201
             assert dataset.json()["version_number"] == 1
+            assert dataset.json()["data_origin"] == "synthetic"
+            assert dataset.json()["review_status"] == "not_applicable"
             dataset_id = dataset.json()["id"]
+            rejected_review = await client.post(
+                f"/api/workbench/evaluation/datasets/{dataset_id}/review",
+                json={
+                    "review_status": "approved",
+                    "review_note": "模拟数据不得冒充专家审核",
+                },
+                headers=headers,
+            )
+            assert rejected_review.status_code == 409
             evaluation_case = await client.post(
                 f"/api/workbench/evaluation/datasets/{dataset_id}/cases",
                 json={
@@ -191,6 +202,30 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             )
             assert next_dataset.status_code == 201
             assert next_dataset.json()["version_number"] == 2
+
+            customer_dataset = await client.post(
+                "/api/workbench/evaluation/datasets",
+                json={
+                    "project_id": project_id,
+                    "dataset_key": "customer-review-draft",
+                    "name": "客户资料审核草案",
+                    "data_origin": "customer_provided",
+                },
+                headers=headers,
+            )
+            assert customer_dataset.status_code == 201
+            assert customer_dataset.json()["review_status"] == "pending"
+            reviewed_dataset = await client.post(
+                f"/api/workbench/evaluation/datasets/{customer_dataset.json()['id']}/review",
+                json={
+                    "review_status": "approved",
+                    "review_note": "集成测试审核记录",
+                },
+                headers=headers,
+            )
+            assert reviewed_dataset.status_code == 200
+            assert reviewed_dataset.json()["review_status"] == "approved"
+            assert reviewed_dataset.json()["reviewed_by"] == user_id
 
             alignment = await client.post(
                 "/api/workbench/skills/alignment-card",

@@ -59,17 +59,19 @@ flowchart LR
 `base-spark` 集成环境（`luyun-int`）：host network 但服务只绑定 `127.0.0.1` 独立端口，Tailscale Serve 将 Tailnet HTTPS 反代到 Web 入口。发布节奏：
 
 ```text
-合并并通过自动测试 → 部署 luyun-int → Virtus 端到端验证
-  → 专业/安全/迁移/回滚门禁 → 同一镜像晋级 luyun-demo（未建成）
+合并并通过自动测试 → 部署 luyun-int → 工程端到端验证
+  → 模拟数据/安全/迁移/回滚门禁 → 同一镜像晋级 luyun-demo
+  → 替换真实资料与专家回归 → Virtus 人工验收 → G1
 ```
 
-`luyun-int` 的问答、Embedding 和 Reranker 当前均使用固定版 vLLM 0.18.0 工程候选，通过独立 loopback Provider 接入；Ollama 只保留为明示备用。候选模型专业冻结与 `luyun-demo` 尚未完成。
+`luyun-int` 与 `luyun-demo` 的问答、Embedding 和 Reranker 均使用固定版 vLLM 0.18.0 工程候选，通过相互隔离的 loopback 端口接入；Ollama 只保留为明示备用。两套环境共享同一不可变应用镜像，但使用独立数据库、对象存储、模型缓存和 Secret。候选模型专业冻结尚未完成。
 
 ## 当前实现 vs 目标架构
 
 | 组件 | 当前状态 | 目标（阶段） |
 | --- | --- | --- |
-| 检索 | pg_trgm + pgvector + Reranker，字符向量显式降级，索引版本追溯 | 专家冻结模型/阈值、页码级引用（G0/1B） |
+| 检索 | pg_trgm + pgvector + Reranker，字符向量显式降级，索引版本追溯；64 个模拟案例工程回归 | 专家冻结模型/阈值、页码级引用（G0/1B） |
+| 评测来源 | `synthetic/customer_provided/expert_authored` 标记、外部审核状态和模拟集防误批门禁 | 真实资料替换、专家金标与专业阈值签字 |
 | Skills | 六个样板 Skill 统一运行、版本与降级契约 | 专家冻结的完整阶段 1 目录、正式额度与质量门禁 |
 | Memory | 偏好 + 班情 + 钉选 + 显式界面确认 + 审计/清除/导出 | 保留/删除 SLA、授权共享模板（阶段 2–3） |
 | 模型服务 | 逻辑模型名 + Provider Adapter + 固定 vLLM/模型资产登记 | 完整能力路由、Provider 一致性和专业选型门禁 |
@@ -86,8 +88,8 @@ flowchart LR
 → 6 Skills 运行时 → 7 Memory 最小集 → 8 样板生成-诊断-导出 → 9 桌面工作台 → 10 双环境晋级
 ```
 
-当前位置：第 1–9 步已有单一高中议题式技术样板；第 5 步已具备可版本化语义 RAG 和字符向量降级，第 10 步 `luyun-demo` 晋级未完成。
+当前位置：第 1–9 步已有单一高中议题式技术样板；第 10 步的模拟工程回归和 `luyun-demo` 同镜像晋级已完成。真实资料、专家金标、专业模型冻结和 Virtus 人工验收未完成，因此第 10 步的正式 G1 门禁仍未关闭。
 
 ## 一句话总结
 
-问答兼容链路、高中议题式纵向样板、版本化语义 RAG 和工程评测底座已同构；下一门槛是专家金标回归、候选模型专业冻结和 `luyun-demo` 同镜像晋级。
+问答兼容链路、高中议题式纵向样板、版本化语义 RAG、模拟评测和双环境晋级已同构；下一门槛是用真实授权资料替换模拟信息、完成专家金标回归和候选模型专业冻结。

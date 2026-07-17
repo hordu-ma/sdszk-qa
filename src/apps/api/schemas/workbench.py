@@ -1,6 +1,7 @@
 """阶段 1A 工作台 API Schema。"""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -185,6 +186,12 @@ class EvaluationDatasetCreate(BaseModel):
     dataset_key: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9][a-z0-9_-]+$")
     name: str = Field(min_length=2, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
+    data_origin: Literal["synthetic", "customer_provided", "expert_authored"] = "synthetic"
+
+
+class EvaluationDatasetReviewRequest(BaseModel):
+    review_status: Literal["approved", "rejected"]
+    review_note: str = Field(min_length=2, max_length=2000)
 
 
 class EvaluationDatasetResponse(BaseModel):
@@ -196,6 +203,11 @@ class EvaluationDatasetResponse(BaseModel):
     version_number: int
     name: str
     description: str | None
+    data_origin: str
+    review_status: str
+    review_note: str | None
+    reviewed_by: int | None
+    reviewed_at: datetime | None
     status: str
     content_hash: str | None
     case_count: int

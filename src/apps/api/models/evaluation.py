@@ -55,6 +55,15 @@ class EvaluationDataset(Base, TimestampMixin):
     version_number: Mapped[int]
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_origin: Mapped[str] = mapped_column(String(30), default="synthetic", index=True)
+    review_status: Mapped[str] = mapped_column(
+        String(30), default="not_applicable", index=True
+    )
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="draft", index=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     case_count: Mapped[int] = mapped_column(default=0)

@@ -227,7 +227,7 @@ Base-Spark 不直接复用 `dev.yml`，也不替代客户正式 A/B 环境。当
 
 两套环境使用不同 project name、网络、卷、Secret 和数据快照。只有 loopback Web 入口可由 Tailscale Serve 转发；API、PostgreSQL、MinIO、Redis、vLLM 和 Ollama 不直接暴露给浏览器或 Tailnet。
 
-阶段 1 工程样板已在 `luyun-int` 形成“查依据—备课—诊断—导出”技术闭环。本轮新增固定版本 vLLM 编排与模型资产登记、`pg_trgm + pgvector + Reranker` 语义检索、显式字符向量降级，以及可冻结、可哈希、可绑定发布清单的工程评测框架。三类模型仍是工程候选资产，评测案例仍是工程 fixture；专家回归、正式模型选型、`luyun-demo` 晋级和 G0/G1 外部签字尚未完成。
+阶段 1 工程样板已形成“查依据—备课—诊断—导出”技术闭环，并完成 `luyun-int → luyun-demo` 同镜像模拟工程晋级。三类模型仍是工程候选资产，64 个案例是显式 `synthetic` 工程集；专家金标、正式模型选型、Virtus 新增功能人工验收和 G0/G1 外部签字尚未完成。
 
 > 迁移 `f7b8c9d0e123` 起依赖 `pg_trgm`，迁移 `i9d0e1f2a345` 起依赖 `vector`。Base-Spark 使用固定摘要的 `pgvector/pgvector:pg17-trixie`；迁移会执行 `CREATE EXTENSION IF NOT EXISTS`，数据库用户须具备创建扩展权限。
 
@@ -242,9 +242,9 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
 
-2026-07-16 当前发布候选：应用镜像 `stage1-browser-fixes-20260716-r1`，迁移 `i9d0e1f2a345 (head)`，本轮发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260716-140000-browser-fixes/`；上一增量备份保留在 `/home/pgx/backups/luyun-sizheng/20260716-130000-rag-eval/`。数据库迁移此前已通过 `h8c9d0e1f234 → i9d0e1f2a345 → h8c9d0e1f234 → i9d0e1f2a345` 往返；本轮无新迁移。固定模型资产如下，均为工程候选，不代表专业选型：
+2026-07-17 当前发布候选：应用镜像 `stage1-synthetic-gate-20260717-r1`，迁移 `j0e1f2a3b456 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260717-stage1-synthetic-gate-predeploy/`。迁移已在独立测试库通过 `i9d0e1f2a345 → j0e1f2a3b456 → i9d0e1f2a345 → j0e1f2a3b456`；`luyun-int` 已验证旧应用镜像回滚和当前镜像恢复。固定模型资产如下，均为工程候选，不代表专业选型：
 
-本轮回滚：先将仓库外运行配置恢复为 `/home/pgx/luyun-sizheng-int.env.bak-20260716-vllm-primary`，或显式填写上一合格 Provider 参数；再把 `RELEASE_TAG` 改回 `stage1-rag-eval-20260716-r1`，按上面的 `up -d --wait` 命令重新创建 API/Web。因为本轮无迁移，正常应用回滚不需要降级数据库；只有数据损坏时才使用上述发布前备份恢复 PostgreSQL/MinIO。
+本轮回滚：将仓库外 env 的 `RELEASE_TAG` 改回 `stage1-browser-fixes-20260716-r1` 并重新创建 API/Web；旧应用可在 `j0` 数据库上运行。若必须完整回退 Schema，先停止新应用，将数据库降到 `i9d0e1f2a345`，再启动旧镜像；数据损坏时从上述发布前备份恢复 PostgreSQL/MinIO。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
 
 | 类型 | 资产 | 固定 revision | 服务名 / loopback |
 | --- | --- | --- | --- |
@@ -264,7 +264,7 @@ curl -fsS http://127.0.0.1:28003/health
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml --profile model-baseline --profile semantic-rag stop vllm-reranker vllm-embedding vllm-generation
 ```
 
-本轮实机验收结果：三类服务均报告 vLLM `0.18.0`；生成服务通过 Chat、JSON Schema 结构化输出和 SSE `[DONE]`；Embedding 返回两条 512 维向量；Reranker 对相关/无关文档给出完整索引和可区分相关度。HTTPS 业务链完成 active 语义索引、`hybrid_trgm_pgvector_reranker` 检索、冻结数据集、发布清单和逐案例结果；停用 Reranker 后检索显式降级为 `hybrid_trgm_char_vector` 且无 5xx，服务恢复后健康。应用重启后索引、评测与模型资产仍在；旧应用镜像回滚和当前镜像恢复均通过。
+本轮实机验收结果：两套环境三类服务均使用固定 vLLM `0.18.0`；Demo 通过真实 SSE `[DONE]`、64 例冻结模拟集运行、六 Skill、显式 Memory、版本与 Word 导出。停用 Demo Reranker 后检索显式降级为 `hybrid_trgm_char_vector` 且无 5xx，服务恢复后健康。64 例结果为 43 `matched`、21 `failed`、0 `error`，仅作为工程差距基线。
 
 本次 HTTPS 验收已覆盖双账号角色、六个 Skill、项目/资料/任务、管理员跨用户审核、教师审核 403、显式 Memory、对齐卡、蓝图、课时分块、非评分诊断、版本差异和 Word 下载。真实 vLLM SSE 返回内容、结束事件和 `[DONE]`，`/api/workbench/model-status` 报告 `vllm · teaching-chat-engineering` 且未降级。真实 Chromium 通过 Tailnet HTTPS 验证步骤门禁逐级解锁、Memory 清除确认、教师端隐藏审核按钮、语义 RAG、失败任务原因和 `word-standard-v2` 下载；DOCX 经 ZIP 检查和 LibreOffice 渲染为 3 页 PDF，包含标题、列表和表格且无内部字典文本。用户已完成此前工作台的 Virtus 人工浏览器验收；本轮自动 Chromium 回归在 Base-Spark 执行，不冒充新的 Virtus 跨设备人工验收。
 
@@ -290,7 +290,20 @@ docker stop luyun-int-minio-1 luyun-int-postgres-1
 
 不要使用 `docker compose down -v` 或删除命名卷进行普通停用；`-v` 会删除数据库和对象存储数据。容器设置为 `restart: unless-stopped`，宿主重启后会自动恢复；如果曾手动 `docker stop`，需按上面的日常启用步骤重新启动。
 
-Base-Spark 当前防火墙不允许新建 Docker bridge 从宿主转发，因此阶段 1 Compose 使用 host network，但所有服务分别固定绑定独立 loopback 端口：Web `8088`、API `28000`、PostgreSQL `25432`、MinIO `29000/29001`、vLLM 生成/Embedding/Reranker `28001/28002/28003`。它们不会直接暴露给局域网或 Tailnet。
+Base-Spark 当前防火墙不允许新建 Docker bridge 从宿主转发，因此阶段 1 Compose 使用 host network，但所有服务只绑定 loopback。默认 `luyun-int` 使用 Web `8088`、API `28000`、PostgreSQL `25432`、MinIO `29000/29001`、vLLM `28001/28002/28003`；`luyun-demo` 使用 Web `8098`、API `28100`、PostgreSQL `26432`、MinIO `30000/30001`、vLLM `28101/28102/28103`。端口均由 env 参数化，示例见 `src/infra/env/base-spark-demo.env.example`。
+
+### Base-Spark 稳定模拟演示环境
+
+`/home/pgx/luyun-sizheng-demo.env` 为仓库外 `0600` 文件；从模板创建后必须替换全部 Secret。晋级顺序：
+
+```bash
+docker compose --project-name luyun-demo --env-file /home/pgx/luyun-sizheng-demo.env -f src/infra/compose/base-spark.yml up -d --wait postgres minio
+docker compose --project-name luyun-demo --env-file /home/pgx/luyun-sizheng-demo.env -f src/infra/compose/base-spark.yml run --rm --no-deps -w /app/src/apps/api api uv run alembic upgrade head
+docker compose --project-name luyun-demo --env-file /home/pgx/luyun-sizheng-demo.env -f src/infra/compose/base-spark.yml --profile model-baseline --profile semantic-rag up -d --wait
+docker compose --project-name luyun-demo --env-file /home/pgx/luyun-sizheng-demo.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
+```
+
+晋级前必须确认 Demo 与 Int 的 API/Web 容器 `.Image` 摘要分别一致；禁止在 Demo 端使用相同 tag 重新构建一份不同镜像。
 
 ### Tailscale Serve 启用、停用与验证
 
@@ -298,6 +311,7 @@ Base-Spark 当前防火墙不允许新建 Docker bridge 从宿主转发，因此
 
 ```text
 https://base-spark.tail84088a.ts.net/ -> http://127.0.0.1:8088
+https://base-spark.tail84088a.ts.net:8443/ -> http://127.0.0.1:8098
 ```
 
 Serve 只向同一 Tailnet 提供 HTTPS，不启用 Funnel，也不直接暴露 API、数据库、MinIO 或模型端口。`--bg` 写入 `tailscaled` 的 Serve 配置，命令退出后映射仍保持；宿主重启后仍应复核状态。
@@ -327,9 +341,9 @@ Serve 只向同一 Tailnet 提供 HTTPS，不启用 Funnel，也不直接暴露 
    curl -fsS https://base-spark.tail84088a.ts.net/healthz
    ```
 
-4. 在已登录同一 Tailnet 的 Virtus 浏览器访问 <https://base-spark.tail84088a.ts.net/>，完成登录、工作台和 SSE 问答冒烟。
+4. 在已登录同一 Tailnet 的 Virtus 浏览器访问集成环境 <https://base-spark.tail84088a.ts.net/> 或稳定模拟演示 <https://base-spark.tail84088a.ts.net:8443/>，完成登录、模拟标记、工作台和 SSE 问答冒烟。
 
-2026-07-16 记录：Serve 已按上述命令恢复，Base-Spark 的 Tailnet HTTPS `/healthz` 返回 `ok`，Virtus 的 `tailscale ping` 为直连在线。用户已完成人工 Virtus 工作台验收；本轮新增五项修复另通过 Base-Spark 上的真实 Chromium Tailnet HTTPS 自动回归，后者不得表述为新的 Virtus 跨设备人工验收。
+2026-07-17 记录：根入口与 `:8443` 均为 Tailnet-only，Base-Spark 通过两个 HTTPS `/healthz`；Demo 的真实 SSE、样板和降级从 Base-Spark 验证。新增模拟标记与稳定演示仍待 Virtus 人工复核，不得表述为跨设备人工验收完成。
 
 #### 每次停用
 
@@ -351,7 +365,7 @@ tailscale serve status
 | 教师角色 | `teacher`（创建项目、上传资料和运行教学流程，不可审核） |
 | 管理员用户名 | `demo_admin` |
 | 管理员角色 | `admin`（审核资料） |
-| 两个账号当前密码 | `Luyun-Stage1A-0715!` |
+| 密码 | 仅存放在对应仓库外 env 文件，不写入文档或 Git |
 
 这两个账号只用于阶段 1 合成数据验证。正式客户部署、公开演示或 Tailnet 访问范围扩大前，必须删除或轮换账号和密码；不得复用当前数据库、JWT、MinIO 等环境 Secret。
 

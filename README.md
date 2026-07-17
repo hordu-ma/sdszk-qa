@@ -6,14 +6,14 @@
 > **一条总规则：** 产品范围、阶段、验收标准只看[主开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0）。
 > 本 README 只描述当前实现和使用入口；凡是标注"目标 / 计划"的能力都尚未实现，任何文档、演示和注释都不得把它们写成已完成。
 
-## 当前状态（2026-07-16）
+## 当前状态（2026-07-17）
 
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |
 | 问答 MVP | 可用 | 登录、主题、会话、历史、SSE 流式问答 |
-| 阶段 1A | 工程底座可用，整体未验收 | `luyun-int` 已固定使用 vLLM 主链，语义 RAG 和版本化工程评测已实现；候选模型与完整 G0 外部签字未冻结 |
-| 阶段 1B / G1 | 技术样板可运行，未通过 G1 | 高中议题式闭环已实现；专家金标评测与稳定环境晋级未完成 |
-| Base-Spark 接入 | 链路已通 | Tailnet HTTPS 可访问；ACL 授权由 Tailnet 管理侧负责 |
+| 阶段 1A | 工程底座可用，整体未验收 | `luyun-int` 已固定使用 vLLM 主链，语义 RAG、来源标记和版本化工程评测已实现；候选模型与完整 G0 外部签字未冻结 |
+| 阶段 1B / G1 | 模拟工程闭环完成，未通过 G1 | 高中议题式闭环、64 个模拟案例回归和同镜像稳定环境晋级已实现；专家金标评测未完成 |
+| Base-Spark 接入 | 双环境链路已通 | `luyun-int` 与 `luyun-demo` 独立运行并通过 Tailnet HTTPS 访问；ACL 授权由 Tailnet 管理侧负责 |
 
 ### 已实现能力
 
@@ -29,6 +29,7 @@
 - 依据检索：`skill.retrieve_basis`，`pg_trgm` + pgvector 语义召回 + Reranker；Provider 故障时显式回退字符向量链，检索不到可靠依据时明确提示"资料不足"
 - 知识索引版本：Embedding/Reranker 仓库、revision、维度和配置哈希可追溯；新索引完整构建后才原子激活
 - 版本化工程评测：数据集按 key/version 冻结，内容 SHA256 不可变；运行绑定应用、vLLM、模型 revision、检索参数和 Skill 版本发布清单
+- 评测来源门禁：数据集显式区分 `synthetic`、`customer_provided`、`expert_authored`；模拟数据不能被审核成正式专家集
 - Skills 运行时：统一权限、Schema、运行审计、停用与降级契约；已注册查依据、对齐卡、蓝图、分块生成、形成性诊断和导出六个 Skill
 - Memory：账户偏好、班情档案、项目/模板钉选；每次注入必须由用户在界面显式勾选，支持导出；一键清除前显示对象数量和不可撤销确认
 - 异步任务：排队、进度、取消、重试，应用重启后自动恢复
@@ -40,12 +41,13 @@
 
 - 模型调用走最小 ModelClient（业务只认逻辑模型名，支持 Ollama / OpenAI 兼容接口）
 - vLLM 运行时固定为 `0.18.0` 镜像摘要，生成、Embedding、Reranker 候选模型固定 Hugging Face revision 并登记入库
+- `luyun-int` 与 `luyun-demo` 使用独立端口、数据卷和 Secret，并以同一 API/Web 镜像摘要晋级；模拟环境在页面显示不可用于专业验收的提示
 - 种子案例一致性校验（`make validate-cases`）
 - "无评分/排名"防护测试：API 和数据模型中出现评分类标识符会使测试失败
 
 ### 尚未完成（主要项）
 
-专家审核的完整阶段 1 Skill/规则目录、专家金标 120–160 个案例及专业阈值、候选模型正式选型、`luyun-demo` 稳定演示环境和 G0/G1 外部签字。当前三个模型是工程兼容性候选，不代表专业选型；工程评测结果不冒充教学质量结论。完整清单见主开发计划 §1.2。
+专家审核的完整阶段 1 Skill/规则目录、专家金标 120–160 个案例及专业阈值、候选模型正式选型、Virtus 人工验收和 G0/G1 外部签字。当前三个模型是工程兼容性候选，64 个案例是模拟工程集；两者都不代表专业验收。完整清单见主开发计划 §1.2。
 
 ## 系统组成
 
@@ -93,6 +95,7 @@ make test-integration    # 集成测试
 | [主开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md) | 范围、阶段 0–4、验收、Skills/Memory 设计（唯一权威） | 涉及产品范围、排期、验收时 |
 | [开发指南](src/docs/DEVELOPMENT.md) | 上手、命令、验证分层、交付标准 | 开始开发前 |
 | [阶段 1 工程冻结基线](src/docs/2026-stage1-g0-engineering-baseline.md) | 当前样板、Skills、Memory、诊断与外部签字边界 | 开发或验收纵向样板时 |
+| [模拟信息替换台账](src/docs/2026-stage1-synthetic-replacement-ledger.md) | 当前模拟项、真实替换入口、门禁与回归要求 | 替换客户资料或准备正式 G0/G1 时 |
 | [架构说明](src/docs/ARCHITECTURE.md) | 当前结构与目标架构边界 | 了解代码组织时 |
 | [基础设施说明](src/infra/README.md) | Compose、部署、base-spark 运维手册 | 部署与运维时 |
 | [AGENTS.md](AGENTS.md) | coding agent 的工作规则 | agent 交付前 |
@@ -104,12 +107,14 @@ make test-integration    # 集成测试
 
 ## 演示环境（base-spark）
 
-- 地址：<https://base-spark.tail84088a.ts.net/>（仅同一 Tailnet 内可访问，不对公网开放）
-- 教师账号：`demo_teacher` / `Luyun-Stage1A-0715!`
-- 管理员账号：`demo_admin` / `Luyun-Stage1A-0715!`
+- 集成环境：<https://base-spark.tail84088a.ts.net/>（仅同一 Tailnet 内可访问）
+- 稳定模拟演示：<https://base-spark.tail84088a.ts.net:8443/>（仅同一 Tailnet 内可访问）
+- 教师账号：`demo_teacher`
+- 管理员账号：`demo_admin`
+- 密码只保存在各环境仓库外 `0600` env 文件中，不写入 Git 或文档
 - 启停、状态检查与故障处理见[基础设施说明](src/infra/README.md#tailscale-serve-启用停用与验证)
 
-> 两个账号仅用于阶段 1A 内部验证；资料审核使用管理员账号。正式部署前必须删除或轮换。
+> 两个账号及全部资料均仅用于阶段 1 模拟工程验证；页面和 API 会显示模拟标记。正式部署前必须替换资料并轮换账号与 Secret。
 
 ## 项目边界
 
@@ -118,7 +123,7 @@ make test-integration    # 集成测试
 1. **不做评分排名。** 教学诊断是形成性建议，不输出教师/学生总分或排名；仓库内有防护测试兜底。
 2. **不做注册和实名。** 用户注册、短信、身份核验由思政课平台用户管理系统实现（计划 §2.6）；本仓只消费平台签发的身份信息，当前本地登录仅为过渡。
 3. **不绑定推理引擎。** 正式环境和验收默认 vLLM，Ollama 只用于开发过渡和明示降级；业务代码只使用逻辑模型名。
-4. **不虚报能力。** 演示和文档不得用原型冒充已实现功能；`luyun-int` 是集成环境，不是稳定演示环境或客户生产方案。
+4. **不虚报能力。** 演示和文档不得用模拟资料或工程评测冒充专家验收；`luyun-int`/`luyun-demo` 都不替代客户生产方案。
 5. **Memory 不做画像。** 只保存用户显式录入、可删除、可审计的教学工作记忆，禁止任何形式的思想侧写或绩效画像。
 
 ## 可审计数据

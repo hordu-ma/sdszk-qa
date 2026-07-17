@@ -116,7 +116,7 @@
 - Memory 项目/模板钉选与前端显式注入确认；六个样板 Skill 均经统一 SkillRun 留痕。
 - `base-spark` 的 `luyun-int` 集成 Compose、loopback 服务边界和 Tailscale Serve HTTPS；已从 `virtus` 验证登录与 SSE 问答，并以真实 Chromium 自动回归本轮工作台增量。
 
-上述状态是实施快照，不改变本计划的范围、工作包和 G1 门槛。当前结论：**阶段 1 工程技术样板可运行；阶段 1A、阶段 1B、G0 和 G1 整体均未完成。**
+上述状态是实施快照，不改变本计划的范围、工作包和 G1 门槛。当前结论：**阶段 1 模拟工程闭环与双环境晋级可运行；阶段 1A、阶段 1B、G0 和 G1 整体均未完成。**
 
 ### 1.2 当前尚未具备的关键能力
 
@@ -136,7 +136,7 @@
 - 受控多智能体任务状态、工具权限、预算和单工作流回退。
 - 图片/音频/短视频的多模态证据定位、纠错、授权和删除。
 - 微调数据流水线、冻结测试集及 Go/No-Go 验收。
-- `base-spark` 的 `luyun-demo` 稳定演示环境、同镜像晋级、演示降级包、备份恢复和一键回滚（`luyun-int` 与 Virtus/Tailscale 技术链路已完成）。
+- `base-spark` 的正式专业演示版本、完整演示降级包与 Virtus 人工验收（`luyun-demo` 模拟工程环境、同镜像晋级、备份恢复和应用回滚基线已完成）。
 - 经专业评测冻结的标准模型资产清单、Provider 一致性回归和 `base-spark` 集成/稳定演示双环境晋级机制（固定资产登记与工程运行基线已实现）。
 
 ### 1.3 现有方案需要修正的方向
@@ -1057,7 +1057,7 @@ G1 的候选构成如下：
 | OpenClaw | 日常控制面独立运行并使用本地模型 | 不进入鲁韵调用链路，不复用 Operator Token、会话、渠道、Workspace 或工具权限 |
 | 当前短请求样本 | 经现有 Ollama/OpenClaw 链路的单次冷路径约 28.49 秒、预热后约 2.46 秒；两路短请求约 2.67/4.43 秒 | 仅证明当前短问答初步可行，不是 vLLM、长教案、多 Agent 或视频任务的容量证据 |
 | 宿主端口与网络 | `9000/9001` 已被其他容器占用，`172.29.0.0/24` 属于其他项目网络 | 现有 `dev.yml` 不能直接用于演示；必须采用专用 Compose 项目、网络、卷和端口预检 |
-| 双环境基础 | `luyun-int` 已部署 `stage1-rag-eval-20260716-r1`，迁移为 `i9d0e1f2a345 (head)`，PostgreSQL/MinIO/API/Web 与三类 vLLM 均健康；`luyun-demo` 尚未建立 | 继续建设独立稳定数据/Secret、同镜像发布门禁和版本晋级机制；不得把集成环境冒充稳定演示环境 |
+| 双环境基础 | `luyun-int`/`luyun-demo` 已部署 `stage1-synthetic-gate-20260717-r1` 同一 API/Web 镜像，迁移为 `j0e1f2a3b456 (head)`；两套 PostgreSQL、MinIO、vLLM 端口、卷和 Secret 隔离且健康 | 已形成模拟工程晋级基线；真实资料、专家回归、ACL/Grant 与 Virtus 人工验收前不得标记为正式专业演示版本 |
 
 当前项目 API 已通过最小 ModelClient 使用逻辑模型名、Provider 标识和 Provider 模型 ID，支持 Ollama 原生流式接口或 OpenAI 兼容接口。Provider 能力登记、认证隔离、任务路由和一致性回归仍未完成；“能返回文本”不等于模型服务已经统一，该差距仍须通过完整 ModelGateway 和 Provider Adapter 解决。
 
@@ -1106,7 +1106,7 @@ flowchart LR
 | D3 演示保障和彩排 | 3–5 个工作日 | vLLM 预热、并发/长连接测试、监控、故障注入、Ollama 明示降级、版本冻结和两次完整彩排 | T-7 首次彩排、T-2 版本冻结、T-1 恢复演练和预热完成 |
 | D4 按节点持续部署 | 贯穿阶段 1–4 | 每个双周迭代或可验收纵向增量先部署 `luyun-int`；通过自动测试、专业回归、迁移、`virtus` 冒烟和回滚检查后，将同一镜像晋级 `luyun-demo` | 每个开发节点均有部署记录；每个 G1–G4 保留不可变镜像、模型清单、数据快照、黄金脚本、验收记录和录屏 |
 
-实施状态（2026-07-16）：D0 已形成固定版 vLLM 三类工程候选的 arm64/GB10 兼容性与模型资产登记基线，但正式模型专业选型、长上下文/并发/容量对比和 Go/No-Go 未完成；D1 完成 `luyun-int` 单环境增量部署、备份、迁移往返、重启持久化和镜像回滚/恢复基线，`luyun-demo` 未建立；D2 的 Serve/MagicDNS、Virtus 浏览器登录和 SSE 问答技术链路已验证，完整阶段 1 脚本与 ACL/Grant 验收未完成；D3 尚未开始。
+实施状态（2026-07-17）：D0 已形成固定版 vLLM 三类工程候选的 arm64/GB10 兼容性与模型资产登记基线，但正式模型专业选型、长上下文/并发/容量对比和 Go/No-Go 未完成；D1 已完成 `luyun-int`/`luyun-demo` 独立端口、卷、Secret 和同镜像模拟工程晋级，备份、迁移往返、重启持久化及应用回滚/恢复均通过；D2 的 Serve/MagicDNS、根入口与 `:8443` 双环境 HTTPS、真实 vLLM SSE 和完整阶段 1 模拟脚本已从 Base-Spark 验证，新增功能的 Virtus 人工界面及 ACL/Grant 验收未完成；D3 已完成一次 Reranker 故障降级和恢复工程演练，正式监控、并发/长连接目标及两次完整彩排未完成。
 
 D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的串行总和。D0 的镜像/端口盘点、故事线和 Tailnet 审批可并行，D2 的权限准备可与 D1 后半段重叠；但 D3 必须在可部署版本和跨设备链路稳定后执行。按此安排，2–3 周交付可访问技术基线，3–5 周交付可投标彩排基线；若投标日期早于 3 周，必须缩减现场实时能力并明确采用 D-L2/D-L3，不以取消恢复和彩排测试换取工期。
 
@@ -1322,7 +1322,7 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 - **1A 可信平台骨架（4–5 周）：** WP1.1–WP1.4 的最小闭环，重点验收 Teaching Project、ModelClient、异步任务、RAG、`retrieve_basis`、版本追溯和可部署基线。
 - **1B 纵向业务样板（5–7 周）：** 打通“查依据—备课—诊断—导出”四类用户任务入口；内部可由 2.5.1 的多个 Skill 组合，但不要求八个 Skill 都形成独立页面或同等成熟度。完成最小 Memory、桌面工作台、Word 导出、专家回归和双环境晋级后进入 G1。
 
-实施状态（2026-07-16）：**阶段 1 工程样板进行中。** 第 1–9 步已有单一高中议题式技术闭环：Teaching Project/Version、服务层、ModelClient/Provider Adapter、应用内资料任务、审核门禁、语义混合检索与显式降级、六个样板 Skills、显式 Memory、结构化生成、非评分诊断、版本差异、结构化 Word 导出和可版本化工程评测。固定版 vLLM 三类工程候选、模型/索引资产登记和 `luyun-int` 增量部署已验证；当前业务主链已切换为 vLLM，教师/管理员测试身份已分离，工作台具备步骤门禁、Memory 清除确认和失败任务原因反馈。Virtus 人工浏览器复核由用户于 2026-07-16 确认完成，本轮新增界面另通过 Base-Spark 上的真实 Chromium 自动回归。第 10 步 `luyun-demo` 同镜像晋级、专业模型冻结、专家评测及 G0/G1 外部签字仍未完成，因此不得标记 1A、1B、阶段 1、G0 或 G1 整体完成。
+实施状态（2026-07-17）：**阶段 1 工程样板进行中。** 第 1–9 步已有单一高中议题式技术闭环：Teaching Project/Version、服务层、ModelClient/Provider Adapter、应用内资料任务、审核门禁、语义混合检索与显式降级、六个样板 Skills、显式 Memory、结构化生成、非评分诊断、版本差异、结构化 Word 导出和可版本化工程评测。第 10 步已完成 64 个显式模拟案例回归和 `luyun-int → luyun-demo` 同镜像模拟工程晋级；评测来源/审核门禁阻止模拟集冒充专家集。固定版 vLLM 三类工程候选和模型/索引资产已登记，教师/管理员测试身份已分离，工作台显式提示模拟状态。真实资料替换、专业模型冻结、专家金标、Virtus 新增功能人工验收及 G0/G1 外部签字仍未完成，因此不得标记 1A、1B、阶段 1、G0 或 G1 整体完成。
 
 实施记录（2026-07-16）：按 §5.4.1 第 5–7 步交付以下增量：
 （a）`retrieve_basis` 检索从应用内词项匹配升级为 PostgreSQL `pg_trgm` 库内词法检索（相似度排序、短查询子串兜底、资料不足阈值 `RETRIEVE_MIN_RELEVANCE`）；向量 + Reranker 混合检索仍待 D0 模型选型后接入。
@@ -1365,6 +1365,16 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 （c）Word 模板升级为 `word-standard-v2`，使用 A4 页边距、标题、列表和表格表达对齐卡、蓝图、课堂活动与诊断，不再输出内部字典文本。工作台按最新版本的前置成果逐步解锁；Memory 清除显示对象数量并二次确认；失败任务直接显示服务端错误原因。
 
 （d）`luyun-int` 已部署 `stage1-browser-fixes-20260716-r1`，数据库仍为 `i9d0e1f2a345 (head)`，发布前 PostgreSQL/MinIO 备份为 `/home/pgx/backups/luyun-sizheng/20260716-140000-browser-fixes/`，本轮无新迁移。Tailnet HTTPS API 验证双账号 RBAC、管理员审核、教师 403、vLLM 状态和真实 SSE；真实 Chromium 自动回归步骤门禁、Memory 确认、教师端权限、语义 RAG、失败原因和 Word 下载。导出件经 ZIP 完整性和 LibreOffice 渲染检查。该自动回归不替代新增功能的 Virtus 跨设备人工复核，也不改变阶段/G 门状态。
+
+工程实施与部署验收记录（2026-07-17，第五增量）：
+
+（a）评测数据集新增 `synthetic/customer_provided/expert_authored` 来源、外部审核状态、意见、审核人与时间；模拟集审核请求返回冲突，不能改成正式通过。`CONTENT_MODE`/免责声明通过 API 和工作台持续显示，替换路径记录在《阶段 1 模拟信息替换台账》。
+
+（b）`seed_demo` 幂等生成 8 份模拟资料、初始 ProjectVersion 和 64 个冻结案例；工程回归为 43 `matched`、21 `failed`、0 `error`。该结果仅暴露工程候选检索差距，不设置专业阈值，不替代 60–80 个 G0 专家案例或 120–160 个 G1 金标集。
+
+（c）Base-Spark Compose 端口全部参数化；`luyun-int`/`luyun-demo` 使用独立 PostgreSQL、MinIO、vLLM 端口、卷和仓库外 Secret。两套 API/Web 均使用 `stage1-synthetic-gate-20260717-r1` 同一镜像摘要，数据库均为 `j0e1f2a3b456 (head)`；Demo 通过 Tailnet `:8443`、六 Skill、Memory、Word、真实 vLLM SSE 和 Reranker 停机降级验证。
+
+（d）发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260717-stage1-synthetic-gate-predeploy/`。迁移在独立测试库通过 `i9 → j0 → i9 → j0`；`luyun-int` 回滚至 `stage1-browser-fixes-20260716-r1` 后健康并恢复当前镜像。新增模拟界面与 `:8443` 演示仍待 Virtus 人工复核，不改变阶段/G 门状态。
 
 ### 10.2 工作包
 

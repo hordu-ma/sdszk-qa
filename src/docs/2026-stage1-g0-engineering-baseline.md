@@ -18,6 +18,7 @@
 - 诊断原则：只给证据、状态和修改建议，不给教师/学生总分、等级、排名或绩效结论。
 - Memory 原则：只注入用户在本次运行中显式勾选的对象；清除后不可用于新 SkillRun。
 - 模型与检索原则：固定运行时和模型 revision 仅作为工程候选；专业选型仍待专家金标评测。
+- 数据原则：缺少真实资料时只允许使用显式 `synthetic` 数据；模拟集不能审核成正式专家集，替换规则见《阶段 1 模拟信息替换台账》。
 
 ## 2. 产品 Skills 目录 v1（工程冻结部分）
 
@@ -83,6 +84,7 @@
 - 每次运行绑定数据集哈希与应用发布、vLLM 镜像、三个模型 revision、检索参数和 Skill 版本清单。
 - 单案例只记录 expected document/资料不足是否命中、检索模式、延迟和错误；汇总为 matched/failed/error 技术计数。
 - 当前框架不含专家金标，不设置专业通过阈值，也不输出教师/学生总分、等级或排名。
+- 评测集记录 `data_origin`、外部审核状态/意见/审核人/时间；`synthetic` 审核状态固定为 `not_applicable`。
 
 ## 6. 版本、导出与追溯
 
@@ -112,6 +114,15 @@ make harness-full
 8. 停止 Reranker，确认检索显式降级且不返回 5xx；恢复服务后确认健康。
 9. 清除 Memory，确认旧引用不能用于新 SkillRun。
 10. 分别以 `demo_teacher` 和 `demo_admin` 验证教师不可审核、管理员可审核；确认失败任务显示服务端错误原因。
+
+## 7.1 模拟工程门禁记录（2026-07-17）
+
+- `seed_demo` 幂等生成 8 份显式模拟资料、一个初始项目版本和 64 个冻结工程案例。
+- 64 例语义检索工程回归结果为 43 `matched`、21 `failed`、0 `error`；该结果保留候选检索差距，不作为专业通过率。
+- `luyun-int` 与 `luyun-demo` 使用 `stage1-synthetic-gate-20260717-r1` 同一 API/Web 镜像摘要；数据库、MinIO、模型端口、卷和 Secret 独立。
+- `luyun-demo` 通过六 Skill 主链、显式 Memory、版本、`word-standard-v2`、真实 vLLM SSE 和 Reranker 停机降级验证。
+- `luyun-int` 已验证回滚到 `stage1-browser-fixes-20260716-r1` 后健康，再恢复当前镜像；迁移已在独立测试库通过 `i9 → j0 → i9 → j0`。
+- Base-Spark 本机已通过 Tailnet `:8443` HTTPS 验证；新增模拟数据和双环境界面仍待 Virtus 人工复核。
 
 ## 8. 仍需外部签字的 G0 输入
 

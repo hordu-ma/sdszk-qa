@@ -7,9 +7,9 @@ COPY src/apps/web/ ./
 RUN npm run build
 
 FROM nginx:1.27-alpine
-COPY src/infra/compose/nginx/base-spark.conf /etc/nginx/conf.d/default.conf
+COPY src/infra/compose/nginx/base-spark.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 \
-  CMD wget -q -O - http://127.0.0.1:8088/healthz || exit 1
+  CMD wget -q -O - "http://127.0.0.1:${WEB_PORT:-8088}/healthz" || exit 1

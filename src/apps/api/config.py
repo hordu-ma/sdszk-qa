@@ -77,6 +77,9 @@ class Settings(BaseSettings):
 
     # 发布清单中的应用版本；由部署环境注入，不从 Git 猜测。
     APP_RELEASE: str = "dev"
+    # 当前内容是否为可替换的模拟工程数据。正式资料完成审核前保持 synthetic。
+    CONTENT_MODE: str = Field(default="synthetic", pattern="^(synthetic|production)$")
+    CONTENT_DISCLAIMER: str = "模拟数据，仅用于工程验证；不得作为专业验收结论。"
 
     # JWT 配置
     JWT_SECRET: str = Field(..., min_length=1)

@@ -220,4 +220,6 @@ export interface ModelStatus {
   provider: string;
   provider_model: string;
   degraded: boolean;
+  content_mode: "synthetic" | "production";
+  content_disclaimer: string;
 }

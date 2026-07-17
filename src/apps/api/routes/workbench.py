@@ -47,6 +47,7 @@ from src.apps.api.schemas.workbench import (
     EvaluationCaseResultResponse,
     EvaluationDatasetCreate,
     EvaluationDatasetResponse,
+    EvaluationDatasetReviewRequest,
     EvaluationRunResponse,
     ExportArtifactOutput,
     ExportArtifactRequest,
@@ -82,6 +83,7 @@ from src.apps.api.services.evaluation_service import (
     get_owned_run,
     list_datasets,
     list_run_results,
+    review_dataset,
     run_dataset,
 )
 from src.apps.api.services.knowledge_service import (
@@ -727,6 +729,8 @@ async def model_status(current_user: CurrentUser) -> dict[str, str | bool]:
         "provider": settings.LLM_PROVIDER,
         "provider_model": settings.LLM_MODEL,
         "degraded": settings.LLM_PROVIDER.lower() != "vllm",
+        "content_mode": settings.CONTENT_MODE,
+        "content_disclaimer": settings.CONTENT_DISCLAIMER,
     }
 
 
@@ -802,6 +806,7 @@ async def create_evaluation_dataset(
         dataset_key=payload.dataset_key,
         name=payload.name,
         description=payload.description,
+        data_origin=payload.data_origin,
     )
     await write_audit_log(
         db,
@@ -811,6 +816,37 @@ async def create_evaluation_dataset(
         "evaluation_dataset",
         str(dataset.id),
         {"dataset_key": dataset.dataset_key, "version_number": dataset.version_number},
+    )
+    await db.commit()
+    return EvaluationDatasetResponse.model_validate(dataset)
+
+
+@router.post(
+    "/evaluation/datasets/{dataset_id}/review",
+    response_model=EvaluationDatasetResponse,
+)
+async def review_evaluation_dataset(
+    dataset_id: int,
+    payload: EvaluationDatasetReviewRequest,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> EvaluationDatasetResponse:
+    dataset = await review_dataset(
+        db,
+        dataset_id=dataset_id,
+        reviewer=current_user,
+        review_status=payload.review_status,
+        review_note=payload.review_note,
+    )
+    await write_audit_log(
+        db,
+        request,
+        "review_evaluation_dataset",
+        current_user.id,
+        "evaluation_dataset",
+        str(dataset.id),
+        {"data_origin": dataset.data_origin, "review_status": dataset.review_status},
     )
     await db.commit()
     return EvaluationDatasetResponse.model_validate(dataset)

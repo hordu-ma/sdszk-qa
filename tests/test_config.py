@@ -18,3 +18,5 @@ def test_settings_defaults() -> None:
     assert settings.LLM_MAX_CONTEXT_LEN == 1024
     assert settings.JWT_ALGORITHM == "HS256"
     assert settings.MINIO_SECURE is False
+    assert settings.CONTENT_MODE == "synthetic"
+    assert "模拟数据" in settings.CONTENT_DISCLAIMER

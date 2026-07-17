@@ -34,6 +34,7 @@ async def create_dataset(
     dataset_key: str,
     name: str,
     description: str | None,
+    data_origin: str,
 ) -> EvaluationDataset:
     await get_owned_project(db, project_id, user.id)
     latest = await db.execute(
@@ -49,10 +50,49 @@ async def create_dataset(
         version_number=int(latest.scalar() or 0) + 1,
         name=name,
         description=description,
+        data_origin=data_origin,
+        review_status="not_applicable" if data_origin == "synthetic" else "pending",
         status="draft",
         case_count=0,
     )
     db.add(dataset)
+    await db.commit()
+    await db.refresh(dataset)
+    return dataset
+
+
+async def review_dataset(
+    db: AsyncSession,
+    *,
+    dataset_id: int,
+    reviewer: User,
+    review_status: str,
+    review_note: str,
+) -> EvaluationDataset:
+    if reviewer.role not in {"admin", "reviewer"}:
+        raise BusinessError(
+            "只有审核员或管理员可以审核评测数据集",
+            status_code=403,
+            error_code="evaluation_review_forbidden",
+        )
+    result = await db.execute(
+        select(EvaluationDataset).where(EvaluationDataset.id == dataset_id)
+    )
+    dataset = result.scalar_one_or_none()
+    if dataset is None:
+        raise BusinessError(
+            "评测数据集不存在", status_code=404, error_code="dataset_not_found"
+        )
+    if dataset.data_origin == "synthetic":
+        raise BusinessError(
+            "模拟数据集不能标记为专业审核通过，请导入真实资料后创建新版本",
+            status_code=409,
+            error_code="synthetic_dataset_not_approvable",
+        )
+    dataset.review_status = review_status
+    dataset.review_note = review_note
+    dataset.reviewed_by = reviewer.id
+    dataset.reviewed_at = _utcnow()
     await db.commit()
     await db.refresh(dataset)
     return dataset
