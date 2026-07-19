@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { onBeforeRouteLeave } from "vue-router";
 import { showConfirmDialog, showFailToast, showSuccessToast } from "vant";
+import ArtifactEditor from "../components/ArtifactEditor.vue";
 import {
   cancelTask,
   clearMemory,
@@ -36,6 +38,7 @@ import {
   retrieveBasis,
   retryTask,
   runEvaluationDataset,
+  saveProjectVersion,
   savePreference,
   submitEvaluationCaseReview,
   uploadDocument,
@@ -81,6 +84,8 @@ const selectedEvaluationDatasetId = ref<number | null>(null);
 const evaluationCases = ref<EvaluationCase[]>([]);
 const evaluationReport = ref<EvaluationDatasetReport | null>(null);
 const loading = ref(false);
+const editorSaving = ref(false);
+const editorDirty = ref(false);
 const query = ref("");
 const newProject = ref({ title: "", stage: "高中", course_type: "议题式" });
 const memoryForm = ref({
@@ -407,6 +412,64 @@ async function handleCompareVersions() {
   );
 }
 
+async function handleSaveArtifact(content: Record<string, unknown>) {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  editorSaving.value = true;
+  const sourceVersion = versions.value[0].version_number;
+  try {
+    const saved = await saveProjectVersion(selectedProjectId.value, content);
+    await refreshProjectData();
+    diffForm.value = { from: sourceVersion, to: saved.version_number };
+    versionDiff.value = await compareVersions(
+      selectedProjectId.value,
+      sourceVersion,
+      saved.version_number,
+    );
+    editorDirty.value = false;
+    showSuccessToast(`教师修改已保存为 v${saved.version_number}，请重新运行形成性诊断`);
+  } finally {
+    editorSaving.value = false;
+  }
+}
+
+async function handleSelectProject(projectId: number) {
+  if (projectId === selectedProjectId.value) return;
+  if (editorDirty.value) {
+    try {
+      await showConfirmDialog({
+        title: "放弃未保存修改？",
+        message: "切换项目会丢弃当前编辑器中的未保存修改。",
+        confirmButtonText: "放弃并切换",
+        confirmButtonColor: "#9d3926",
+      });
+    } catch {
+      return;
+    }
+  }
+  selectedProjectId.value = projectId;
+}
+
+function handleBeforeUnload(event: BeforeUnloadEvent) {
+  if (!editorDirty.value) return;
+  event.preventDefault();
+  event.returnValue = "";
+}
+
+onBeforeRouteLeave(async () => {
+  if (!editorDirty.value) return true;
+  try {
+    await showConfirmDialog({
+      title: "离开工作台？",
+      message: "当前专业编辑内容尚未保存，离开后会丢失。",
+      confirmButtonText: "放弃并离开",
+      confirmButtonColor: "#9d3926",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+});
+
 async function handleExportArtifact() {
   if (!selectedProjectId.value) return;
   loading.value = true;
@@ -548,6 +611,7 @@ watch(selectedProjectId, async () => {
 watch(selectedEvaluationDatasetId, refreshEvaluationDetails);
 
 onMounted(async () => {
+  window.addEventListener("beforeunload", handleBeforeUnload);
   try {
     modelStatus.value = await getModelStatus();
     await Promise.all([refreshProjects(), refreshMemory()]);
@@ -561,18 +625,20 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (timer) window.clearInterval(timer);
+  window.removeEventListener("beforeunload", handleBeforeUnload);
 });
 </script>
 
 <template>
-  <main class="workbench-page">
+  <a class="skip-link" href="#workbench-content">跳到工作台主要内容</a>
+  <main id="workbench-content" class="workbench-page" tabindex="-1">
     <header class="hero">
       <div>
         <p class="eyebrow">阶段 1 · 可信底座与纵向样板</p>
         <h1>鲁韵教学工作台</h1>
         <p>创建教学项目、加工授权资料，并用可定位引用验证可信检索。</p>
       </div>
-      <div v-if="modelStatus" :class="['provider', { degraded: modelStatus.degraded }]">
+      <div v-if="modelStatus" :class="['provider', { degraded: modelStatus.degraded }]" role="status" aria-live="polite">
         <span>{{ modelStatus.degraded ? "降级 Provider" : "默认 Provider" }}</span>
         <strong>{{ modelStatus.provider }} · {{ modelStatus.provider_model }}</strong>
       </div>
@@ -591,12 +657,15 @@ onBeforeUnmount(() => {
     <section class="grid">
       <article class="panel projects-panel">
         <h2>1. 教学项目</h2>
-        <div class="form-row">
-          <input v-model="newProject.title" placeholder="例如：高中家国情怀议题式教学" />
-          <select v-model="newProject.stage">
+        <div class="form-row" aria-label="创建教学项目">
+          <label class="sr-only" for="project-title">项目名称</label>
+          <input id="project-title" v-model="newProject.title" placeholder="例如：高中家国情怀议题式教学" />
+          <label class="sr-only" for="project-stage">学段</label>
+          <select id="project-stage" v-model="newProject.stage">
             <option>小学</option><option>初中</option><option>高中</option><option>大学</option>
           </select>
-          <select v-model="newProject.course_type">
+          <label class="sr-only" for="project-course-type">课型</label>
+          <select id="project-course-type" v-model="newProject.course_type">
             <option>议题式</option><option>案例式</option><option>实践式</option>
           </select>
           <button :disabled="loading" @click="handleCreateProject">创建项目</button>
@@ -606,7 +675,8 @@ onBeforeUnmount(() => {
             v-for="project in projects"
             :key="project.id"
             :class="{ active: project.id === selectedProjectId }"
-            @click="selectedProjectId = project.id"
+            :aria-pressed="project.id === selectedProjectId"
+            @click="handleSelectProject(project.id)"
           >
             {{ project.title }}
           </button>
@@ -643,8 +713,9 @@ onBeforeUnmount(() => {
 
       <article class="panel retrieve-panel">
         <h2>3. 可信依据检索</h2>
-        <div class="search-row">
-          <input v-model="query" placeholder="例如：家国情怀教学目标应如何设置？" @keyup.enter="handleRetrieve" />
+        <div class="search-row" role="search">
+          <label class="sr-only" for="basis-query">可信依据检索问题</label>
+          <input id="basis-query" v-model="query" placeholder="例如：家国情怀教学目标应如何设置？" @keyup.enter="handleRetrieve" />
           <button :disabled="!selectedProjectId || loading" @click="handleRetrieve">运行 retrieve_basis</button>
         </div>
         <p v-if="insufficiencyReason === 'low_relevance' && citations.length" class="review-hint">
@@ -732,18 +803,18 @@ onBeforeUnmount(() => {
         <h2>6. 高中议题式纵向样板</h2>
         <p class="hint">固定顺序：课程依据对齐卡 → 目标—证据—任务蓝图 → 课时分块 → 非评分诊断 → Word 导出。</p>
         <div class="sample-inputs">
-          <input v-model="sampleForm.topic" placeholder="样板主题" />
-          <input v-model="sampleForm.core_question" placeholder="核心议题" />
-          <input v-model="sampleForm.basis_query" placeholder="依据检索问题" />
+          <label>样板主题<input v-model="sampleForm.topic" /></label>
+          <label>核心议题<input v-model="sampleForm.core_question" /></label>
+          <label>依据检索问题<input v-model="sampleForm.basis_query" /></label>
         </div>
         <div class="pipeline-actions">
-          <button :disabled="loading || !selectedProjectId" @click="runSampleStep('alignment')">1 对齐卡</button>
-          <button :disabled="loading || !selectedProjectId || !hasAlignmentCard" title="请先完成对齐卡" @click="runSampleStep('blueprint')">2 教学蓝图</button>
-          <button :disabled="loading || !selectedProjectId || !hasDesignBlueprint" title="请先完成教学蓝图" @click="runSampleStep('generate')">3 课时设计</button>
-          <button :disabled="loading || !selectedProjectId || !hasLessonDesign" title="请先完成课时设计" @click="runSampleStep('diagnose')">4 形成性诊断</button>
-          <button :disabled="loading || !selectedProjectId || !hasDiagnosis" title="请先完成形成性诊断" @click="handleExportArtifact">5 导出 Word</button>
+          <button :disabled="loading || editorDirty || !selectedProjectId" @click="runSampleStep('alignment')">1 对齐卡</button>
+          <button :disabled="loading || editorDirty || !selectedProjectId || !hasAlignmentCard" title="请先完成对齐卡" @click="runSampleStep('blueprint')">2 教学蓝图</button>
+          <button :disabled="loading || editorDirty || !selectedProjectId || !hasDesignBlueprint" title="请先完成教学蓝图" @click="runSampleStep('generate')">3 课时设计</button>
+          <button :disabled="loading || editorDirty || !selectedProjectId || !hasLessonDesign" title="请先完成课时设计并保存编辑" @click="runSampleStep('diagnose')">4 形成性诊断</button>
+          <button :disabled="loading || editorDirty || !selectedProjectId || !hasDiagnosis" title="请先完成形成性诊断" @click="handleExportArtifact">5 导出 Word</button>
         </div>
-        <p v-if="selectedProjectId" class="workflow-progress">
+        <p v-if="selectedProjectId" class="workflow-progress" role="status" aria-live="polite">
           当前进度：对齐卡 {{ hasAlignmentCard ? "✓" : "○" }} · 教学蓝图 {{ hasDesignBlueprint ? "✓" : "○" }} ·
           课时设计 {{ hasLessonDesign ? "✓" : "○" }} · 形成性诊断 {{ hasDiagnosis ? "✓" : "○" }}
         </p>
@@ -751,6 +822,12 @@ onBeforeUnmount(() => {
           <header><strong>{{ latestStep.skill_id }}</strong><span>v{{ latestStep.version_number }}</span></header>
           <pre>{{ JSON.stringify(latestStep, null, 2) }}</pre>
         </div>
+        <ArtifactEditor
+          :version="versions[0] || null"
+          :saving="editorSaving"
+          @dirty-change="editorDirty = $event"
+          @save="handleSaveArtifact"
+        />
       </article>
 
       <article class="panel full-panel">
@@ -768,10 +845,10 @@ onBeforeUnmount(() => {
           </label>
           <button @click="handleCompareVersions">比较</button>
         </div>
-        <div v-if="versionDiff" class="diff-list">
+        <div v-if="versionDiff" class="diff-list" aria-live="polite">
           <article v-for="section in versionDiff.changed_sections" :key="section.section">
             <strong>{{ section.section }}</strong>
-            <div><pre>{{ JSON.stringify(section.before, null, 2) }}</pre><pre>{{ JSON.stringify(section.after, null, 2) }}</pre></div>
+            <div><section><h4>修改前</h4><pre>{{ JSON.stringify(section.before, null, 2) }}</pre></section><section><h4>修改后</h4><pre>{{ JSON.stringify(section.after, null, 2) }}</pre></section></div>
           </article>
           <p v-if="!versionDiff.changed_sections.length" class="empty">两个版本没有结构化差异。</p>
         </div>
@@ -896,6 +973,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 1000; transform: translateY(-160%); border-radius: 8px; background: #fff; color: #173f35; padding: 10px 14px; box-shadow: 0 4px 14px rgba(0, 0, 0, .2); }
+.skip-link:focus { transform: translateY(0); }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 .workbench-page { min-height: 100vh; background: #f3f5f0; color: #172019; padding: 32px; }
 .hero { max-width: 1320px; margin: 0 auto; padding: 32px 36px; border-radius: 22px; background: #173f35; color: white; display: flex; justify-content: space-between; gap: 24px; align-items: end; }
 .hero h1 { margin: 4px 0 8px; font-size: 34px; }.hero p { margin: 0; color: #d9e8df; }.eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
@@ -903,13 +983,14 @@ onBeforeUnmount(() => {
 .top-links { max-width: 1320px; margin: 14px auto; display: flex; gap: 10px; }.top-links a { color: #245b4c; background: white; border: 1px solid #d9dfd9; border-radius: 999px; padding: 8px 14px; }
 .synthetic-notice { max-width: 1290px; margin: 14px auto 0; padding: 12px 16px; border: 1px solid #e7af60; border-radius: 12px; background: #fff6df; color: #6f4a08; display: flex; gap: 10px; align-items: baseline; }.synthetic-notice span { font-size: 13px; }
 .grid { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; }.panel { background: white; border: 1px solid #dde4de; border-radius: 18px; padding: 24px; box-shadow: 0 8px 26px rgba(33, 57, 43, .06); }.projects-panel, .full-panel { grid-column: 1 / -1; }.panel h2 { margin: 0 0 16px; font-size: 19px; }.panel h3 { margin: 0 0 12px; font-size: 15px; }
-.form-row, .search-row { display: flex; gap: 10px; }.form-row input, .search-row input { flex: 1; }.form-row input, .form-row select, .search-row input { border: 1px solid #cfd8d1; border-radius: 10px; padding: 11px 12px; background: white; color: #172019; }.panel button, .upload-button { border: 0; border-radius: 10px; padding: 10px 14px; background: #286b58; color: white; cursor: pointer; font: inherit; }.panel button:disabled, .upload-button.disabled { opacity: .45; cursor: not-allowed; }
+.form-row, .search-row { display: flex; gap: 10px; }.form-row input, .search-row input { flex: 1; }.form-row input, .form-row select, .search-row input { border: 1px solid #aebcb2; border-radius: 10px; padding: 11px 12px; background: white; color: #172019; }.panel button, .upload-button { border: 0; border-radius: 10px; padding: 10px 14px; background: #286b58; color: white; cursor: pointer; font: inherit; }.panel button:disabled, .upload-button.disabled { opacity: .45; cursor: not-allowed; }
+.panel button:focus-visible, .upload-button:focus-within, .top-links a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #d28a24; outline-offset: 2px; }
 .project-tabs { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }.project-tabs button { background: #edf3ef; color: #285143; }.project-tabs button.active { background: #173f35; color: white; }
 .panel-title, .document-item, .task-item, .citation header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }.panel-title p { margin: -10px 0 12px; color: #637068; font-size: 13px; }.upload-button input { display: none; }
 .document-item, .task-item { border-top: 1px solid #edf0ed; padding: 12px 0; }.document-item div, .task-item div:first-child { display: grid; gap: 3px; }.document-item small, .task-item small { color: #778179; }.task-error { color: #9d3926 !important; max-width: 680px; overflow-wrap: anywhere; }.review-hint { color: #875b0b !important; }.status { border-radius: 999px; background: #e8ece9; padding: 4px 9px; font-size: 12px; }.status.ready, .status.completed { background: #dcf5e8; color: #17633f; }.status.failed, .status.cancelled { background: #fde5df; color: #9d3926; }.status.processing, .status.running, .status.queued { background: #fff0ce; color: #875b0b; }
 .document-actions { display: flex !important; align-items: center; gap: 6px !important; }.document-actions button { padding: 5px 8px; font-size: 12px; }.status.approved { background: #dcf5e8; color: #17633f; }.status.pending { background: #fff0ce; color: #875b0b; }.status.disabled, .status.rejected { background: #edf0ed; color: #657068; }
 .retrieve-panel { min-height: 350px; }.citation-list { display: grid; gap: 10px; margin-top: 16px; }.citation { border-left: 4px solid #4c8d77; background: #f5f8f6; padding: 14px; border-radius: 8px; }.citation header span { color: #6b756e; font-size: 12px; }.citation p { white-space: pre-wrap; line-height: 1.65; margin: 10px 0 0; color: #36443a; }.task-actions { display: flex; gap: 7px; align-items: center; }.task-actions button { padding: 5px 9px; font-size: 12px; }.empty { color: #7b857e; font-size: 13px; }
-.memory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }.memory-grid section { border: 1px solid #e4e9e5; border-radius: 12px; padding: 16px; }.stack-form { display: grid; gap: 8px; }.stack-form input, .sample-inputs input, .diff-controls select { border: 1px solid #cfd8d1; border-radius: 9px; padding: 9px 10px; }.memory-actions, .pipeline-actions, .diff-controls { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-top: 12px; }.check-row, .memory-item { display: flex; gap: 8px; align-items: center; }.memory-item { border-top: 1px solid #edf0ed; padding: 9px 0; }.memory-item span { display: grid; gap: 2px; flex: 1; }.memory-item small { color: #778179; }.memory-item button { padding: 5px 8px; font-size: 12px; }.danger-button { background: #9d3926 !important; }.hint, .workflow-progress { color: #637068; }.workflow-progress { font-size: 13px; margin: 10px 0 0; }.sample-inputs { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 9px; }.step-result { margin-top: 16px; border: 1px solid #d7e1da; border-radius: 10px; overflow: hidden; }.step-result header { display: flex; justify-content: space-between; background: #edf3ef; padding: 10px 12px; }.step-result pre, .diff-list pre { white-space: pre-wrap; overflow: auto; font-size: 12px; line-height: 1.5; padding: 12px; margin: 0; background: #f8faf8; }.diff-controls label { display: flex; gap: 6px; align-items: center; }.diff-list { display: grid; gap: 12px; margin-top: 16px; }.diff-list article { border: 1px solid #e1e7e2; border-radius: 10px; padding: 12px; }.diff-list article > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.memory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }.memory-grid section { border: 1px solid #e4e9e5; border-radius: 12px; padding: 16px; }.stack-form { display: grid; gap: 8px; }.stack-form input, .sample-inputs input, .diff-controls select { border: 1px solid #aebcb2; border-radius: 9px; padding: 9px 10px; }.memory-actions, .pipeline-actions, .diff-controls { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-top: 12px; }.check-row, .memory-item { display: flex; gap: 8px; align-items: center; }.memory-item { border-top: 1px solid #edf0ed; padding: 9px 0; }.memory-item span { display: grid; gap: 2px; flex: 1; }.memory-item small { color: #6c776f; }.memory-item button { padding: 5px 8px; font-size: 12px; }.danger-button { background: #9d3926 !important; }.hint, .workflow-progress { color: #58675e; }.workflow-progress { font-size: 13px; margin: 10px 0 0; }.sample-inputs { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 9px; }.sample-inputs label { display: grid; gap: 5px; color: #394a40; font-size: 13px; font-weight: 600; }.step-result { margin-top: 16px; border: 1px solid #d7e1da; border-radius: 10px; overflow: hidden; }.step-result header { display: flex; justify-content: space-between; background: #edf3ef; padding: 10px 12px; }.step-result pre, .diff-list pre { white-space: pre-wrap; overflow: auto; font-size: 12px; line-height: 1.5; padding: 12px; margin: 0; background: #f8faf8; }.diff-controls label { display: flex; gap: 6px; align-items: center; }.diff-list { display: grid; gap: 12px; margin-top: 16px; }.diff-list article { border: 1px solid #e1e7e2; border-radius: 10px; padding: 12px; }.diff-list article > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }.diff-list h4 { margin: 0 0 6px; color: #4d5f54; font-size: 12px; }
 .evaluation-grid { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 16px; }.evaluation-grid > section, .gold-review-section { border: 1px solid #e1e7e2; border-radius: 12px; padding: 16px; }.evaluation-panel textarea, .evaluation-panel select, .evaluation-panel input { width: 100%; box-sizing: border-box; border: 1px solid #cfd8d1; border-radius: 9px; padding: 9px 10px; background: white; color: #172019; }.json-input { margin-bottom: 10px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }.dataset-list, .case-tabs { display: grid; gap: 7px; margin-top: 12px; }.dataset-button { display: grid; gap: 3px; text-align: left; background: #edf3ef !important; color: #285143 !important; }.dataset-button.active, .case-tabs button.active { background: #173f35 !important; color: white !important; }.dataset-button small { opacity: .78; }.report-summary { display: grid; gap: 7px; margin: 14px 0 0; }.report-summary div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #edf0ed; padding-top: 7px; }.report-summary dt { color: #637068; }.report-summary dd { margin: 0; text-align: right; overflow-wrap: anywhere; }.gold-review-section { margin-top: 16px; }.case-tabs { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }.case-tabs button { background: #edf3ef; color: #285143; }.gold-review-form { display: grid; grid-template-columns: 160px 1fr 120px 1fr; gap: 9px; align-items: center; margin-top: 12px; }.gold-review-form textarea, .gold-review-form button { grid-column: 1 / -1; }.synthetic-inline { color: #875b0b; background: #fff6df; border-radius: 9px; padding: 10px; }
 @media (max-width: 850px) { .workbench-page { padding: 14px; }.hero { align-items: stretch; flex-direction: column; padding: 24px; }.grid { grid-template-columns: 1fr; }.projects-panel, .full-panel { grid-column: auto; }.form-row, .search-row { flex-direction: column; }.provider { min-width: 0; }.memory-grid, .sample-inputs, .diff-list article > div, .evaluation-grid, .gold-review-form { grid-template-columns: 1fr; } }
 </style>

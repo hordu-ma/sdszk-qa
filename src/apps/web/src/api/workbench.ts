@@ -141,6 +141,16 @@ export function listProjectVersions(projectId: number) {
   return request.get<unknown, ProjectVersion[]>(`/workbench/projects/${projectId}/versions`);
 }
 
+export function saveProjectVersion(
+  projectId: number,
+  content: Record<string, unknown>,
+) {
+  return request.post<unknown, ProjectVersion>(`/workbench/projects/${projectId}/versions`, {
+    content,
+    status: "draft",
+  });
+}
+
 export function compareVersions(projectId: number, fromVersion: number, toVersion: number) {
   return request.get<unknown, VersionDiff>(`/workbench/projects/${projectId}/versions/diff`, {
     params: { from_version: fromVersion, to_version: toVersion },

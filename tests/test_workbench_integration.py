@@ -465,6 +465,45 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
                 "diagnosis",
             }
 
+            source_content = versions.json()[0]["content"]
+            edited_content = {
+                **source_content,
+                "lesson_design": {
+                    **source_content["lesson_design"],
+                    "opening": "教师修改后的课堂导入",
+                },
+                "_trace": {
+                    "action": "teacher_edit",
+                    "source_version": 5,
+                    "edited_sections": ["lesson_design"],
+                    "edit_summary": "调整课堂导入",
+                },
+            }
+            edited_content.pop("diagnosis")
+            manual_version = await client.post(
+                f"/api/workbench/projects/{project_id}/versions",
+                json={"content": edited_content, "status": "draft"},
+                headers=headers,
+            )
+            assert manual_version.status_code == 201
+            assert manual_version.json()["version_number"] == 6
+            assert manual_version.json()["content"]["lesson_design"]["opening"] == (
+                "教师修改后的课堂导入"
+            )
+            assert "diagnosis" not in manual_version.json()["content"]
+            assert manual_version.json()["content"]["_trace"]["action"] == "teacher_edit"
+
+            manual_diff = await client.get(
+                f"/api/workbench/projects/{project_id}/versions/diff",
+                params={"from_version": 5, "to_version": 6},
+                headers=headers,
+            )
+            assert manual_diff.status_code == 200
+            assert {item["section"] for item in manual_diff.json()["changed_sections"]} >= {
+                "lesson_design",
+                "diagnosis",
+            }
+
             tasks = await client.get(
                 "/api/workbench/tasks", params={"project_id": project_id}, headers=headers
             )

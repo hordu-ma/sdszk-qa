@@ -14,7 +14,7 @@
 - 课型：议题式教学。
 - 样板主题：家国情怀与青年责任。
 - 核心议题默认值：青年如何把个人理想融入国家发展。
-- 闭环：依据对齐卡 → 目标—证据—任务蓝图 → 课时分块 → 形成性诊断 → `word-standard-v2` 结构化 Word 导出；界面只在前置成果存在时解锁下一步。
+- 闭环：依据对齐卡 → 目标—证据—任务蓝图 → 课时分块 → 教师结构化编辑 → 形成性诊断 → `word-standard-v2` 结构化 Word 导出；编辑保存为不可变新版本并清除旧诊断，界面只在前置成果存在时解锁下一步。
 - 诊断原则：只给证据、状态和修改建议，不给教师/学生总分、等级、排名或绩效结论。
 - Memory 原则：只注入用户在本次运行中显式勾选的对象；清除后不可用于新 SkillRun。
 - 模型与检索原则：固定运行时和模型 revision 仅作为工程候选；专业选型仍待专家金标评测。
@@ -72,7 +72,9 @@
 
 实施记录（2026-07-17，内部代理决策，自助 §0.5 优先级 4）：上述三维已从 `diagnose_artifact_handler` 内联逻辑抽离为**可配置诊断规则字典 v2（内部版）**，入口 `src/apps/api/services/diagnostic_rules.py`。每条 `DiagnosticRule` 声明 `rule_id`、维度、依赖样板小节、达标判定、证据与改进建议；新增维度只需 `register_diagnostic_rule` 注册，无需改动诊断编排。规则字典严守非评分约束：只产出 `aligned/needs_attention`，注册入口对评分/排名类词元（与 `tests/test_no_scoring_paths.py` 同口径）和重复注册做防护拦截，回归见 `tests/test_diagnostic_rules.py`。三维内容与适用范围仍待专家确认（补签清单，见《模拟信息替换台账》§2），本记录不改变 G0/G1 状态。
 
-部署记录（2026-07-19）：优先级 4 已以同一 API/Web 镜像 `stage1-diagnostic-rules-20260719-r1` 部署到 `luyun-int` 与 `luyun-demo`；数据库保持 `m2a3b4c5d678 (head)`。本轮同时修复 MinIO 健康检查端口未跟随双环境配置的问题，双环境 PostgreSQL、MinIO、API、Web 和三类 vLLM 均健康；规则注册、教师登录、真实 SSE、Tailnet HTTPS 和临时验证数据清理通过。发布前备份为 `/home/pgx/backups/luyun-sizheng/20260719-stage1-diagnostic-rules-predeploy/`。下一内部增量为工作台体验，不改变 G0/G1 状态。
+部署记录（2026-07-19）：优先级 4 已以同一 API/Web 镜像 `stage1-diagnostic-rules-20260719-r1` 部署到 `luyun-int` 与 `luyun-demo`；数据库保持 `m2a3b4c5d678 (head)`。本轮同时修复 MinIO 健康检查端口未跟随双环境配置的问题，双环境 PostgreSQL、MinIO、API、Web 和三类 vLLM 均健康；规则注册、教师登录、真实 SSE、Tailnet HTTPS 和临时验证数据清理通过。发布前备份为 `/home/pgx/backups/luyun-sizheng/20260719-stage1-diagnostic-rules-predeploy/`。
+
+工作台体验记录（2026-07-19，自助开发 §0.5 优先级 5 内部版）：纵向样板新增教学成果结构化专业编辑器，覆盖对齐卡、教学蓝图、学习任务、课时活动、评价证据和教师提示；保存沿用现有版本接口生成不可变新版本，保留原稿并记录 `teacher_edit` 来源追踪。教师编辑会清除旧诊断并阻止直接导出，保存后自动比较修改前后版本；未保存状态会锁定样板流水线，并在切换项目、离开路由和关闭页面时提示。工作台同时补齐跳转入口、显式表单标签、键盘焦点、状态播报和桌面优先布局。`luyun-int` 已部署 `stage1-workbench-ux-20260719-r1` 并通过自动 Chromium 回归及 Virtus 手动验证；`luyun-demo` 暂留上一稳定镜像，数据库无新迁移。该内部走查不等于真实教师可用性研究或 G0/G1 外部验收。
 
 ## 5. 检索与模型工程决策
 
