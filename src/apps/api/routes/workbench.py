@@ -67,6 +67,9 @@ from src.apps.api.schemas.workbench import (
     ModelAssetResponse,
     PinnedItemCreate,
     PinnedItemResponse,
+    ProfessionalInputOutput,
+    ProfessionalInputRequest,
+    ProfessionalInputResponse,
     ProjectCreate,
     ProjectResponse,
     ProjectVersionCreate,
@@ -394,6 +397,30 @@ async def run_retrieve_basis(
         insufficiency_reason=output.insufficiency_reason,
         retrieval_mode=output.retrieval_mode,
         citations=output.citations,
+    )
+
+
+@router.post(
+    "/skills/confirm-professional-input",
+    response_model=ProfessionalInputResponse,
+)
+async def run_confirm_professional_input(
+    data: ProfessionalInputRequest,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ProfessionalInputResponse:
+    run, output = await run_skill(
+        db,
+        skill_id="skill.confirm_professional_input",
+        user=current_user,
+        payload=data.model_dump(exclude={"memory_refs"}),
+        memory_refs=data.memory_refs,
+    )
+    assert isinstance(output, ProfessionalInputOutput)
+    return ProfessionalInputResponse(
+        skill_run_id=run.id,
+        skill_version=run.skill_version,
+        **output.model_dump(),
     )
 
 

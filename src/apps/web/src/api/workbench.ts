@@ -13,6 +13,8 @@ import type {
   ModelStatus,
   PinnedItem,
   ProjectVersion,
+  ProfessionalInputPayload,
+  ProfessionalInputResponse,
   RetrieveBasisResponse,
   SkillStepResponse,
   TaskRun,
@@ -149,6 +151,17 @@ export function saveProjectVersion(
     content,
     status: "draft",
   });
+}
+
+export function confirmProfessionalInput(
+  projectId: number,
+  data: ProfessionalInputPayload,
+  memoryRefs: MemoryRef[],
+) {
+  return request.post<unknown, ProfessionalInputResponse>(
+    "/workbench/skills/confirm-professional-input",
+    { project_id: projectId, ...data, memory_refs: memoryRefs },
+  );
 }
 
 export function compareVersions(projectId: number, fromVersion: number, toVersion: number) {

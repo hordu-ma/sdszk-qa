@@ -3,10 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { showConfirmDialog, showFailToast, showSuccessToast } from "vant";
 import ArtifactEditor from "../components/ArtifactEditor.vue";
+import ProfessionalInputPanel from "../components/ProfessionalInputPanel.vue";
 import {
   cancelTask,
   clearMemory,
   compareVersions,
+  confirmProfessionalInput,
   createAlignmentCard,
   createClassProfile,
   createEvaluationDataset,
@@ -55,6 +57,8 @@ import type {
   MemoryRef,
   ModelStatus,
   PinnedItem,
+  ProfessionalInputPayload,
+  ProfessionalInputResponse,
   ProjectVersion,
   SkillStepResponse,
   TaskRun,
@@ -86,6 +90,8 @@ const evaluationReport = ref<EvaluationDatasetReport | null>(null);
 const loading = ref(false);
 const editorSaving = ref(false);
 const editorDirty = ref(false);
+const professionalInputSaving = ref(false);
+const professionalInputDirty = ref(false);
 const query = ref("");
 const newProject = ref({ title: "", stage: "高中", course_type: "议题式" });
 const memoryForm = ref({
@@ -145,6 +151,15 @@ const hasAlignmentCard = computed(() => Boolean(latestVersionContent.value.align
 const hasDesignBlueprint = computed(() => Boolean(latestVersionContent.value.design_blueprint));
 const hasLessonDesign = computed(() => Boolean(latestVersionContent.value.lesson_design));
 const hasDiagnosis = computed(() => Boolean(latestVersionContent.value.diagnosis));
+const professionalInput = computed<Record<string, unknown>>(() => {
+  const value = latestVersionContent.value.professional_input;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+});
+const hasProfessionalInput = computed(() => Boolean(latestVersionContent.value.professional_input));
+const professionalInputReady = computed(() => professionalInput.value.ready_for_alignment === true);
+const hasUnsavedChanges = computed(() => editorDirty.value || professionalInputDirty.value);
 const canReview = computed(() => ["admin", "reviewer"].includes(userStore.userInfo?.role || ""));
 const hasMemory = computed(() => Boolean(
   preference.value || classProfiles.value.length || pinnedItems.value.length,
@@ -432,9 +447,41 @@ async function handleSaveArtifact(content: Record<string, unknown>) {
   }
 }
 
+async function handleConfirmProfessionalInput(payload: ProfessionalInputPayload) {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  professionalInputSaving.value = true;
+  const sourceVersion = versions.value[0].version_number;
+  try {
+    const result: ProfessionalInputResponse = await confirmProfessionalInput(
+      selectedProjectId.value,
+      payload,
+      selectedMemoryRefs.value,
+    );
+    await refreshProjectData();
+    diffForm.value = { from: sourceVersion, to: result.version_number };
+    versionDiff.value = await compareVersions(
+      selectedProjectId.value,
+      sourceVersion,
+      result.version_number,
+    );
+    sampleForm.value.topic = result.confirmed_input.topic;
+    sampleForm.value.core_question = result.confirmed_input.core_question;
+    sampleForm.value.basis_query = result.confirmed_input.course_basis
+      || result.confirmed_input.core_question;
+    professionalInputDirty.value = false;
+    if (result.ready_for_alignment) {
+      showSuccessToast(`专业输入已确认并保存为 v${result.version_number}`);
+    } else {
+      showFailToast("输入已保存，但仍有冲突或未确认假设");
+    }
+  } finally {
+    professionalInputSaving.value = false;
+  }
+}
+
 async function handleSelectProject(projectId: number) {
   if (projectId === selectedProjectId.value) return;
-  if (editorDirty.value) {
+  if (hasUnsavedChanges.value) {
     try {
       await showConfirmDialog({
         title: "放弃未保存修改？",
@@ -450,13 +497,13 @@ async function handleSelectProject(projectId: number) {
 }
 
 function handleBeforeUnload(event: BeforeUnloadEvent) {
-  if (!editorDirty.value) return;
+  if (!hasUnsavedChanges.value) return;
   event.preventDefault();
   event.returnValue = "";
 }
 
 onBeforeRouteLeave(async () => {
-  if (!editorDirty.value) return true;
+  if (!hasUnsavedChanges.value) return true;
   try {
     await showConfirmDialog({
       title: "离开工作台？",
@@ -634,7 +681,7 @@ onBeforeUnmount(() => {
   <main id="workbench-content" class="workbench-page" tabindex="-1">
     <header class="hero">
       <div>
-        <p class="eyebrow">阶段 1 · 可信底座与纵向样板</p>
+        <p class="eyebrow">阶段 1 可信底座 → 阶段 2 生产闭环</p>
         <h1>鲁韵教学工作台</h1>
         <p>创建教学项目、加工授权资料，并用可定位引用验证可信检索。</p>
       </div>
@@ -799,20 +846,30 @@ onBeforeUnmount(() => {
         </div>
       </article>
 
+      <ProfessionalInputPanel
+        :project="selectedProject || null"
+        :version="versions[0] || null"
+        :class-profiles="classProfiles"
+        :selected-profile-ids="selectedProfileIds"
+        :saving="professionalInputSaving"
+        @dirty-change="professionalInputDirty = $event"
+        @confirm="handleConfirmProfessionalInput"
+      />
+
       <article class="panel full-panel sample-panel">
-        <h2>6. 高中议题式纵向样板</h2>
-        <p class="hint">固定顺序：课程依据对齐卡 → 目标—证据—任务蓝图 → 课时分块 → 非评分诊断 → Word 导出。</p>
+        <h2>7. 高中议题式纵向样板</h2>
+        <p class="hint">阶段 2 路径：专业输入确认 → 课程依据对齐卡 → 目标—证据—任务蓝图 → 课时分块 → 非评分诊断 → Word 导出。旧项目仍可沿用阶段 1 路径。</p>
         <div class="sample-inputs">
           <label>样板主题<input v-model="sampleForm.topic" /></label>
           <label>核心议题<input v-model="sampleForm.core_question" /></label>
           <label>依据检索问题<input v-model="sampleForm.basis_query" /></label>
         </div>
         <div class="pipeline-actions">
-          <button :disabled="loading || editorDirty || !selectedProjectId" @click="runSampleStep('alignment')">1 对齐卡</button>
-          <button :disabled="loading || editorDirty || !selectedProjectId || !hasAlignmentCard" title="请先完成对齐卡" @click="runSampleStep('blueprint')">2 教学蓝图</button>
-          <button :disabled="loading || editorDirty || !selectedProjectId || !hasDesignBlueprint" title="请先完成教学蓝图" @click="runSampleStep('generate')">3 课时设计</button>
-          <button :disabled="loading || editorDirty || !selectedProjectId || !hasLessonDesign" title="请先完成课时设计并保存编辑" @click="runSampleStep('diagnose')">4 形成性诊断</button>
-          <button :disabled="loading || editorDirty || !selectedProjectId || !hasDiagnosis" title="请先完成形成性诊断" @click="handleExportArtifact">5 导出 Word</button>
+          <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || (hasProfessionalInput && !professionalInputReady)" title="阶段 2 项目需先完成专业输入确认" @click="runSampleStep('alignment')">1 对齐卡</button>
+          <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasAlignmentCard" title="请先完成对齐卡" @click="runSampleStep('blueprint')">2 教学蓝图</button>
+          <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasDesignBlueprint" title="请先完成教学蓝图" @click="runSampleStep('generate')">3 课时设计</button>
+          <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasLessonDesign" title="请先完成课时设计并保存编辑" @click="runSampleStep('diagnose')">4 形成性诊断</button>
+          <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasDiagnosis" title="请先完成形成性诊断" @click="handleExportArtifact">5 导出 Word</button>
         </div>
         <p v-if="selectedProjectId" class="workflow-progress" role="status" aria-live="polite">
           当前进度：对齐卡 {{ hasAlignmentCard ? "✓" : "○" }} · 教学蓝图 {{ hasDesignBlueprint ? "✓" : "○" }} ·
@@ -831,7 +888,7 @@ onBeforeUnmount(() => {
       </article>
 
       <article class="panel full-panel">
-        <h2>7. 版本差异</h2>
+        <h2>8. 版本差异</h2>
         <div class="diff-controls">
           <label>从
             <select v-model.number="diffForm.from">
@@ -857,7 +914,7 @@ onBeforeUnmount(() => {
       <article class="panel full-panel evaluation-panel">
         <div class="panel-title">
           <div>
-            <h2>8. G1 评测治理（工程就绪）</h2>
+            <h2>9. G1 评测治理（工程就绪）</h2>
             <p>正式数据集必须完成来源审核、双专家独立复核；有分歧时完成仲裁后才能冻结。</p>
           </div>
           <span v-if="evaluationReport" :class="['status', evaluationReport.ready_for_freeze ? 'approved' : 'pending']">

@@ -42,10 +42,13 @@ from src.apps.api.schemas.workbench import (
     GenerateSectionInput,
     GenerateSectionOutput,
     MemoryRef,
+    ProfessionalInputInput,
+    ProfessionalInputOutput,
     RetrieveBasisInput,
     RetrieveBasisOutput,
 )
 from src.apps.api.services.knowledge_service import retrieve_basis_handler
+from src.apps.api.services.professional_input_service import confirm_professional_input_handler
 from src.apps.api.services.vertical_sample_service import (
     alignment_card_handler,
     design_blueprint_handler,
@@ -291,6 +294,20 @@ register_skill(
         maturity="baseline",
         knowledge_scope="approved_project_documents",
         degradation_policy="explicit_insufficient_basis",
+    )
+)
+
+register_skill(
+    RegisteredSkill(
+        skill_id="skill.confirm_professional_input",
+        skill_version="1.0.0",
+        name="确认专业输入并检查显式冲突",
+        input_model=ProfessionalInputInput,
+        output_model=ProfessionalInputOutput,
+        handler=confirm_professional_input_handler,  # pyright: ignore[reportArgumentType]
+        maturity="vertical_sample",
+        rule_set_version="stage2-input-conflict-v1",
+        degradation_policy="save_assumptions_and_block_unresolved_conflicts",
     )
 )
 

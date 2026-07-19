@@ -281,6 +281,40 @@ export interface ProjectVersion {
   created_at: string;
 }
 
+export interface ProfessionalInputConflict {
+  conflict_id: string;
+  severity: "blocking" | "needs_confirmation";
+  field: string;
+  message: string;
+  resolution: string;
+}
+
+export interface ProfessionalInputPayload {
+  topic: string;
+  core_question: string;
+  course_basis: string;
+  class_context: string;
+  course_type: string;
+  lesson_minutes: number;
+  available_minutes: number;
+  teacher_intent: string;
+  available_resources: string;
+  assumptions_confirmed: boolean;
+}
+
+export interface ProfessionalInputResponse {
+  skill_run_id: number;
+  skill_id: "skill.confirm_professional_input";
+  skill_version: string;
+  confirmed_input: Omit<ProfessionalInputPayload, "assumptions_confirmed">;
+  conflicts: ProfessionalInputConflict[];
+  assumptions: string[];
+  assumptions_confirmed: boolean;
+  ready_for_alignment: boolean;
+  invalidated_sections: string[];
+  version_number: number;
+}
+
 export interface VersionDiff {
   project_id: number;
   from_version: number;

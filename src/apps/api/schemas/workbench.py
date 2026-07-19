@@ -91,6 +91,48 @@ class MemoryRef(BaseModel):
     memory_id: int
 
 
+class ProfessionalInputConflict(BaseModel):
+    conflict_id: str
+    severity: Literal["blocking", "needs_confirmation"]
+    field: str
+    message: str
+    resolution: str
+
+
+class ProfessionalInputInput(BaseModel):
+    project_id: int
+    topic: str = Field(min_length=2, max_length=200)
+    core_question: str = Field(min_length=2, max_length=500)
+    course_basis: str = Field(default="", max_length=2000)
+    class_context: str = Field(default="", max_length=2000)
+    course_type: str = Field(min_length=1, max_length=50)
+    lesson_minutes: int = Field(default=45, ge=20, le=180)
+    available_minutes: int = Field(default=45, ge=20, le=180)
+    teacher_intent: str = Field(min_length=2, max_length=1000)
+    available_resources: str = Field(default="", max_length=1000)
+    assumptions_confirmed: bool = False
+
+
+class ProfessionalInputOutput(BaseModel):
+    confirmed_input: dict
+    conflicts: list[ProfessionalInputConflict]
+    assumptions: list[str]
+    assumptions_confirmed: bool
+    ready_for_alignment: bool
+    invalidated_sections: list[str]
+    version_number: int
+
+
+class ProfessionalInputRequest(ProfessionalInputInput):
+    memory_refs: list[MemoryRef] = Field(default_factory=list, max_length=10)
+
+
+class ProfessionalInputResponse(ProfessionalInputOutput):
+    skill_run_id: int
+    skill_id: str = "skill.confirm_professional_input"
+    skill_version: str
+
+
 class RetrieveBasisRequest(BaseModel):
     project_id: int
     query: str = Field(min_length=2, max_length=500)

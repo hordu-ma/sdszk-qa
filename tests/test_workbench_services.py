@@ -109,6 +109,7 @@ def test_registry_registers_retrieve_basis_baseline() -> None:
 def test_registry_contains_vertical_sample_chain() -> None:
     assert list(SKILL_REGISTRY) == [
         "skill.retrieve_basis",
+        "skill.confirm_professional_input",
         "skill.alignment_card",
         "skill.design_blueprint",
         "skill.generate_section",

@@ -504,6 +504,80 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
                 "diagnosis",
             }
 
+            blocked_input = await client.post(
+                "/api/workbench/skills/confirm-professional-input",
+                json={
+                    "project_id": project_id,
+                    "topic": "高中家国情怀议题式教学",
+                    "core_question": "青年如何把个人理想融入国家发展",
+                    "course_basis": "课程标准要求形成有依据的价值判断。",
+                    "class_context": "高一3班，45人，可开展小组讨论。",
+                    "course_type": "议题式",
+                    "lesson_minutes": 60,
+                    "available_minutes": 45,
+                    "teacher_intent": "通过材料研读和讨论形成判断。",
+                    "available_resources": "普通教室，多媒体可用。",
+                },
+                headers=headers,
+            )
+            assert blocked_input.status_code == 200
+            assert blocked_input.json()["version_number"] == 7
+            assert blocked_input.json()["ready_for_alignment"] is False
+            assert {item["conflict_id"] for item in blocked_input.json()["conflicts"]} == {
+                "lesson_time_exceeds_available"
+            }
+            assert set(blocked_input.json()["invalidated_sections"]) == {
+                "alignment_card",
+                "design_blueprint",
+                "lesson_design",
+            }
+            blocked_alignment = await client.post(
+                "/api/workbench/skills/alignment-card",
+                json={
+                    "project_id": project_id,
+                    "topic": "高中家国情怀议题式教学",
+                    "core_question": "青年如何把个人理想融入国家发展",
+                    "basis_query": "家国情怀教学目标",
+                },
+                headers=headers,
+            )
+            assert blocked_alignment.status_code == 409
+            assert blocked_alignment.json()["error_code"] == "professional_input_not_ready"
+
+            ready_input = await client.post(
+                "/api/workbench/skills/confirm-professional-input",
+                json={
+                    "project_id": project_id,
+                    "topic": "高中家国情怀议题式教学",
+                    "core_question": "青年如何把个人理想融入国家发展",
+                    "course_basis": "",
+                    "class_context": "",
+                    "course_type": "议题式",
+                    "lesson_minutes": 45,
+                    "available_minutes": 45,
+                    "teacher_intent": "通过材料研读和讨论形成判断。",
+                    "available_resources": "",
+                    "assumptions_confirmed": True,
+                },
+                headers=headers,
+            )
+            assert ready_input.status_code == 200
+            assert ready_input.json()["version_number"] == 8
+            assert ready_input.json()["ready_for_alignment"] is True
+            assert len(ready_input.json()["assumptions"]) == 3
+            assert ready_input.json()["confirmed_input"]["topic"] == (
+                "高中家国情怀议题式教学"
+            )
+            versions_after_input = await client.get(
+                f"/api/workbench/projects/{project_id}/versions", headers=headers
+            )
+            latest_input_content = versions_after_input.json()[0]["content"]
+            assert latest_input_content["professional_input"]["ready_for_alignment"] is True
+            assert "alignment_card" not in latest_input_content
+            assert latest_input_content["_trace"]["skill_id"] == (
+                "skill.confirm_professional_input"
+            )
+
             tasks = await client.get(
                 "/api/workbench/tasks", params={"project_id": project_id}, headers=headers
             )
@@ -649,6 +723,7 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
             assert skills.status_code == 200
             assert [item["skill_id"] for item in skills.json()] == [
                 "skill.retrieve_basis",
+                "skill.confirm_professional_input",
                 "skill.alignment_card",
                 "skill.design_blueprint",
                 "skill.generate_section",

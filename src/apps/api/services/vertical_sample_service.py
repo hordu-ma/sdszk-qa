@@ -85,6 +85,15 @@ async def alignment_card_handler(
 ) -> AlignmentCardOutput:
     project, source = await _latest_version(db, payload.project_id, user.id)
     run.project_id = project.id
+    professional_input = source.content.get("professional_input")
+    if isinstance(professional_input, dict) and not professional_input.get(
+        "ready_for_alignment"
+    ):
+        raise BusinessError(
+            "专业输入仍有冲突或未确认假设，请先重新检查",
+            status_code=409,
+            error_code="professional_input_not_ready",
+        )
     search_result = await search_chunks(
         db,
         project_id=project.id,

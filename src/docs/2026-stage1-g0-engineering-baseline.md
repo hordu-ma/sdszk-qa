@@ -151,6 +151,13 @@ make harness-full
 - 引用精细化：段落/PDF 页码定位、资料有效期过滤、两级资料不足判定（`no_candidates`/`low_relevance`），`skill.retrieve_basis` v1.2.0，迁移 `m2a3b4c5d678`。
 - 发布 `stage1-selfserve-rag-20260717-r1` 已完成 `luyun-int` 验收、回滚/恢复演练和 `luyun-demo` 同镜像晋级。全部为内部工程产物，不构成专家验收，不改变阶段/G 门状态。
 
+## 7.4 M1-int 内部门收口（2026-07-19）
+
+- 结论：**M1-int 通过**。自助开发 §0.5 优先级 1–5 的内部代理产物、内部金标 v0、内部阈值、专业编辑走查、无评分防护和运行态证据已闭合；该结论只授权继续阶段 2 内部工程开发，不等于 G1 通过。
+- 晋级：`stage1-workbench-ux-20260719-r1` 已从 `luyun-int` 以相同 API/Web 镜像 ID `a74d09eff3f3...` / `77a2b532290e...` 晋级 `luyun-demo`。Demo PostgreSQL 保持 `m2a3b4c5d678 (head)`，Tailnet `:8443`、教师登录、vLLM 状态和真实页面渲染通过。
+- 回滚：Demo 已实际恢复 `stage1-diagnostic-rules-20260719-r1` 并通过健康检查，再恢复当前工作台镜像；发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260719-m1-int-workbench-promotion/`。
+- 边界：真实授权资料、真实专家金标、模型专业冻结、真实教师可用性研究、客户/专家签字和 G0/G1 仍在补签清单。详细证据见《阶段 1 M1-int 内部门收口记录》。
+
 ## 8. 仍需外部签字的 G0 输入（补签清单）
 
 - 专家确认教学结构、三个诊断维度及后续规则字典。
