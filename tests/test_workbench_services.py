@@ -117,6 +117,11 @@ def test_registry_contains_vertical_sample_chain() -> None:
         "skill.export_artifact",
     ]
     assert all(item.degradation_policy for item in SKILL_REGISTRY.values())
+    assert SKILL_REGISTRY["skill.generate_section"].skill_version == "1.1.0"
+    assert (
+        SKILL_REGISTRY["skill.generate_section"].rule_set_version
+        == "stage2-structured-gen-v1"
+    )
 
 
 def test_char_vector_similarity_prefers_related_text() -> None:
@@ -159,6 +164,42 @@ def test_build_docx_contains_required_ooxml_parts() -> None:
                 ],
                 "teacher_notes": ["保留教师确认点"],
             },
+            "teaching_artifacts": {
+                "task_sheet": {
+                    "title": "家国情怀课堂任务单",
+                    "instructions": "引用依据完成任务",
+                    "tasks": [
+                        {
+                            "title": "研读任务",
+                            "evidence": "研读记录",
+                            "submission": "观点与依据",
+                        }
+                    ],
+                },
+                "rubric": {
+                    "title": "非评分观察量规（不计分、不排名）",
+                    "criteria": [
+                        {
+                            "dimension": "依据对应",
+                            "aligned_description": "能够定位依据",
+                            "attention_prompt": "继续追问来源",
+                        }
+                    ],
+                },
+                "board_plan": {
+                    "title": "板书设计",
+                    "sections": [{"heading": "观点", "content": ["观点与依据"]}],
+                },
+                "slide_outline": {
+                    "slides": [{"title": "情境导入", "purpose": "进入议题"}]
+                },
+                "practice_task": {
+                    "title": "校园实践任务",
+                    "scenario": "校园真实情境",
+                    "steps": ["提出方案"],
+                    "reflection": "说明修改依据",
+                },
+            },
             "diagnosis": {
                 "conclusion": "可进入教师确认",
                 "items": [
@@ -179,6 +220,10 @@ def test_build_docx_contains_required_ooxml_parts() -> None:
         assert "高中议题式教学样板" in document
         assert "教师活动" in document
         assert "改进建议" in document
+        assert "课堂任务单" in document
+        assert "非评分观察量规" in document
+        assert "课件提纲" in document
+        assert "实践任务" in document
         assert "<w:tbl>" in document
         assert "{'title'" not in document
 

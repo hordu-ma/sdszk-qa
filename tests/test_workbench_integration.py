@@ -482,7 +482,7 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             edited_content.pop("diagnosis")
             manual_version = await client.post(
                 f"/api/workbench/projects/{project_id}/versions",
-                json={"content": edited_content, "status": "draft"},
+                json={"content": edited_content, "status": "draft", "source_version": 5},
                 headers=headers,
             )
             assert manual_version.status_code == 201
@@ -629,6 +629,261 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             await db.execute(delete(User).where(User.id == user_id))
             await db.execute(delete(User).where(User.id == reviewer_id))
             await db.execute(delete(User).where(User.id == arbitrator_id))
+            await db.commit()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_wp22_structured_generation_lock_restore_and_artifacts() -> None:
+    """WP2.2：锁定、局部重生成、多成果、字段差异和恢复形成不可变闭环。"""
+    await _ensure_schema()
+
+    username = f"wp22_{uuid4().hex[:8]}"
+    password = "password123"
+    user = User(
+        username=username,
+        hashed_password=bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+        full_name="WP2.2 集成验证",
+        role="teacher",
+        is_active=True,
+    )
+    async with AsyncSessionLocal() as db:
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        user_id = user.id
+
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            login = await client.post(
+                "/api/auth/login", json={"username": username, "password": password}
+            )
+            headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+            project = await client.post(
+                "/api/workbench/projects",
+                json={"title": "WP2.2 结构化闭环", "stage": "高中", "course_type": "议题式"},
+                headers=headers,
+            )
+            project_id = project.json()["id"]
+            initial_content = {
+                "alignment_card": {
+                    "topic": "青年责任",
+                    "core_question": "青年如何承担时代责任",
+                    "objectives": ["形成有依据的价值判断"],
+                    "citations": [],
+                },
+                "design_blueprint": {
+                    "core_question": "青年如何承担时代责任",
+                    "objectives": ["形成有依据的价值判断"],
+                    "evidence": ["观点与依据记录"],
+                    "learning_tasks": [
+                        {"title": "材料研读", "minutes": 20, "evidence": "研读记录"},
+                        {"title": "观点讨论", "minutes": 25, "evidence": "讨论记录"},
+                    ],
+                },
+                "lesson_design": {
+                    "section_name": "课时设计",
+                    "opening": "从青年榜样故事导入。",
+                    "activities": [
+                        {
+                            "sequence": 1,
+                            "title": "材料研读",
+                            "minutes": 20,
+                            "teacher_action": "提供材料",
+                            "student_action": "提取观点",
+                            "evidence": "研读记录",
+                        }
+                    ],
+                    "assessment_evidence": ["观点与依据记录"],
+                    "teacher_notes": ["追问依据来源"],
+                },
+                "diagnosis": {"conclusion": "旧诊断", "items": [], "blocking_issues": []},
+            }
+            seeded = await client.post(
+                f"/api/workbench/projects/{project_id}/versions",
+                json={"content": initial_content, "source_version": 1},
+                headers=headers,
+            )
+            assert seeded.status_code == 201
+            seeded_version = seeded.json()["version_number"]
+
+            locked = await client.post(
+                f"/api/workbench/projects/{project_id}/versions/locks",
+                json={
+                    "source_version": seeded_version,
+                    "locked_paths": ["lesson_design.opening"],
+                },
+                headers=headers,
+            )
+            assert locked.status_code == 201
+            locked_version = locked.json()["version_number"]
+            assert locked.json()["content"]["editor_state"]["locked_paths"] == [
+                "lesson_design.opening"
+            ]
+
+            blocked = await client.post(
+                "/api/workbench/skills/generate-section",
+                json={
+                    "project_id": project_id,
+                    "artifact_kind": "lesson_design",
+                    "target_path": "lesson_design.opening",
+                    "guidance": "改为问题导入",
+                    "source_version": locked_version,
+                },
+                headers=headers,
+            )
+            assert blocked.status_code == 409
+            assert blocked.json()["error_code"] == "target_locked"
+
+            regenerated = await client.post(
+                "/api/workbench/skills/generate-section",
+                json={
+                    "project_id": project_id,
+                    "artifact_kind": "lesson_design",
+                    "target_path": "lesson_design.activities.0.evidence",
+                    "guidance": "补充可定位材料编号",
+                    "source_version": locked_version,
+                },
+                headers=headers,
+            )
+            assert regenerated.status_code == 200
+            regenerated_version = regenerated.json()["version_number"]
+            assert regenerated.json()["changed_paths"] == [
+                "lesson_design.activities.0.evidence"
+            ]
+            versions = await client.get(
+                f"/api/workbench/projects/{project_id}/versions", headers=headers
+            )
+            regenerated_content = versions.json()[0]["content"]
+            assert regenerated_content["lesson_design"]["opening"] == (
+                "从青年榜样故事导入。"
+            )
+            assert "补充可定位材料编号" in regenerated_content["lesson_design"][
+                "activities"
+            ][0]["evidence"]
+            assert "diagnosis" not in regenerated_content
+
+            diff = await client.get(
+                f"/api/workbench/projects/{project_id}/versions/diff",
+                params={"from_version": locked_version, "to_version": regenerated_version},
+                headers=headers,
+            )
+            assert diff.status_code == 200
+            field_paths = {item["path"] for item in diff.json()["field_changes"]}
+            assert "lesson_design.activities.0.evidence" in field_paths
+            assert "diagnosis" in field_paths
+            assert "lesson_design.opening" not in field_paths
+
+            stale = await client.post(
+                "/api/workbench/skills/generate-section",
+                json={
+                    "project_id": project_id,
+                    "target_path": "lesson_design.teacher_notes",
+                    "source_version": locked_version,
+                },
+                headers=headers,
+            )
+            assert stale.status_code == 409
+            assert stale.json()["error_code"] == "source_version_conflict"
+
+            current_version = regenerated_version
+            artifact_kinds = [
+                "task_sheet",
+                "rubric",
+                "board_plan",
+                "slide_outline",
+                "practice_task",
+            ]
+            for artifact_kind in artifact_kinds:
+                artifact = await client.post(
+                    "/api/workbench/skills/generate-section",
+                    json={
+                        "project_id": project_id,
+                        "artifact_kind": artifact_kind,
+                        "source_version": current_version,
+                    },
+                    headers=headers,
+                )
+                assert artifact.status_code == 200
+                assert artifact.json()["artifact_kind"] == artifact_kind
+                current_version = artifact.json()["version_number"]
+
+            artifact_versions = await client.get(
+                f"/api/workbench/projects/{project_id}/versions", headers=headers
+            )
+            artifact_content = artifact_versions.json()[0]["content"]
+            assert set(artifact_content["teaching_artifacts"]) == set(artifact_kinds)
+            assert "不计分、不排名" in artifact_content["teaching_artifacts"]["rubric"][
+                "title"
+            ]
+            all_artifacts_version = current_version
+
+            artifact_lock = await client.post(
+                f"/api/workbench/projects/{project_id}/versions/locks",
+                json={
+                    "source_version": current_version,
+                    "locked_paths": [
+                        "lesson_design.opening",
+                        "teaching_artifacts.task_sheet",
+                    ],
+                },
+                headers=headers,
+            )
+            current_version = artifact_lock.json()["version_number"]
+            full_regeneration = await client.post(
+                "/api/workbench/skills/generate-section",
+                json={
+                    "project_id": project_id,
+                    "artifact_kind": "lesson_design",
+                    "guidance": "优化活动衔接",
+                    "source_version": current_version,
+                },
+                headers=headers,
+            )
+            assert full_regeneration.status_code == 200
+            current_version = full_regeneration.json()["version_number"]
+            after_full = await client.get(
+                f"/api/workbench/projects/{project_id}/versions", headers=headers
+            )
+            after_full_content = after_full.json()[0]["content"]
+            assert after_full_content["lesson_design"]["opening"] == (
+                "从青年榜样故事导入。"
+            )
+            assert set(after_full_content["teaching_artifacts"]) == {"task_sheet"}
+
+            restored = await client.post(
+                f"/api/workbench/projects/{project_id}/versions/restore",
+                json={
+                    "source_version": current_version,
+                    "restore_version": all_artifacts_version,
+                },
+                headers=headers,
+            )
+            assert restored.status_code == 201
+            assert set(restored.json()["content"]["teaching_artifacts"]) == set(
+                artifact_kinds
+            )
+            assert restored.json()["content"]["_trace"]["action"] == "restore_version"
+
+            tampered = restored.json()["content"]
+            tampered["lesson_design"]["opening"] = "试图覆盖锁定导入"
+            rejected_edit = await client.post(
+                f"/api/workbench/projects/{project_id}/versions",
+                json={
+                    "content": tampered,
+                    "source_version": restored.json()["version_number"],
+                },
+                headers=headers,
+            )
+            assert rejected_edit.status_code == 409
+            assert rejected_edit.json()["error_code"] == "locked_content_changed"
+    finally:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(TeachingProject).where(TeachingProject.owner_id == user_id)
+            )
+            await db.execute(delete(User).where(User.id == user_id))
             await db.commit()
 
 

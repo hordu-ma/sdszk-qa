@@ -23,10 +23,9 @@ from src.apps.api.schemas.workbench import (
     DiagnoseArtifactOutput,
     ExportArtifactInput,
     ExportArtifactOutput,
-    GenerateSectionInput,
-    GenerateSectionOutput,
     VersionDiffResponse,
     VersionDiffSection,
+    VersionFieldChange,
 )
 from src.apps.api.services.diagnostic_rules import evaluate_diagnostic_rules
 from src.apps.api.services.knowledge_service import checksum, put_object, search_chunks
@@ -62,6 +61,23 @@ async def _save_step(
     skill_run: SkillRun,
 ) -> ProjectVersion:
     content = deepcopy(source.content)
+    invalidated_by_step = {
+        "alignment_card": (
+            "design_blueprint",
+            "lesson_design",
+            "diagnosis",
+            "teaching_artifacts",
+            "editor_state",
+        ),
+        "design_blueprint": (
+            "lesson_design",
+            "diagnosis",
+            "teaching_artifacts",
+            "editor_state",
+        ),
+    }
+    for section in invalidated_by_step.get(step, ()):
+        content.pop(section, None)
     content[step] = payload
     content["_trace"] = {
         "skill_run_id": skill_run.id,
@@ -190,47 +206,6 @@ async def design_blueprint_handler(
         skill_run=run,
     )
     return DesignBlueprintOutput(**draft, version_number=version.version_number)
-
-
-async def generate_section_handler(
-    db: AsyncSession, user: User, payload: GenerateSectionInput, run: SkillRun
-) -> GenerateSectionOutput:
-    project, source = await _latest_version(db, payload.project_id, user.id)
-    run.project_id = project.id
-    blueprint = _require_section(source.content, "design_blueprint", "请先完成目标—证据—任务蓝图")
-    tasks = list(blueprint.get("learning_tasks", []))
-    activities = [
-        {
-            "sequence": index,
-            "title": str(task.get("title", f"学习任务 {index}")),
-            "minutes": int(task.get("minutes", 0)),
-            "teacher_action": "提供问题、审核资料片段和追问支架",
-            "student_action": "形成观点、引用依据、回应同伴并修正表达",
-            "evidence": str(task.get("evidence", "课堂过程证据")),
-        }
-        for index, task in enumerate(tasks, 1)
-    ]
-    draft = {
-        "section_name": payload.section_name,
-        "opening": f"以“{blueprint['core_question']}”为主问题进入课堂探究。",
-        "activities": activities,
-        "assessment_evidence": list(blueprint.get("evidence", [])),
-        "teacher_notes": [
-            "所有结论均要求回到已审核资料或课堂事实",
-            "允许学生保留不同观点，但必须说明依据",
-            payload.guidance or "根据现场生成性问题调整追问，不改变核心目标",
-        ],
-    }
-    version = await _save_step(
-        db,
-        project=project,
-        source=source,
-        user_id=user.id,
-        step="lesson_design",
-        payload=draft,
-        skill_run=run,
-    )
-    return GenerateSectionOutput(**draft, version_number=version.version_number)
 
 
 async def diagnose_artifact_handler(
@@ -399,6 +374,78 @@ def build_docx(project: TeachingProject, content: dict) -> bytes:
         ]
     )
 
+    artifacts = content.get("teaching_artifacts", {})
+    if isinstance(artifacts, dict) and artifacts:
+        parts.append(_paragraph("配套教学成果", style="Heading1"))
+        task_sheet = artifacts.get("task_sheet", {})
+        if isinstance(task_sheet, dict):
+            parts.extend(
+                [
+                    _paragraph("课堂任务单", style="Heading2"),
+                    _paragraph(task_sheet.get("title", "课堂任务单"), bold=True),
+                    _paragraph(task_sheet.get("instructions", "")),
+                    _table(
+                        ["任务", "证据要求", "提交内容"],
+                        [
+                            [
+                                item.get("title", ""),
+                                item.get("evidence", ""),
+                                item.get("submission", ""),
+                            ]
+                            for item in task_sheet.get("tasks", [])
+                            if isinstance(item, dict)
+                        ],
+                    ),
+                ]
+            )
+        rubric = artifacts.get("rubric", {})
+        if isinstance(rubric, dict):
+            parts.extend(
+                [
+                    _paragraph("非评分观察量规", style="Heading2"),
+                    _paragraph(rubric.get("title", "非评分观察量规"), bold=True),
+                    _table(
+                        ["观察维度", "符合表现", "继续追问"],
+                        [
+                            [
+                                item.get("dimension", ""),
+                                item.get("aligned_description", ""),
+                                item.get("attention_prompt", ""),
+                            ]
+                            for item in rubric.get("criteria", [])
+                            if isinstance(item, dict)
+                        ],
+                    ),
+                ]
+            )
+        board_plan = artifacts.get("board_plan", {})
+        if isinstance(board_plan, dict):
+            parts.append(_paragraph("板书设计", style="Heading2"))
+            parts.append(_paragraph(board_plan.get("title", "板书设计"), bold=True))
+            for section in board_plan.get("sections", []):
+                if isinstance(section, dict):
+                    parts.append(_paragraph(section.get("heading", "板书节点"), bold=True))
+                    parts.extend(_bullet(item) for item in section.get("content", []))
+        slide_outline = artifacts.get("slide_outline", {})
+        if isinstance(slide_outline, dict):
+            parts.append(_paragraph("课件提纲", style="Heading2"))
+            parts.extend(
+                _bullet(f"{item.get('title', '')}：{item.get('purpose', '')}")
+                for item in slide_outline.get("slides", [])
+                if isinstance(item, dict)
+            )
+        practice_task = artifacts.get("practice_task", {})
+        if isinstance(practice_task, dict):
+            parts.extend(
+                [
+                    _paragraph("实践任务", style="Heading2"),
+                    _paragraph(practice_task.get("title", "实践任务"), bold=True),
+                    _paragraph(practice_task.get("scenario", "")),
+                    *[_bullet(item) for item in practice_task.get("steps", [])],
+                    _paragraph(f"反思要求：{practice_task.get('reflection', '')}"),
+                ]
+            )
+
     status_labels = {"aligned": "符合", "needs_attention": "需关注"}
     diagnosis_items = diagnosis.get("items", [])
     parts.extend(
@@ -534,4 +581,69 @@ async def diff_versions(
         from_version=from_version,
         to_version=to_version,
         changed_sections=changed,
+        field_changes=_diff_fields(before, after),
     )
+
+
+def _diff_fields(before: object, after: object, path: str = "") -> list[VersionFieldChange]:
+    """递归生成字段级差异；列表按稳定索引展开。"""
+    if isinstance(before, dict) and isinstance(after, dict):
+        changes: list[VersionFieldChange] = []
+        for key in sorted((set(before) | set(after)) - ({"_trace"} if not path else set())):
+            child_path = f"{path}.{key}" if path else key
+            if key not in before:
+                changes.append(
+                    VersionFieldChange(
+                        path=child_path,
+                        change_type="added",
+                        before=None,
+                        after=after[key],
+                    )
+                )
+            elif key not in after:
+                changes.append(
+                    VersionFieldChange(
+                        path=child_path,
+                        change_type="removed",
+                        before=before[key],
+                        after=None,
+                    )
+                )
+            else:
+                changes.extend(_diff_fields(before[key], after[key], child_path))
+        return changes
+    if isinstance(before, list) and isinstance(after, list):
+        changes = []
+        for index in range(max(len(before), len(after))):
+            child_path = f"{path}.{index}"
+            if index >= len(before):
+                changes.append(
+                    VersionFieldChange(
+                        path=child_path,
+                        change_type="added",
+                        before=None,
+                        after=after[index],
+                    )
+                )
+            elif index >= len(after):
+                changes.append(
+                    VersionFieldChange(
+                        path=child_path,
+                        change_type="removed",
+                        before=before[index],
+                        after=None,
+                    )
+                )
+            else:
+                changes.extend(_diff_fields(before[index], after[index], child_path))
+        return changes
+    if before == after:
+        return []
+    return [
+        VersionFieldChange(
+            path=path,
+            change_type="changed",
+            before=before,
+            after=after,
+        )
+    ]

@@ -27,6 +27,7 @@ class ProjectResponse(BaseModel):
 class ProjectVersionCreate(BaseModel):
     content: dict = Field(default_factory=dict)
     status: str = Field(default="draft", pattern="^(draft|pending_confirmation|completed)$")
+    source_version: int = Field(ge=1)
 
 
 class ProjectVersionResponse(BaseModel):
@@ -39,6 +40,16 @@ class ProjectVersionResponse(BaseModel):
     content: dict
     created_by: int
     created_at: datetime
+
+
+class ProjectVersionLockUpdate(BaseModel):
+    source_version: int = Field(ge=1)
+    locked_paths: list[str] = Field(default_factory=list, max_length=50)
+
+
+class ProjectVersionRestore(BaseModel):
+    source_version: int = Field(ge=1)
+    restore_version: int = Field(ge=1)
 
 
 class DocumentResponse(BaseModel):
@@ -496,14 +507,28 @@ class GenerateSectionInput(BaseModel):
     project_id: int
     section_name: str = Field(default="课时设计", min_length=2, max_length=100)
     guidance: str = Field(default="", max_length=1000)
+    artifact_kind: Literal[
+        "lesson_design",
+        "task_sheet",
+        "rubric",
+        "board_plan",
+        "slide_outline",
+        "practice_task",
+    ] = "lesson_design"
+    target_path: str | None = Field(default=None, min_length=2, max_length=200)
+    source_version: int | None = Field(default=None, ge=1)
 
 
 class GenerateSectionOutput(BaseModel):
+    artifact_kind: str = "lesson_design"
     section_name: str
-    opening: str
-    activities: list[dict]
-    assessment_evidence: list[str]
-    teacher_notes: list[str]
+    opening: str = ""
+    activities: list[dict] = Field(default_factory=list)
+    assessment_evidence: list[str] = Field(default_factory=list)
+    teacher_notes: list[str] = Field(default_factory=list)
+    content: dict = Field(default_factory=dict)
+    changed_paths: list[str] = Field(default_factory=list)
+    preserved_locked_paths: list[str] = Field(default_factory=list)
     version_number: int
 
 
@@ -574,8 +599,16 @@ class VersionDiffSection(BaseModel):
     after: object | None
 
 
+class VersionFieldChange(BaseModel):
+    path: str
+    change_type: Literal["added", "removed", "changed"]
+    before: object | None
+    after: object | None
+
+
 class VersionDiffResponse(BaseModel):
     project_id: int
     from_version: int
     to_version: int
     changed_sections: list[VersionDiffSection]
+    field_changes: list[VersionFieldChange]

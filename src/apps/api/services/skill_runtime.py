@@ -52,12 +52,14 @@ from src.apps.api.services.professional_input_service import (
     RULE_SET_VERSION as PROFESSIONAL_INPUT_RULE_SET_VERSION,
 )
 from src.apps.api.services.professional_input_service import confirm_professional_input_handler
+from src.apps.api.services.structured_generation_service import (
+    generate_structured_content_handler,
+)
 from src.apps.api.services.vertical_sample_service import (
     alignment_card_handler,
     design_blueprint_handler,
     diagnose_artifact_handler,
     export_artifact_handler,
-    generate_section_handler,
 )
 
 SkillHandler = Callable[[AsyncSession, User, BaseModel, SkillRun], Awaitable[BaseModel]]
@@ -345,14 +347,14 @@ register_skill(
 register_skill(
     RegisteredSkill(
         skill_id="skill.generate_section",
-        skill_version="1.0.0",
-        name="生成课时设计分块",
+        skill_version="1.1.0",
+        name="结构化生成、局部重生成与多成果派生",
         input_model=GenerateSectionInput,
         output_model=GenerateSectionOutput,
-        handler=generate_section_handler,  # pyright: ignore[reportArgumentType]
+        handler=generate_structured_content_handler,  # pyright: ignore[reportArgumentType]
         maturity="vertical_sample",
-        rule_set_version="high-school-inquiry-v1",
-        degradation_policy="require_design_blueprint",
+        rule_set_version="stage2-structured-gen-v1",
+        degradation_policy="require_blueprint_and_preserve_locked_paths",
     )
 )
 

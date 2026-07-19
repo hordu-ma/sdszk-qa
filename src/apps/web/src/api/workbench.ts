@@ -21,6 +21,8 @@ import type {
   TeachingProject,
   UserPreference,
   VersionDiff,
+  StructuredGenerationResponse,
+  TeachingArtifactKind,
 } from "../types/api";
 
 export function listProjects() {
@@ -158,11 +160,35 @@ export function listProjectVersions(projectId: number) {
 export function saveProjectVersion(
   projectId: number,
   content: Record<string, unknown>,
+  sourceVersion: number,
 ) {
   return request.post<unknown, ProjectVersion>(`/workbench/projects/${projectId}/versions`, {
     content,
     status: "draft",
+    source_version: sourceVersion,
   });
+}
+
+export function updateProjectVersionLocks(
+  projectId: number,
+  sourceVersion: number,
+  lockedPaths: string[],
+) {
+  return request.post<unknown, ProjectVersion>(
+    `/workbench/projects/${projectId}/versions/locks`,
+    { source_version: sourceVersion, locked_paths: lockedPaths },
+  );
+}
+
+export function restoreProjectVersion(
+  projectId: number,
+  sourceVersion: number,
+  restoreVersion: number,
+) {
+  return request.post<unknown, ProjectVersion>(
+    `/workbench/projects/${projectId}/versions/restore`,
+    { source_version: sourceVersion, restore_version: restoreVersion },
+  );
 }
 
 export function confirmProfessionalInput(
@@ -200,13 +226,28 @@ export function createDesignBlueprint(projectId: number, memoryRefs: MemoryRef[]
   });
 }
 
-export function generateSection(projectId: number, memoryRefs: MemoryRef[]) {
-  return request.post<unknown, SkillStepResponse>("/workbench/skills/generate-section", {
+export function generateSection(
+  projectId: number,
+  memoryRefs: MemoryRef[],
+  options: {
+    artifact_kind?: TeachingArtifactKind;
+    target_path?: string;
+    guidance?: string;
+    source_version?: number;
+  } = {},
+) {
+  return request.post<unknown, StructuredGenerationResponse>(
+    "/workbench/skills/generate-section",
+    {
     project_id: projectId,
     section_name: "课时设计",
-    guidance: "保留教师确认点，突出依据引用与课堂证据",
+    guidance: options.guidance || "保留教师确认点，突出依据引用与课堂证据",
+    artifact_kind: options.artifact_kind || "lesson_design",
+    target_path: options.target_path,
+    source_version: options.source_version,
     memory_refs: memoryRefs,
-  });
+    },
+  );
 }
 
 export function diagnoseArtifact(projectId: number, memoryRefs: MemoryRef[]) {

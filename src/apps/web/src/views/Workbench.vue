@@ -38,12 +38,14 @@ import {
   importEvaluationCases,
   reviewDocument,
   reviewEvaluationDataset,
+  restoreProjectVersion,
   retrieveBasis,
   retryTask,
   runEvaluationDataset,
   saveProjectVersion,
   savePreference,
   submitEvaluationCaseReview,
+  updateProjectVersionLocks,
   uploadDocument,
 } from "../api/workbench";
 import type {
@@ -63,6 +65,7 @@ import type {
   ProjectVersion,
   SkillStepResponse,
   TaskRun,
+  TeachingArtifactKind,
   TeachingProject,
   UserPreference,
   VersionDiff,
@@ -426,6 +429,7 @@ async function runSampleStep(step: "alignment" | "blueprint" | "generate" | "dia
       latestStep.value = await generateSection(
         selectedProjectId.value,
         selectedMemoryRefs.value,
+        { source_version: versions.value[0]?.version_number },
       );
     } else {
       latestStep.value = await diagnoseArtifact(
@@ -457,7 +461,11 @@ async function handleSaveArtifact(content: Record<string, unknown>) {
   editorSaving.value = true;
   const sourceVersion = versions.value[0].version_number;
   try {
-    const saved = await saveProjectVersion(selectedProjectId.value, content);
+    const saved = await saveProjectVersion(
+      selectedProjectId.value,
+      content,
+      sourceVersion,
+    );
     await refreshProjectData();
     diffForm.value = { from: sourceVersion, to: saved.version_number };
     versionDiff.value = await compareVersions(
@@ -467,6 +475,102 @@ async function handleSaveArtifact(content: Record<string, unknown>) {
     );
     editorDirty.value = false;
     showSuccessToast(`教师修改已保存为 v${saved.version_number}，请重新运行形成性诊断`);
+  } finally {
+    editorSaving.value = false;
+  }
+}
+
+async function refreshAfterVersionOperation(sourceVersion: number, newVersion: number) {
+  await refreshProjectData();
+  diffForm.value = { from: sourceVersion, to: newVersion };
+  versionDiff.value = await compareVersions(
+    selectedProjectId.value!,
+    sourceVersion,
+    newVersion,
+  );
+  editorDirty.value = false;
+}
+
+async function handleUpdateArtifactLocks(lockedPaths: string[]) {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  editorSaving.value = true;
+  const sourceVersion = versions.value[0].version_number;
+  try {
+    const saved = await updateProjectVersionLocks(
+      selectedProjectId.value,
+      sourceVersion,
+      lockedPaths,
+    );
+    await refreshAfterVersionOperation(sourceVersion, saved.version_number);
+    showSuccessToast(`锁定状态已保存为 v${saved.version_number}`);
+  } finally {
+    editorSaving.value = false;
+  }
+}
+
+async function handleRegenerateArtifactField(data: {
+  target_path: string;
+  guidance: string;
+}) {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  editorSaving.value = true;
+  const sourceVersion = versions.value[0].version_number;
+  try {
+    latestStep.value = await generateSection(
+      selectedProjectId.value,
+      selectedMemoryRefs.value,
+      {
+        target_path: data.target_path,
+        guidance: data.guidance,
+        source_version: sourceVersion,
+      },
+    );
+    await refreshAfterVersionOperation(sourceVersion, latestStep.value.version_number);
+    showSuccessToast(`局部重生成已保存为 v${latestStep.value.version_number}`);
+  } finally {
+    editorSaving.value = false;
+  }
+}
+
+async function handleGenerateTeachingArtifact(artifactKind: TeachingArtifactKind) {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  editorSaving.value = true;
+  const sourceVersion = versions.value[0].version_number;
+  try {
+    latestStep.value = await generateSection(
+      selectedProjectId.value,
+      selectedMemoryRefs.value,
+      { artifact_kind: artifactKind, source_version: sourceVersion },
+    );
+    await refreshAfterVersionOperation(sourceVersion, latestStep.value.version_number);
+    showSuccessToast(`配套成果已生成到 v${latestStep.value.version_number}`);
+  } finally {
+    editorSaving.value = false;
+  }
+}
+
+async function handleRestoreArtifactVersion(versionNumber: number) {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  try {
+    await showConfirmDialog({
+      title: `恢复 v${versionNumber}？`,
+      message: "系统会基于该历史快照创建一个新版本，不会删除当前或历史版本。",
+      confirmButtonText: "创建恢复版本",
+      confirmButtonColor: "#286b58",
+    });
+  } catch {
+    return;
+  }
+  editorSaving.value = true;
+  const sourceVersion = versions.value[0].version_number;
+  try {
+    const restored = await restoreProjectVersion(
+      selectedProjectId.value,
+      sourceVersion,
+      versionNumber,
+    );
+    await refreshAfterVersionOperation(sourceVersion, restored.version_number);
+    showSuccessToast(`已从 v${versionNumber} 创建恢复版本 v${restored.version_number}`);
   } finally {
     editorSaving.value = false;
   }
@@ -909,9 +1013,14 @@ onBeforeUnmount(() => {
         </div>
         <ArtifactEditor
           :version="versions[0] || null"
+          :versions="versions"
           :saving="editorSaving"
           @dirty-change="editorDirty = $event"
           @save="handleSaveArtifact"
+          @update-locks="handleUpdateArtifactLocks"
+          @regenerate="handleRegenerateArtifactField"
+          @generate-artifact="handleGenerateTeachingArtifact"
+          @restore="handleRestoreArtifactVersion"
         />
       </article>
 
@@ -931,11 +1040,19 @@ onBeforeUnmount(() => {
           <button @click="handleCompareVersions">比较</button>
         </div>
         <div v-if="versionDiff" class="diff-list" aria-live="polite">
+          <h3>字段级差异</h3>
+          <article v-for="field in versionDiff.field_changes" :key="`${field.path}-${field.change_type}`" class="field-diff">
+            <strong>{{ field.path }}</strong><span>{{ field.change_type }}</span>
+            <div><section><h4>修改前</h4><pre>{{ JSON.stringify(field.before, null, 2) }}</pre></section><section><h4>修改后</h4><pre>{{ JSON.stringify(field.after, null, 2) }}</pre></section></div>
+          </article>
+          <details>
+            <summary>查看章节级原始差异</summary>
           <article v-for="section in versionDiff.changed_sections" :key="section.section">
             <strong>{{ section.section }}</strong>
             <div><section><h4>修改前</h4><pre>{{ JSON.stringify(section.before, null, 2) }}</pre></section><section><h4>修改后</h4><pre>{{ JSON.stringify(section.after, null, 2) }}</pre></section></div>
           </article>
-          <p v-if="!versionDiff.changed_sections.length" class="empty">两个版本没有结构化差异。</p>
+          </details>
+          <p v-if="!versionDiff.field_changes.length" class="empty">两个版本没有结构化差异。</p>
         </div>
       </article>
 

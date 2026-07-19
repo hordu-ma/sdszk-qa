@@ -73,7 +73,9 @@ from src.apps.api.schemas.workbench import (
     ProjectCreate,
     ProjectResponse,
     ProjectVersionCreate,
+    ProjectVersionLockUpdate,
     ProjectVersionResponse,
+    ProjectVersionRestore,
     RetrieveBasisOutput,
     RetrieveBasisRequest,
     RetrieveBasisResponse,
@@ -123,6 +125,11 @@ from src.apps.api.services.memory_service import (
 )
 from src.apps.api.services.project_service import create_version, get_owned_project
 from src.apps.api.services.skill_runtime import SKILL_REGISTRY, ensure_definition, run_skill
+from src.apps.api.services.structured_generation_service import (
+    restore_project_version,
+    save_teacher_edit_version,
+    update_version_locks,
+)
 from src.apps.api.services.vertical_sample_service import diff_versions
 
 router = APIRouter()
@@ -179,8 +186,60 @@ async def add_project_version(
     db: DbSession,
     current_user: CurrentUser,
 ) -> ProjectVersionResponse:
-    project = await get_owned_project(db, project_id, current_user.id)
-    version = await create_version(db, project, current_user.id, data.content, data.status)
+    version = await save_teacher_edit_version(
+        db,
+        project_id=project_id,
+        user_id=current_user.id,
+        proposed_content=data.content,
+        status=data.status,
+        source_version=data.source_version,
+    )
+    await db.commit()
+    await db.refresh(version)
+    return ProjectVersionResponse.model_validate(version)
+
+
+@router.post(
+    "/projects/{project_id}/versions/locks",
+    response_model=ProjectVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def update_project_version_locks(
+    project_id: int,
+    data: ProjectVersionLockUpdate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ProjectVersionResponse:
+    version = await update_version_locks(
+        db,
+        project_id=project_id,
+        user_id=current_user.id,
+        source_version=data.source_version,
+        paths=data.locked_paths,
+    )
+    await db.commit()
+    await db.refresh(version)
+    return ProjectVersionResponse.model_validate(version)
+
+
+@router.post(
+    "/projects/{project_id}/versions/restore",
+    response_model=ProjectVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def restore_project_version_route(
+    project_id: int,
+    data: ProjectVersionRestore,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ProjectVersionResponse:
+    version = await restore_project_version(
+        db,
+        project_id=project_id,
+        user_id=current_user.id,
+        source_version=data.source_version,
+        restore_version=data.restore_version,
+    )
     await db.commit()
     await db.refresh(version)
     return ProjectVersionResponse.model_validate(version)

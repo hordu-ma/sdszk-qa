@@ -329,6 +329,28 @@ export interface VersionDiff {
     before: unknown;
     after: unknown;
   }>;
+  field_changes: Array<{
+    path: string;
+    change_type: "added" | "removed" | "changed";
+    before: unknown;
+    after: unknown;
+  }>;
+}
+
+export type TeachingArtifactKind =
+  | "lesson_design"
+  | "task_sheet"
+  | "rubric"
+  | "board_plan"
+  | "slide_outline"
+  | "practice_task";
+
+export interface StructuredGenerationResponse extends SkillStepResponse {
+  artifact_kind: TeachingArtifactKind;
+  section_name: string;
+  content: Record<string, unknown>;
+  changed_paths: string[];
+  preserved_locked_paths: string[];
 }
 
 export interface SkillStepResponse {

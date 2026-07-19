@@ -242,11 +242,11 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
 
-2026-07-19 当前集成候选：`luyun-int` 应用镜像 `stage2-wp21-closure-20260719-r1`，API/Web 镜像 ID 为 `d74520905434...` / `38db8467c589...`，迁移保持 `m2a3b4c5d678 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260719-stage2-wp21-closure-predeploy/`。本轮无 Schema 变化，只重建 `luyun-int` API/Web；51 例非集成测试、6 例 PostgreSQL 17 独立测试库集成测试、真实 API 冒烟和 Chromium 专业输入/Memory 交互验证通过，临时项目、班情和模板已清理。应用已实际回滚至上一增量 `stage2-professional-input-20260719-r1` 后健康并恢复当前镜像，无需数据库降级。详细范围和边界见《[WP2.1 收口记录](../docs/2026-stage2-wp21-closure.md)》。
+2026-07-19 当前集成候选：`luyun-int` 应用镜像 `stage2-wp22-closure-20260719-r3`，API/Web 镜像 ID 为 `7b1b9cd91085...` / `9b0be24e6495...`，迁移保持 `m2a3b4c5d678 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260719-stage2-wp22-closure-r3-predeploy/`。本轮无 Schema 变化，只重建 `luyun-int` API/Web；58 项完整测试、真实 API 纵向冒烟、Chromium 结构化编辑器控件和 Tailnet Skill 版本验证通过，临时项目已清理。应用已实际回滚至上一收口镜像 `stage2-wp22-closure-20260719-r2` 后健康并恢复当前镜像，无需数据库降级。详细范围和边界见《[WP2.2 收口记录](../docs/2026-stage2-wp22-closure.md)》。
 
 M1-int 稳定演示基线：`luyun-demo` 已晋级 `stage1-workbench-ux-20260719-r1`，API/Web 与晋级前 `luyun-int` 使用相同镜像 ID `a74d09eff3f3...` / `77a2b532290e...`；Demo 发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260719-m1-int-workbench-promotion/`。Demo 已通过 Tailnet `:8443`、教师登录、vLLM 状态和 Chromium 页面渲染，并实际回滚至 `stage1-diagnostic-rules-20260719-r1` 后恢复当前稳定镜像。
 
-前一增量同时修复 MinIO healthcheck：旧配置 `mc ready local` 固定探测 `localhost:9000`，与 Base-Spark 的 `29000/30000` 实际监听不一致；当前检查通过 `MINIO_PORT` 生成目标地址，并在容器内展开已有凭据。回滚当前 WP2.1 收口应用只需将 `luyun-int` 仓库外 env 的 `RELEASE_TAG` 改回 `stage2-professional-input-20260719-r1` 并重新创建 API/Web；本轮无数据库降级。若只回滚 healthcheck，可恢复上一 Compose 配置并重建 MinIO，但会重新出现错误的 `unhealthy` 状态，不建议作为正常回滚路径。数据损坏时从上述发布前备份恢复 PostgreSQL；MinIO 本轮未修改对象数据。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
+前一增量同时修复 MinIO healthcheck：旧配置 `mc ready local` 固定探测 `localhost:9000`，与 Base-Spark 的 `29000/30000` 实际监听不一致；当前检查通过 `MINIO_PORT` 生成目标地址，并在容器内展开已有凭据。回滚当前 WP2.2 收口应用只需将 `luyun-int` 仓库外 env 的 `RELEASE_TAG` 改回 `stage2-wp21-closure-20260719-r1` 并重新创建 API/Web；本轮无数据库降级。若只回滚 healthcheck，可恢复上一 Compose 配置并重建 MinIO，但会重新出现错误的 `unhealthy` 状态，不建议作为正常回滚路径。数据损坏时从上述发布前备份恢复 PostgreSQL；MinIO 本轮未修改对象数据。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
 
 上一发布 `stage1-selfserve-rag-20260717-r1` 已完成独立测试库和 `luyun-int` 的 `k1f2a3b4c567 → m2a3b4c5d678 → k1f2a3b4c567 → m2a3b4c5d678` 往返，并以同一镜像晋级 `luyun-demo`。部署数据基线时需依次执行 `seed_demo` 与 `seed_internal_gold`（两者会构建并激活语义索引）。固定模型资产如下，均为工程候选，不代表专业选型：
 

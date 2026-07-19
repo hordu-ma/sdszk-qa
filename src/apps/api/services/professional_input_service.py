@@ -26,6 +26,8 @@ DOWNSTREAM_SECTIONS = (
     "design_blueprint",
     "lesson_design",
     "diagnosis",
+    "teaching_artifacts",
+    "editor_state",
 )
 FORBIDDEN_RULE_TOKENS = {
     "score",
