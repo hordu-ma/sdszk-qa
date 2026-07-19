@@ -242,9 +242,11 @@ docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.e
 docker compose --project-name luyun-int --env-file /home/pgx/luyun-sizheng-int.env -f src/infra/compose/base-spark.yml exec api uv run python -m src.apps.api.scripts.seed_demo
 ```
 
-2026-07-17 当前发布候选：应用镜像 `stage1-selfserve-rag-20260717-r1`，迁移 `m2a3b4c5d678 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260717-stage1-selfserve-rag-predeploy/`（含部署后快照 `int-postgres-postdeploy.dump`）。迁移已在独立测试库和 `luyun-int` 通过 `k1f2a3b4c567 → m2a3b4c5d678 → k1f2a3b4c567 → m2a3b4c5d678`；`luyun-int` 已验证回滚到 `stage1-gold-review-20260717-r1` + 数据库降级后健康，并从部署后快照恢复当前版本，随后以同一 API/Web 镜像摘要晋级 `luyun-demo`。部署时需依次执行 `seed_demo` 与 `seed_internal_gold`（两者会构建并激活语义索引）。双环境已验证健康检查、真实 vLLM SSE、64 例冒烟集与 140 例内部金标全量通过（真实语义链）、引用段落/页码定位、资料不足两级判定和 Reranker 停机显式降级；固定模型资产如下，均为工程候选，不代表专业选型：
+2026-07-19 当前发布候选：应用镜像 `stage1-diagnostic-rules-20260719-r1`，迁移保持 `m2a3b4c5d678 (head)`，发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260719-stage1-diagnostic-rules-predeploy/`。本轮无 Schema 变化；API/Web 只在 `luyun-int` 构建一次，再以相同镜像 ID `b689cc492440...` / `48a805189120...` 晋级 `luyun-demo`。双环境已验证诊断规则注册、教师登录与身份、真实 vLLM SSE `data:`/`[DONE]`、Tailnet HTTPS 和临时数据清理；PostgreSQL、MinIO、API、Web 与三类 vLLM 全部健康。
 
-本轮回滚：将仓库外 env 的 `RELEASE_TAG` 改回 `stage1-gold-review-20260717-r1`，停止当前 API，将数据库降到 `k1f2a3b4c567`，再重新创建上一 API/Web；恢复当前版本时按相反顺序升级到 `m2a3b4c5d678`。数据损坏时从上述发布前备份恢复 PostgreSQL/MinIO。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
+本轮同时修复 MinIO healthcheck：旧配置 `mc ready local` 固定探测 `localhost:9000`，与 Base-Spark 的 `29000/30000` 实际监听不一致；当前检查通过 `MINIO_PORT` 生成目标地址，并在容器内展开已有凭据。回滚当前应用只需将仓库外 env 的 `RELEASE_TAG` 改回 `stage1-selfserve-rag-20260717-r1` 并重新创建 API/Web；本轮无数据库降级。若只回滚 healthcheck，可恢复上一 Compose 配置并重建 MinIO，但会重新出现错误的 `unhealthy` 状态，不建议作为正常回滚路径。数据损坏时从上述发布前备份恢复 PostgreSQL；MinIO 本轮未修改对象数据。`luyun-demo` 可用 `tailscale serve --https=8443 off` 撤销入口，并停止其 Compose project；普通停用不得加 `-v`。
+
+上一发布 `stage1-selfserve-rag-20260717-r1` 已完成独立测试库和 `luyun-int` 的 `k1f2a3b4c567 → m2a3b4c5d678 → k1f2a3b4c567 → m2a3b4c5d678` 往返，并以同一镜像晋级 `luyun-demo`。部署数据基线时需依次执行 `seed_demo` 与 `seed_internal_gold`（两者会构建并激活语义索引）。固定模型资产如下，均为工程候选，不代表专业选型：
 
 | 类型 | 资产 | 固定 revision | 服务名 / loopback |
 | --- | --- | --- | --- |

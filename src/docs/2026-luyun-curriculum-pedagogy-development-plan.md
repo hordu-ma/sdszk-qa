@@ -1425,6 +1425,8 @@ D0–D3 的工期是各工作包的投入窗口，不是可以无条件压缩的
 
 工程实施记录（2026-07-17，第八增量，自助开发 §0.5 优先级 4：诊断规则字典 v2 内部版）：把纵向样板三个工程诊断维度（依据可追溯、目标—证据一致、任务可实施）从 `diagnose_artifact_handler` 内联逻辑抽离为可配置规则字典，入口 `src/apps/api/services/diagnostic_rules.py`。每条 `DiagnosticRule` 声明 `rule_id`、维度、依赖样板小节、达标判定、可观察证据与改进建议，并可标记是否阻断；新增维度只需 `register_diagnostic_rule` 注册，诊断编排不再改动。规则字典严守 §16.1 非评分约束：只产 `aligned/needs_attention`，注册入口对评分/排名类词元（与 `tests/test_no_scoring_paths.py` 同口径）与重复注册做防护拦截。新增 `tests/test_diagnostic_rules.py` 覆盖默认三维判定、blocking 汇总、可扩展注册与防护拦截；`diagnose_artifact_handler` 输出 Schema 不变、行为等价（blocking 仍按维度名汇总）；ruff + basedpyright + 43 例非集成 pytest 全绿。三维内容与适用范围仍为待专家确认的补签项（《阶段 1 模拟信息替换台账》§2 教学结构/诊断行），本记录不改变阶段 1A/1B、G0、G1 未完成的结论。下一步转入 §0.5 优先级 5（工作台体验：专业编辑、可用性走查、无障碍）。
 
+部署验收记录（2026-07-19，第八增量）：修复 Base-Spark MinIO 健康检查仍探测默认 `localhost:9000`、未跟随 `MINIO_PORT` 的配置缺陷；新检查按两套环境实际端口和容器内凭据执行，不把 Secret 写入仓库。`luyun-int` 与 `luyun-demo` 已部署同一 API/Web 镜像 `stage1-diagnostic-rules-20260719-r1`，镜像 ID 分别为 `b689cc492440...` / `48a805189120...`，数据库均保持 `m2a3b4c5d678 (head)`。双环境 PostgreSQL、MinIO、API、Web 和三类 vLLM 均健康；诊断规则注册、教师登录/身份、真实 vLLM SSE `data:`/`[DONE]`、Tailnet 两个 HTTPS `/healthz` 通过，临时会话及审计数据已清理。发布前备份位于 `/home/pgx/backups/luyun-sizheng/20260719-stage1-diagnostic-rules-predeploy/`。该发布只完成内部工程增量，不改变阶段 1A/1B、G0、G1 未完成的结论；下一步仍为 §0.5 优先级 5。
+
 ### 10.2 工作包
 
 #### WP1.1 教学成果领域对象

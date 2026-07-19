@@ -48,12 +48,12 @@
 
 ## 4. 当前工程基线结果
 
-- 发布：`stage1-selfserve-rag-20260717-r1`。
+- 发布：`stage1-diagnostic-rules-20260719-r1`（双环境同一 API/Web 镜像；包含诊断规则字典 v2 与 MinIO 健康检查端口修复）。
 - 迁移：`m2a3b4c5d678 (head)`。
 - 双环境：API/Web 使用同一镜像摘要；PostgreSQL、MinIO、vLLM 端口、卷和 Secret 隔离。
 - 模拟评测：`stage1-synthetic-g0` 64 例现为 64 `matched`（语义索引已真实激活）。注意：该集资料正文内嵌查询原文（查询泄漏），只作工程冒烟回归下限，不能测量检索质量；历史 43/64 已取证定位为门禁开发期旧语料下 Reranker 低分被阈值过滤所致。
 - 内部金标：`stage1-internal-gold` 140 例（`internal_authored`，无泄漏）双环境 140 `matched`、0 `failed`、0 `error`；内部阈值见《内部阈值标定报告 v0》。该集为内部自研，不是专家金标。
-- 已验证：六个 Skill 主链、显式 Memory、版本、Word 导出、真实 vLLM SSE、Reranker 停机显式降级（含 `semantic_index_missing` 降级）、引用段落/页码定位、资料有效期过滤、资料不足两级判定、应用旧镜像回滚与数据库 `k1 ↔ m2` 往返恢复。
+- 已验证：六个 Skill 主链、显式 Memory、版本、Word 导出、真实 vLLM SSE、Reranker 停机显式降级（含 `semantic_index_missing` 降级）、引用段落/页码定位、资料有效期过滤、资料不足两级判定、诊断规则字典 v2 注册、双环境 MinIO 正确端口健康检查、应用旧镜像回滚与数据库 `k1 ↔ m2` 往返恢复。
 - 金标批量导入、双评/第三人仲裁、占位案例防冻结和报告接口已在双环境用内部金标走通全流程。该工程工具与内部金标状态不代表真实专家金标已经到位。
 
 ## 5. 正式状态限制

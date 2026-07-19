@@ -27,7 +27,9 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test:
+        - "CMD-SHELL"
+        - 'MC_HOST_health="http://$${MINIO_ROOT_USER}:$${MINIO_ROOT_PASSWORD}@127.0.0.1:${MINIO_PORT:-29000}" mc ready health'
       interval: 5s
       timeout: 3s
       retries: 20
