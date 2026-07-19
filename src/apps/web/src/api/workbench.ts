@@ -127,6 +127,18 @@ export function pinProject(project: TeachingProject) {
   });
 }
 
+export function createProfessionalInputTemplate(
+  name: string,
+  payload: Record<string, unknown>,
+) {
+  return request.post<unknown, PinnedItem>("/workbench/memory/pinned-items", {
+    item_type: "template",
+    project_id: null,
+    name,
+    payload,
+  });
+}
+
 export function deletePinnedItem(itemId: number) {
   return request.delete(`/workbench/memory/pinned-items/${itemId}`);
 }

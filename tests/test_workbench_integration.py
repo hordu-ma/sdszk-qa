@@ -510,9 +510,13 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
                     "project_id": project_id,
                     "topic": "高中家国情怀议题式教学",
                     "core_question": "青年如何把个人理想融入国家发展",
+                    "basis_query": "家国情怀教学目标与评价证据",
                     "course_basis": "课程标准要求形成有依据的价值判断。",
+                    "learning_objectives": "结合材料形成有依据的价值判断。",
                     "class_context": "高一3班，45人，可开展小组讨论。",
                     "course_type": "议题式",
+                    "activity_format": "混合",
+                    "intended_use": "日常教学",
                     "lesson_minutes": 60,
                     "available_minutes": 45,
                     "teacher_intent": "通过材料研读和讨论形成判断。",
@@ -550,9 +554,13 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
                     "project_id": project_id,
                     "topic": "高中家国情怀议题式教学",
                     "core_question": "青年如何把个人理想融入国家发展",
+                    "basis_query": "已确认的家国情怀依据检索问题",
                     "course_basis": "",
+                    "learning_objectives": "结合材料形成有依据的价值判断。",
                     "class_context": "",
                     "course_type": "议题式",
+                    "activity_format": "混合",
+                    "intended_use": "日常教学",
                     "lesson_minutes": 45,
                     "available_minutes": 45,
                     "teacher_intent": "通过材料研读和讨论形成判断。",
@@ -565,6 +573,7 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             assert ready_input.json()["version_number"] == 8
             assert ready_input.json()["ready_for_alignment"] is True
             assert len(ready_input.json()["assumptions"]) == 3
+            assert ready_input.json()["rule_set_version"] == "stage2-input-conflict-v2"
             assert ready_input.json()["confirmed_input"]["topic"] == (
                 "高中家国情怀议题式教学"
             )
@@ -577,6 +586,35 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             assert latest_input_content["_trace"]["skill_id"] == (
                 "skill.confirm_professional_input"
             )
+
+            authoritative_alignment = await client.post(
+                "/api/workbench/skills/alignment-card",
+                json={
+                    "project_id": project_id,
+                    "topic": "客户端篡改主题",
+                    "core_question": "客户端篡改核心议题",
+                    "basis_query": "客户端篡改检索问题",
+                },
+                headers=headers,
+            )
+            assert authoritative_alignment.status_code == 200
+            assert authoritative_alignment.json()["topic"] == (
+                "高中家国情怀议题式教学"
+            )
+            assert authoritative_alignment.json()["core_question"] == (
+                "青年如何把个人理想融入国家发展"
+            )
+            async with AsyncSessionLocal() as db:
+                run = await db.get(
+                    SkillRun, authoritative_alignment.json()["skill_run_id"]
+                )
+                assert run is not None
+                assert run.input_payload["professional_input_version"] == 8
+                assert run.input_payload["effective_input"] == {
+                    "topic": "高中家国情怀议题式教学",
+                    "core_question": "青年如何把个人理想融入国家发展",
+                    "basis_query": "已确认的家国情怀依据检索问题",
+                }
 
             tasks = await client.get(
                 "/api/workbench/tasks", params={"project_id": project_id}, headers=headers
@@ -731,6 +769,7 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
                 "skill.export_artifact",
             ]
             assert skills.json()[0]["status"] == "enabled"
+            assert skills.json()[1]["skill_version"] == "1.1.0"
 
             preference = await client.put(
                 "/api/workbench/memory/preference",
@@ -766,6 +805,21 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
             )
             assert pinned.status_code == 201
 
+            template = await client.post(
+                "/api/workbench/memory/pinned-items",
+                json={
+                    "item_type": "template",
+                    "project_id": None,
+                    "name": "初中案例式常用输入",
+                    "payload": {
+                        "course_type": "案例式",
+                        "activity_format": "讨论",
+                    },
+                },
+                headers=headers,
+            )
+            assert template.status_code == 201
+
             memory_refs = [{"memory_type": "class_context_profile", "memory_id": profile_id}]
             retrieval = await client.post(
                 "/api/workbench/skills/retrieve-basis",
@@ -800,13 +854,13 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
             export = await client.get("/api/workbench/memory/export", headers=headers)
             assert export.json()["preference"]["default_stage"] == "初中"
             assert len(export.json()["class_profiles"]) == 1
-            assert len(export.json()["pinned_items"]) == 1
+            assert len(export.json()["pinned_items"]) == 2
 
             cleared = await client.post("/api/workbench/memory/clear", headers=headers)
             assert cleared.json() == {
                 "cleared_preference": True,
                 "cleared_class_profiles": 1,
-                "cleared_pinned_items": 1,
+                "cleared_pinned_items": 2,
             }
 
             rejected = await client.post(

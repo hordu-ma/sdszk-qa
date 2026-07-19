@@ -292,9 +292,13 @@ export interface ProfessionalInputConflict {
 export interface ProfessionalInputPayload {
   topic: string;
   core_question: string;
+  basis_query: string;
   course_basis: string;
+  learning_objectives: string;
   class_context: string;
   course_type: string;
+  activity_format: "讲授" | "讨论" | "实践" | "混合";
+  intended_use: "日常教学" | "公开课" | "教研展示";
   lesson_minutes: number;
   available_minutes: number;
   teacher_intent: string;
@@ -306,6 +310,7 @@ export interface ProfessionalInputResponse {
   skill_run_id: number;
   skill_id: "skill.confirm_professional_input";
   skill_version: string;
+  rule_set_version: string;
   confirmed_input: Omit<ProfessionalInputPayload, "assumptions_confirmed">;
   conflicts: ProfessionalInputConflict[];
   assumptions: string[];

@@ -103,9 +103,13 @@ class ProfessionalInputInput(BaseModel):
     project_id: int
     topic: str = Field(min_length=2, max_length=200)
     core_question: str = Field(min_length=2, max_length=500)
+    basis_query: str = Field(default="", max_length=500)
     course_basis: str = Field(default="", max_length=2000)
+    learning_objectives: str = Field(default="", max_length=2000)
     class_context: str = Field(default="", max_length=2000)
     course_type: str = Field(min_length=1, max_length=50)
+    activity_format: Literal["讲授", "讨论", "实践", "混合"] = "混合"
+    intended_use: Literal["日常教学", "公开课", "教研展示"] = "日常教学"
     lesson_minutes: int = Field(default=45, ge=20, le=180)
     available_minutes: int = Field(default=45, ge=20, le=180)
     teacher_intent: str = Field(min_length=2, max_length=1000)
@@ -114,6 +118,7 @@ class ProfessionalInputInput(BaseModel):
 
 
 class ProfessionalInputOutput(BaseModel):
+    rule_set_version: str
     confirmed_input: dict
     conflicts: list[ProfessionalInputConflict]
     assumptions: list[str]

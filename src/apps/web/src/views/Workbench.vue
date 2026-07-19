@@ -11,6 +11,7 @@ import {
   confirmProfessionalInput,
   createAlignmentCard,
   createClassProfile,
+  createProfessionalInputTemplate,
   createEvaluationDataset,
   createProject,
   createDesignBlueprint,
@@ -80,6 +81,9 @@ const modelStatus = ref<ModelStatus | null>(null);
 const preference = ref<UserPreference | null>(null);
 const classProfiles = ref<ClassProfile[]>([]);
 const pinnedItems = ref<PinnedItem[]>([]);
+const professionalInputTemplates = computed(() => pinnedItems.value.filter(
+  (item) => item.item_type === "template",
+));
 const versions = ref<ProjectVersion[]>([]);
 const latestStep = ref<SkillStepResponse | null>(null);
 const versionDiff = ref<VersionDiff | null>(null);
@@ -335,6 +339,27 @@ async function handleCreateProfile() {
   showSuccessToast("班情档案已创建并显式选中");
 }
 
+async function handleSaveProfessionalInputClassProfile(data: {
+  name: string;
+  context: Record<string, unknown>;
+}) {
+  const profile = await createClassProfile(data);
+  if (!selectedProfileIds.value.includes(profile.id)) {
+    selectedProfileIds.value.push(profile.id);
+  }
+  await refreshMemory();
+  showSuccessToast("本次班情已保存并显式选中");
+}
+
+async function handleSaveProfessionalInputTemplate(data: {
+  name: string;
+  payload: Record<string, unknown>;
+}) {
+  await createProfessionalInputTemplate(data.name, data.payload);
+  await refreshMemory();
+  showSuccessToast("专业输入已保存为常用模板");
+}
+
 async function handleDeleteProfile(profileId: number) {
   await deleteClassProfile(profileId);
   selectedProfileIds.value = selectedProfileIds.value.filter((id) => id !== profileId);
@@ -466,7 +491,7 @@ async function handleConfirmProfessionalInput(payload: ProfessionalInputPayload)
     );
     sampleForm.value.topic = result.confirmed_input.topic;
     sampleForm.value.core_question = result.confirmed_input.core_question;
-    sampleForm.value.basis_query = result.confirmed_input.course_basis
+    sampleForm.value.basis_query = result.confirmed_input.basis_query
       || result.confirmed_input.core_question;
     professionalInputDirty.value = false;
     if (result.ready_for_alignment) {
@@ -851,9 +876,12 @@ onBeforeUnmount(() => {
         :version="versions[0] || null"
         :class-profiles="classProfiles"
         :selected-profile-ids="selectedProfileIds"
+        :templates="professionalInputTemplates"
         :saving="professionalInputSaving"
         @dirty-change="professionalInputDirty = $event"
         @confirm="handleConfirmProfessionalInput"
+        @save-class-profile="handleSaveProfessionalInputClassProfile"
+        @save-template="handleSaveProfessionalInputTemplate"
       />
 
       <article class="panel full-panel sample-panel">

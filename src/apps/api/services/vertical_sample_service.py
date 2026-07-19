@@ -86,30 +86,57 @@ async def alignment_card_handler(
     project, source = await _latest_version(db, payload.project_id, user.id)
     run.project_id = project.id
     professional_input = source.content.get("professional_input")
-    if isinstance(professional_input, dict) and not professional_input.get(
-        "ready_for_alignment"
-    ):
-        raise BusinessError(
-            "专业输入仍有冲突或未确认假设，请先重新检查",
-            status_code=409,
-            error_code="professional_input_not_ready",
+    effective_topic = payload.topic
+    effective_core_question = payload.core_question
+    effective_basis_query = payload.basis_query
+    if isinstance(professional_input, dict):
+        if not professional_input.get("ready_for_alignment"):
+            raise BusinessError(
+                "专业输入仍有冲突或未确认假设，请先重新检查",
+                status_code=409,
+                error_code="professional_input_not_ready",
+            )
+        confirmed_input = professional_input.get("confirmed_input")
+        if not isinstance(confirmed_input, dict):
+            raise BusinessError(
+                "专业输入版本缺少确认内容，请重新检查",
+                status_code=409,
+                error_code="professional_input_invalid",
+            )
+        effective_topic = str(confirmed_input.get("topic") or payload.topic)
+        effective_core_question = str(
+            confirmed_input.get("core_question") or payload.core_question
         )
+        effective_basis_query = str(
+            confirmed_input.get("basis_query")
+            or confirmed_input.get("core_question")
+            or payload.basis_query
+        )
+        run.input_payload = {
+            **run.input_payload,
+            "professional_input_version": source.version_number,
+            "effective_input": {
+                "topic": effective_topic,
+                "core_question": effective_core_question,
+                "basis_query": effective_basis_query,
+            },
+        }
     search_result = await search_chunks(
         db,
         project_id=project.id,
         user_id=user.id,
-        query=payload.basis_query,
+        query=effective_basis_query,
         limit=5,
     )
     citations = [BasisCitation(**row) for row in search_result.citations]
     objectives = [
-        f"围绕“{payload.core_question}”解释核心概念并形成有依据的判断",
-        f"结合“{payload.topic}”真实情境比较不同选择及其影响",
+        f"围绕“{effective_core_question}”解释核心概念并形成有依据的判断",
+        f"结合“{effective_topic}”真实情境比较不同选择及其影响",
         "在课堂任务中提出主张、引用依据并回应不同观点",
     ]
     draft = {
-        "topic": payload.topic,
-        "core_question": payload.core_question,
+        "topic": effective_topic,
+        "core_question": effective_core_question,
         "objectives": objectives,
         "basis_summary": [item.content[:180] for item in citations],
         "citations": [item.model_dump() for item in citations],
