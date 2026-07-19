@@ -3,7 +3,7 @@
 面向山东省大中小学思政课教师、教研员和管理者的教学智能支持平台。
 今天它是一个"可信问答 + 教学工作台雏形"；按计划它将分阶段成长为覆盖教学设计生产、证据化诊断、四学段一体化的完整平台。
 
-> **一条总规则：** 产品范围、阶段、验收标准只看[主开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0）。
+> **一条总规则：** 产品范围、阶段、验收标准只看[主开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0 签字，现行 v1.4）。
 > 本 README 只描述当前实现和使用入口；凡是标注"目标 / 计划"的能力都尚未实现，任何文档、演示和注释都不得把它们写成已完成。
 
 ## 当前状态（2026-07-19）
@@ -108,6 +108,7 @@ make test-integration    # 集成测试
 | 文档 | 内容 | 何时读 |
 | --- | --- | --- |
 | [主开发计划](src/docs/2026-luyun-curriculum-pedagogy-development-plan.md) | 范围、阶段 0–4、验收、Skills/Memory 设计（唯一权威） | 涉及产品范围、排期、验收时 |
+| [实施记录附录](src/docs/2026-implementation-log.md) | 历次实施、部署与收口记录原文（审计与回溯） | 追溯某次增量的部署/回滚证据时 |
 | [开发指南](src/docs/DEVELOPMENT.md) | 上手、命令、验证分层、交付标准 | 开始开发前 |
 | [阶段 1 工程冻结基线](src/docs/2026-stage1-g0-engineering-baseline.md) | 当前样板、Skills、Memory、诊断与外部签字边界 | 开发或验收纵向样板时 |
 | [M1-int 收口记录](src/docs/2026-stage1-m1-int-closure.md) | 阶段 1 内部门结论、双环境晋级、回滚证据和外部补签边界 | 进入阶段 2 或复核 G1 状态时 |
@@ -122,7 +123,7 @@ make test-integration    # 集成测试
 | [对外方案](src/docs/2026-luyun-external-solution-v1.0.md) / [Word 版](鲁韵思政大模型建设方案_v1.0_对外版.docx) | 客户对外表达版 | 对外沟通时 |
 | `2026-product-extension-*.md` | 能力图与方向稿（**非排期**） | 仅作背景参考 |
 
-阶段状态不另设排期文件；变化直接以"实施记录"写入主开发计划。
+阶段状态不另设排期文件；主计划只保留现状摘要，逐次"实施记录/部署验收记录/收口记录"写入[实施记录附录](src/docs/2026-implementation-log.md)。
 
 ## 演示环境（base-spark）
 

@@ -1,7 +1,7 @@
 # 架构说明
 
 本文说明当前代码的组织方式和调用链，并标出与目标架构的边界。
-范围与阶段以[主开发计划](2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0）为准；部署操作见 [src/infra/README.md](../infra/README.md)。
+范围与阶段以[主开发计划](2026-luyun-curriculum-pedagogy-development-plan.md)（v1.0 签字，现行 v1.4）为准；部署操作见 [src/infra/README.md](../infra/README.md)。
 
 ## 代码组织
 

@@ -20,7 +20,7 @@ Instruction precedence follows the same order. Do not scan the entire `.github` 
 ## Scope
 
 - This file is the always-on workspace guidance. Keep it short and move domain-specific rules into scoped docs.
-- Product range, phases, acceptance, product Skills, and user Memory: `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` (v1.0 signed; v1.2 current) is the single source of truth. Do not treat `2026-product-extension-*.md` as schedule.
+- Product range, phases, acceptance, product Skills, and user Memory: `src/docs/2026-luyun-curriculum-pedagogy-development-plan.md` (v1.0 signed; v1.4 current) is the single source of truth. Implementation/deployment records live in `src/docs/2026-implementation-log.md`, not in the plan body. Do not treat `2026-product-extension-*.md` as schedule.
 - Self-serve development mode is active (plan §0.5, since 2026-07-17): customer/expert inputs are deferred to a re-sign backlog; proceed with internal proxy decisions, the internal gold set, and M0-int/M1-int internal gates. Never present internal conclusions as customer confirmation or expert signoff, and never relabel `synthetic` datasets as formal ones.
 - User registration and identity upgrade (registered vs verified) are specified in plan §2.6 and **must be implemented in the 思政课平台 user-management system**, not in this repo. Do not add phone signup, SMS, or KYC flows here; only consume platform tokens/claims when integrating.
 - Use `src/docs/DEVELOPMENT.md` as the development and validation entrypoint (commands, verification layers, delivery baseline).
