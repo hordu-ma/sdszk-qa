@@ -60,6 +60,7 @@ from src.apps.api.schemas.workbench import (
     EvaluationDatasetReportResponse,
     EvaluationDatasetResponse,
     EvaluationDatasetReviewRequest,
+    EvaluationGateReportResponse,
     EvaluationRunResponse,
     ExportArtifactOutput,
     ExportArtifactRequest,
@@ -98,6 +99,7 @@ from src.apps.api.services.diagnosis_workflow_service import (
     detect_diagnosis_structure,
     save_diagnosis_decision,
 )
+from src.apps.api.services.evaluation_gate_service import regression_gate_report
 from src.apps.api.services.evaluation_service import (
     EvaluationCaseInput,
     add_case,
@@ -1201,6 +1203,17 @@ async def get_evaluation_dataset_report(
 ) -> EvaluationDatasetReportResponse:
     report = await dataset_report(db, dataset_id=dataset_id, user=current_user)
     return EvaluationDatasetReportResponse.model_validate(report)
+
+
+@router.get(
+    "/evaluation/datasets/{dataset_id}/regression-gate",
+    response_model=EvaluationGateReportResponse,
+)
+async def get_evaluation_regression_gate(
+    dataset_id: int, db: DbSession, current_user: CurrentUser
+) -> EvaluationGateReportResponse:
+    report = await regression_gate_report(db, dataset_id=dataset_id, user=current_user)
+    return EvaluationGateReportResponse.model_validate(report)
 
 
 @router.post(

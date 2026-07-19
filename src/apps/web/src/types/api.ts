@@ -271,6 +271,52 @@ export interface EvaluationDatasetReport {
   latest_run: EvaluationLatestRunSummary | null;
 }
 
+export interface EvaluationGateCheck {
+  check: string;
+  threshold: string;
+  observed: number | null;
+  passed: boolean;
+}
+
+export interface EvaluationManifestChange {
+  path: string;
+  baseline: string | number | boolean | null;
+  current: string | number | boolean | null;
+}
+
+export interface EvaluationGateMetrics {
+  total_cases: number;
+  matched_cases: number;
+  error_cases: number;
+  match_rate: number;
+  top1_total: number;
+  top1_hits: number;
+  top1_hit_rate: number | null;
+  insufficient_basis_misses: number;
+}
+
+export interface EvaluationGateBaseline {
+  baseline_run_id: number;
+  manifest_changes: EvaluationManifestChange[];
+  regressed_case_keys: string[];
+  improved_case_keys: string[];
+  still_failed_case_keys: string[];
+}
+
+export interface EvaluationGateReport {
+  dataset_id: number;
+  dataset_key: string;
+  data_origin: EvaluationDataOrigin;
+  disclaimer: string;
+  verdict: "no_run" | "stale" | "blocked" | "promotable";
+  can_promote: boolean;
+  latest_run_id: number | null;
+  metrics: EvaluationGateMetrics | null;
+  checks: EvaluationGateCheck[];
+  pending_manifest_changes: EvaluationManifestChange[];
+  baseline: EvaluationGateBaseline | null;
+}
+
 export interface ProjectVersion {
   id: number;
   project_id: number;

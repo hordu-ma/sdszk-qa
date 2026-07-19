@@ -236,6 +236,43 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
             assert evaluation_results.status_code == 200
             assert evaluation_results.json()[0]["status"] == "matched"
 
+            gate = await client.get(
+                f"/api/workbench/evaluation/datasets/{dataset_id}/regression-gate",
+                headers=headers,
+            )
+            assert gate.status_code == 200
+            gate_body = gate.json()
+            assert gate_body["verdict"] == "promotable"
+            assert gate_body["can_promote"] is True
+            assert gate_body["latest_run_id"] == run_id
+            assert gate_body["pending_manifest_changes"] == []
+            assert gate_body["metrics"]["match_rate"] == 1.0
+            assert gate_body["metrics"]["top1_hit_rate"] == 1.0
+            assert "不代表专家验收" in gate_body["disclaimer"]
+            assert {item["check"] for item in gate_body["checks"]} == {
+                "match_rate",
+                "top1_hit_rate",
+                "insufficient_basis_misses",
+                "error_cases",
+            }
+            assert gate_body["baseline"] is None
+
+            second_run = await client.post(
+                f"/api/workbench/evaluation/datasets/{dataset_id}/runs",
+                headers=headers,
+            )
+            assert second_run.status_code == 200
+            gate_after_second = await client.get(
+                f"/api/workbench/evaluation/datasets/{dataset_id}/regression-gate",
+                headers=headers,
+            )
+            assert gate_after_second.status_code == 200
+            second_gate_body = gate_after_second.json()
+            assert second_gate_body["verdict"] == "promotable"
+            assert second_gate_body["baseline"]["baseline_run_id"] == run_id
+            assert second_gate_body["baseline"]["regressed_case_keys"] == []
+            assert second_gate_body["baseline"]["manifest_changes"] == []
+
             next_dataset = await client.post(
                 "/api/workbench/evaluation/datasets",
                 json={

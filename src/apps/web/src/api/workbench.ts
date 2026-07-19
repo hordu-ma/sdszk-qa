@@ -9,6 +9,7 @@ import type {
   EvaluationDataOrigin,
   EvaluationDataset,
   EvaluationDatasetReport,
+  EvaluationGateReport,
   MemoryRef,
   ModelStatus,
   PinnedItem,
@@ -388,6 +389,12 @@ export function submitEvaluationCaseReview(
 export function getEvaluationDatasetReport(datasetId: number) {
   return request.get<unknown, EvaluationDatasetReport>(
     `/workbench/evaluation/datasets/${datasetId}/report`,
+  );
+}
+
+export function getEvaluationRegressionGate(datasetId: number) {
+  return request.get<unknown, EvaluationGateReport>(
+    `/workbench/evaluation/datasets/${datasetId}/regression-gate`,
   );
 }
 

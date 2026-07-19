@@ -384,6 +384,52 @@ class EvaluationDatasetReportResponse(BaseModel):
     latest_run: EvaluationLatestRunSummary | None
 
 
+class EvaluationGateCheck(BaseModel):
+    check: str
+    threshold: str
+    observed: float | int | None
+    passed: bool
+
+
+class EvaluationManifestChange(BaseModel):
+    path: str
+    baseline: str | float | int | bool | None
+    current: str | float | int | bool | None
+
+
+class EvaluationGateMetrics(BaseModel):
+    total_cases: int
+    matched_cases: int
+    error_cases: int
+    match_rate: float
+    top1_total: int
+    top1_hits: int
+    top1_hit_rate: float | None
+    insufficient_basis_misses: int
+
+
+class EvaluationGateBaseline(BaseModel):
+    baseline_run_id: int
+    manifest_changes: list[EvaluationManifestChange]
+    regressed_case_keys: list[str]
+    improved_case_keys: list[str]
+    still_failed_case_keys: list[str]
+
+
+class EvaluationGateReportResponse(BaseModel):
+    dataset_id: int
+    dataset_key: str
+    data_origin: str
+    disclaimer: str
+    verdict: str
+    can_promote: bool
+    latest_run_id: int | None
+    metrics: EvaluationGateMetrics | None
+    checks: list[EvaluationGateCheck]
+    pending_manifest_changes: list[EvaluationManifestChange]
+    baseline: EvaluationGateBaseline | None
+
+
 class UserPreferenceUpdate(BaseModel):
     default_stage: str | None = Field(default=None, max_length=50)
     default_course_type: str | None = Field(default=None, max_length=50)

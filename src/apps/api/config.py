@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     RETRIEVE_LEXICAL_WEIGHT: float = 0.7
     RETRIEVE_VECTOR_WEIGHT: float = 0.3
 
+    # WP2.4 内部评测回归门禁阈值（《内部阈值标定报告 v0》§5）。
+    # internal_authored 工程口径，仅约束 luyun-int → luyun-demo 晋级，不构成专业验收。
+    EVAL_GATE_MIN_MATCH_RATE: float = 0.95
+    EVAL_GATE_MIN_TOP1_HIT_RATE: float = 0.90
+
     # 发布清单中的应用版本；由部署环境注入，不从 Git 猜测。
     APP_RELEASE: str = "dev"
     # 当前内容是否为可替换的模拟工程数据。正式资料完成审核前保持 synthetic。
