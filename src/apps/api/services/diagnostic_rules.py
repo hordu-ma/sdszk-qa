@@ -53,6 +53,11 @@ class DiagnosticRule:
     rule_id: str
     dimension: str
     section: str
+    source_path: str
+    rule_basis: str
+    impact: str
+    example_revision: str
+    revision_target_path: str
     predicate: Callable[[SectionData], bool]
     evidence: Callable[[SectionData], str]
     aligned_suggestion: str
@@ -63,10 +68,16 @@ class DiagnosticRule:
         section_data: SectionData = sections.get(self.section) or {}
         ok = bool(self.predicate(section_data))
         return DiagnosisItem(
+            item_id=self.rule_id,
             dimension=self.dimension,
             status=RULE_STATUS_ALIGNED if ok else RULE_STATUS_ATTENTION,
+            source_path=self.source_path,
+            rule_basis=self.rule_basis,
             evidence=self.evidence(section_data),
+            impact=self.impact,
             suggestion=self.aligned_suggestion if ok else self.attention_suggestion,
+            example_revision=self.example_revision,
+            revision_target_path=self.revision_target_path,
         )
 
 
@@ -119,6 +130,11 @@ register_diagnostic_rule(
         rule_id="basis_traceability",
         dimension="依据可追溯",
         section="alignment_card",
+        source_path="alignment_card.citations",
+        rule_basis="课程依据必须来自已审核资料并保留可追溯引用",
+        impact="缺少依据会使教学目标和课堂结论无法复核",
+        example_revision="补入课标或教材原文引用，并注明资料名称与定位。",
+        revision_target_path="lesson_design.teacher_notes",
         predicate=lambda section: bool(_as_list(section, "citations")),
         evidence=lambda section: f"引用片段 {len(_as_list(section, 'citations'))} 条",
         aligned_suggestion="保留引用卡并在导出前复核有效期",
@@ -130,6 +146,11 @@ register_diagnostic_rule(
         rule_id="objective_evidence_alignment",
         dimension="目标—证据一致",
         section="design_blueprint",
+        source_path="design_blueprint.objectives / design_blueprint.evidence",
+        rule_basis="每项目标必须对应至少一项可观察学习证据",
+        impact="目标与证据脱节时无法判断课堂任务是否支持目标达成",
+        example_revision="为每项目标补充观点陈述、依据引用或迁移成果等证据。",
+        revision_target_path="design_blueprint.evidence",
         predicate=lambda section: bool(_as_list(section, "objectives"))
         and bool(_as_list(section, "evidence")),
         evidence=lambda section: (
@@ -145,6 +166,11 @@ register_diagnostic_rule(
         rule_id="task_feasibility",
         dimension="任务可实施",
         section="lesson_design",
+        source_path="lesson_design.activities",
+        rule_basis="课堂任务应明确活动、时间、师生行动和产出证据",
+        impact="任务信息不足会降低课堂可执行性并增加临场调整成本",
+        example_revision="补充分组方式、预计时长、教师支架与学生可见成果。",
+        revision_target_path="lesson_design.teacher_notes",
         predicate=lambda section: bool(_as_list(section, "activities")),
         evidence=lambda section: f"课时活动 {len(_as_list(section, 'activities'))} 个",
         aligned_suggestion="试教后记录调整原因",

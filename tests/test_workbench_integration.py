@@ -889,6 +889,151 @@ async def test_wp22_structured_generation_lock_restore_and_artifacts() -> None:
 
 @pytest.mark.integration
 @pytest.mark.asyncio(loop_scope="session")
+async def test_wp23_evidence_diagnosis_decisions_and_apply_revision() -> None:
+    """WP2.3：结构校正、证据诊断、四类决定和仅采纳项修订形成闭环。"""
+    await _ensure_schema()
+    username = f"wp23_{uuid4().hex[:8]}"
+    password = "password123"
+    user = User(
+        username=username,
+        hashed_password=bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+        full_name="WP2.3 集成测试",
+        role="teacher",
+        is_active=True,
+    )
+    async with AsyncSessionLocal() as db:
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        user_id = user.id
+
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            login = await client.post(
+                "/api/auth/login", json={"username": username, "password": password}
+            )
+            headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+            project = await client.post(
+                "/api/workbench/projects",
+                json={"title": "WP2.3 诊断闭环", "stage": "高中", "course_type": "议题式"},
+                headers=headers,
+            )
+            project_id = project.json()["id"]
+            seeded = await client.post(
+                f"/api/workbench/projects/{project_id}/versions",
+                json={
+                    "source_version": 1,
+                    "content": {
+                        "alignment_card": {"citations": []},
+                        "design_blueprint": {
+                            "objectives": ["形成判断"],
+                            "evidence": [],
+                            "learning_tasks": [],
+                        },
+                        "lesson_design": {
+                            "section_name": "已有教案",
+                            "activities": [],
+                            "teacher_notes": [],
+                            "assessment_evidence": [],
+                        },
+                    },
+                },
+                headers=headers,
+            )
+            source_version = seeded.json()["version_number"]
+
+            preview = await client.get(
+                f"/api/workbench/projects/{project_id}/diagnosis/structure", headers=headers
+            )
+            assert [item["path"] for item in preview.json()] == [
+                "alignment_card",
+                "design_blueprint",
+                "lesson_design",
+            ]
+            nodes = preview.json()
+            nodes[2]["title"] = "教师校正后的课时设计"
+            confirmed = await client.post(
+                f"/api/workbench/projects/{project_id}/diagnosis/structure",
+                json={"source_version": source_version, "nodes": nodes},
+                headers=headers,
+            )
+            assert confirmed.status_code == 200
+            source_version = confirmed.json()["version_number"]
+            assert confirmed.json()["content"]["diagnosis_structure"]["nodes"][2]["title"] == (
+                "教师校正后的课时设计"
+            )
+
+            diagnosis = await client.post(
+                "/api/workbench/skills/diagnose-artifact",
+                json={"project_id": project_id, "source_version": source_version},
+                headers=headers,
+            )
+            assert diagnosis.status_code == 200
+            assert diagnosis.json()["skill_version"] == "1.1.0"
+            items = diagnosis.json()["items"]
+            assert all(
+                item["source_path"]
+                and item["rule_basis"]
+                and item["impact"]
+                and item["example_revision"]
+                for item in items
+            )
+            source_version = diagnosis.json()["version_number"]
+
+            decisions = [
+                ("basis_traceability", "accept", None),
+                ("objective_evidence_alignment", "edit", "补充教师编辑后的观察证据。"),
+                ("task_feasibility", "request_expert", None),
+                ("task_feasibility", "ignore", None),
+            ]
+            for item_id, action, edited_suggestion in decisions:
+                response = await client.post(
+                    f"/api/workbench/projects/{project_id}/diagnosis/items/{item_id}/decision",
+                    json={
+                        "source_version": source_version,
+                        "action": action,
+                        "edited_suggestion": edited_suggestion,
+                    },
+                    headers=headers,
+                )
+                assert response.status_code == 200
+                source_version = response.json()["version_number"]
+
+            revised = await client.post(
+                "/api/workbench/skills/apply-revision",
+                json={"project_id": project_id, "source_version": source_version},
+                headers=headers,
+            )
+            assert revised.status_code == 200
+            assert revised.json()["applied_item_ids"] == [
+                "basis_traceability",
+                "objective_evidence_alignment",
+            ]
+            assert revised.json()["skipped_item_ids"] == ["task_feasibility"]
+            versions = await client.get(
+                f"/api/workbench/projects/{project_id}/versions", headers=headers
+            )
+            content = versions.json()[0]["content"]
+            assert "diagnosis" not in content
+            assert content["diagnosis_history"]
+            assert "补充教师编辑后的观察证据。" in content["design_blueprint"]["evidence"]
+            assert len(content["diagnosis_signals"]) == 4
+            assert all(
+                signal["signal_level"] == "L4"
+                and signal["authorized_for_training"] is False
+                for signal in content["diagnosis_signals"]
+            )
+            assert not any("分数" in str(value) for value in content.values())
+    finally:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(TeachingProject).where(TeachingProject.owner_id == user_id))
+            await db.execute(delete(User).where(User.id == user_id))
+            await db.commit()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
 async def test_review_requires_reviewer_role_and_allows_cross_user(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1021,6 +1166,7 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
                 "skill.design_blueprint",
                 "skill.generate_section",
                 "skill.diagnose_artifact",
+                "skill.apply_revision",
                 "skill.export_artifact",
             ]
             assert skills.json()[0]["status"] == "enabled"

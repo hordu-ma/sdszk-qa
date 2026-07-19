@@ -23,6 +23,9 @@ import type {
   VersionDiff,
   StructuredGenerationResponse,
   TeachingArtifactKind,
+  DiagnosisStructureNode,
+  DiagnosisDecisionAction,
+  ApplyRevisionResponse,
 } from "../types/api";
 
 export function listProjects() {
@@ -191,6 +194,52 @@ export function restoreProjectVersion(
   );
 }
 
+export function previewDiagnosisStructure(projectId: number) {
+  return request.get<unknown, DiagnosisStructureNode[]>(
+    `/workbench/projects/${projectId}/diagnosis/structure`,
+  );
+}
+
+export function confirmDiagnosisStructure(
+  projectId: number,
+  sourceVersion: number,
+  nodes: DiagnosisStructureNode[],
+) {
+  return request.post<unknown, ProjectVersion>(
+    `/workbench/projects/${projectId}/diagnosis/structure`,
+    { source_version: sourceVersion, nodes },
+  );
+}
+
+export function decideDiagnosisItem(
+  projectId: number,
+  itemId: string,
+  sourceVersion: number,
+  action: DiagnosisDecisionAction,
+  editedSuggestion?: string,
+) {
+  return request.post<unknown, ProjectVersion>(
+    `/workbench/projects/${projectId}/diagnosis/items/${itemId}/decision`,
+    {
+      source_version: sourceVersion,
+      action,
+      edited_suggestion: editedSuggestion || null,
+    },
+  );
+}
+
+export function applyDiagnosisRevision(
+  projectId: number,
+  sourceVersion: number,
+  memoryRefs: MemoryRef[] = [],
+) {
+  return request.post<unknown, ApplyRevisionResponse>("/workbench/skills/apply-revision", {
+    project_id: projectId,
+    source_version: sourceVersion,
+    memory_refs: memoryRefs,
+  });
+}
+
 export function confirmProfessionalInput(
   projectId: number,
   data: ProfessionalInputPayload,
@@ -250,9 +299,14 @@ export function generateSection(
   );
 }
 
-export function diagnoseArtifact(projectId: number, memoryRefs: MemoryRef[]) {
+export function diagnoseArtifact(
+  projectId: number,
+  sourceVersion: number,
+  memoryRefs: MemoryRef[],
+) {
   return request.post<unknown, SkillStepResponse>("/workbench/skills/diagnose-artifact", {
     project_id: projectId,
+    source_version: sourceVersion,
     memory_refs: memoryRefs,
   });
 }

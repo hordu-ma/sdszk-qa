@@ -10,11 +10,11 @@
 
 | 范围 | 状态 | 说明 |
 | --- | --- | --- |
-| 开发策略 | 自助开发模式生效 | 客户/专家暂不参与；外部签字项冻结为补签清单，工程按内部代理决策与 M0-int/M1-int 内部门推进（主计划 §0.5） |
+| 开发策略 | 自助开发 + 投标演示优先 | 客户/专家暂不参与；外部签字项冻结为补签清单，先完成桌面 Web 工程闭环和可重复演示，内部结论不冒充外部验收（主计划 §0.5–§0.6） |
 | 问答 MVP | 可用 | 登录、主题、会话、历史、SSE 流式问答 |
 | 阶段 1A | 工程底座可用，整体未验收 | `luyun-int` 已固定使用 vLLM 主链，语义 RAG、来源标记和版本化工程评测已实现；候选模型与完整 G0 外部签字未冻结 |
 | 阶段 1B / G1 | M1-int 内部门通过，未通过 G1 | 高中议题式闭环、140 例内部金标 v0、工作台内部走查和同镜像稳定环境晋级已完成；真实专家金标与外部签字仍未完成 |
-| 阶段 2 | WP2.1、WP2.2 内部工程已收口 | 专业输入、结构化生成、锁定/局部重生成/恢复、字段差异、多成果和标准 Word 闭环已进入集成环境；不代表阶段 2 或 G2 完成 |
+| 阶段 2 | WP2.1–WP2.3 内部工程已收口 | 专业输入、结构化生成、版本保护、证据化诊断、逐条决定和仅采纳项修订已进入集成环境；不代表阶段 2 或 G2 完成 |
 | Base-Spark 接入 | 双环境链路已通 | `luyun-int` 与 `luyun-demo` 独立运行并通过 Tailnet HTTPS 访问；ACL 授权由 Tailnet 管理侧负责 |
 
 ### 已实现能力
@@ -34,7 +34,7 @@
 - 评测来源门禁：数据集显式区分 `synthetic`、`internal_authored`、`customer_provided`、`expert_authored`；模拟数据不能被审核成正式专家集，内部自研数据永远明示非专家来源
 - 内部金标 v0：`stage1-internal-gold` 140 例无泄漏自研评测集（`seed_internal_gold.py`），已走通双评/第三人仲裁全流程并冻结；内部阈值见《[内部阈值标定报告 v0](src/docs/2026-stage1-internal-gold-threshold-report-v0.md)》
 - 金标治理：支持最多 200 例批量导入、审核员正式集复核队列、两位不同审核人独立复核、分歧时由第三人仲裁、占位案例阻止冻结，以及金标状态/最近运行汇总报告；只有数据集所有者可导入、冻结和运行
-- Skills 运行时：统一权限、Schema、运行审计、停用与降级契约；已注册查依据、专业输入确认、对齐卡、蓝图、分块生成、形成性诊断和导出七个 Skill
+- Skills 运行时：统一权限、Schema、运行审计、停用与降级契约；已注册查依据、专业输入确认、对齐卡、蓝图、分块生成、形成性诊断、采纳项修订和导出八个 Skill
 - Memory：账户偏好、班情档案、项目/模板钉选；每次注入必须由用户在界面显式勾选，支持导出；一键清除前显示对象数量和不可撤销确认
 - 异步任务：排队、进度、取消、重试，应用重启后自动恢复
 - 高中议题式样板：依据对齐卡 → 目标—证据—任务蓝图 → 课时分块 → 非评分诊断 → 结构化标准 Word 导出；界面按前置成果逐步解锁
@@ -43,6 +43,8 @@
 - WP2.1 冲突与衔接：版本化规则字典阻断课型、时间、数字资源、目标—活动、资源—用途和协作条件冲突，禁止规则引入评分/排名；空白项只以“假设/待确认”继续；已确认专业输入是后续 `alignment_card` 的服务端单一事实源，上游变化只在新版本中使下游旧成果失效
 - WP2.2 结构化生成：`skill.generate_section` v1.1.0 支持课时整体生成、字段级局部重生成、章节/成果锁定和来源版本冲突检查；锁定绕过由服务端阻断，任何生成、锁定或恢复操作都形成不可变新版本
 - WP2.2 多成果与差异：从当前蓝图和课时设计派生课堂任务单、非评分观察量规、板书、课件提纲和实践任务；版本比较提供字段级差异，历史恢复不删除原版本；`word-standard-v2` 可稳定汇总主教案和配套成果
+- WP2.3 证据化诊断：教师先确认或校正已有教案结构；`skill.diagnose_artifact` v1.1.0 的每条诊断项提供原文位置、规则依据、可见证据、影响、建议和示例改写，可逐条采纳、忽略、编辑后采纳或申请专家复核
+- WP2.3 采纳项修订：`skill.apply_revision` v1.0.0 只应用教师明确采纳或编辑后采纳的条目，尊重 WP2.2 字段锁定并生成不可变二次修改稿；所有决定写为未授权训练的 L4 信号，不产生教师评分或排名
 - 角色边界：教师负责创建、上传和使用资料；管理员/审核员负责资料审核；后台任务失败时界面显示具体错误原因
 
 **工程质量**
@@ -57,7 +59,9 @@
 
 专家审核的完整阶段 1 Skill/规则目录、真实专家金标 120–160 个案例及专业阈值、候选模型正式选型、Virtus 人工验收和 G0/G1 外部签字。金标双评/仲裁工具已经实现，但当前三个模型仍是工程兼容性候选，64 个案例仍是模拟工程集；都不代表专业验收。完整清单见主开发计划 §1.2。
 
-自 2026-07-17 起，上述外部依赖项按主计划 §0.5 自助开发模式冻结为补签清单，不再阻塞开发。自助优先级 1–5 已完成，`stage1-workbench-ux-20260719-r1` 已以同一镜像摘要晋级 `luyun-demo`，完成备份、Tailnet 冒烟和上一镜像回滚恢复；M1-int 内部门结论为通过，详见《[M1-int 收口记录](src/docs/2026-stage1-m1-int-closure.md)》。当前 `luyun-int` 为 WP2.2 收口候选 `stage2-wp22-closure-20260719-r3`，`luyun-demo` 保持 Stage 1 稳定镜像。WP2.1/WP2.2 内部收口不等于阶段 2 或 G2 完成；客户专属 Word 模板、真实教师验证和外部签字仍在补签/替换清单中。
+自 2026-07-17 起，上述外部依赖项按主计划 §0.5 自助开发模式冻结为补签清单，不再阻塞开发。自助优先级 1–5 已完成，`stage1-workbench-ux-20260719-r1` 已以同一镜像摘要晋级 `luyun-demo`，完成备份、Tailnet 冒烟和上一镜像回滚恢复；M1-int 内部门结论为通过，详见《[M1-int 收口记录](src/docs/2026-stage1-m1-int-closure.md)》。当前 `luyun-int` 为 WP2.3 收口候选 `stage2-wp23-closure-20260719-r1`，`luyun-demo` 保持 Stage 1 稳定镜像。WP2.1–WP2.3 内部收口不等于阶段 2 或 G2 完成；分学段正式量规、真实教师验证、专家复核和外部签字仍在补签/替换清单中。
+
+当前执行顺序已调整为：先完成 WP2.3–WP2.6 的桌面 Web 内部工程和投标演示稳定基线，再推进阶段 3/4 的 Web 能力与增强门禁，最后实现阶段 3 合同归属的小程序轻量端。小程序在此之前只保留接口和跨端协议，不进入并行开发。
 
 ## 系统组成
 
@@ -72,7 +76,7 @@
 ## 主要使用流程
 
 - **问答：** 登录 → 选主题 → 创建会话 → 流式问答 → 查看历史
-- **工作台：** 登录 → 创建项目 → 上传并审核资料 → 显式选择 Memory → 确认专业输入并处理冲突 → 依序运行纵向样板 → 诊断/版本差异 → 导出 Word
+- **工作台：** 登录 → 创建项目 → 上传并审核资料 → 显式选择 Memory → 确认专业输入并处理冲突 → 生成并编辑教案 → 校正结构 → 逐条诊断决定 → 仅采纳项修订 → 导出 Word
 
 ## 关键接口
 
@@ -81,7 +85,8 @@
 - 对话：`POST /api/chat`（SSE）
 - 项目与任务：`/api/workbench/projects`、`/api/workbench/tasks`
 - 资料：`/api/workbench/projects/{id}/documents`、`/api/workbench/documents/{id}/review`
-- Skills：`GET /api/workbench/skills`、`POST /api/workbench/skills/{retrieve-basis|confirm-professional-input|alignment-card|design-blueprint|generate-section|diagnose-artifact|export-artifact}`
+- Skills：`GET /api/workbench/skills`、`POST /api/workbench/skills/{retrieve-basis|confirm-professional-input|alignment-card|design-blueprint|generate-section|diagnose-artifact|apply-revision|export-artifact}`
+- 诊断审核：`/api/workbench/projects/{id}/diagnosis/structure`、`/api/workbench/projects/{id}/diagnosis/items/{item_id}/decision`
 - Memory：`/api/workbench/memory/preference`、`class-profiles`、`pinned-items`、`export`、`clear`
 - 版本/导出：`/api/workbench/projects/{id}/versions`、`versions/diff`、`/api/workbench/exports/{id}/download`
 - 模型/索引：`/api/workbench/runtime/model-assets`、`/api/workbench/projects/{id}/knowledge-indexes`
@@ -108,6 +113,7 @@ make test-integration    # 集成测试
 | [M1-int 收口记录](src/docs/2026-stage1-m1-int-closure.md) | 阶段 1 内部门结论、双环境晋级、回滚证据和外部补签边界 | 进入阶段 2 或复核 G1 状态时 |
 | [WP2.1 收口记录](src/docs/2026-stage2-wp21-closure.md) | 专业输入、Memory 复用、冲突规则、事实源和部署回滚证据 | 开始 WP2.2 或复核 WP2.1 状态时 |
 | [WP2.2 收口记录](src/docs/2026-stage2-wp22-closure.md) | 结构化生成、锁定、局部重生成、多成果、差异、恢复和部署证据 | 开始 WP2.3 或复核 WP2.2 状态时 |
+| [WP2.3 收口记录](src/docs/2026-stage2-wp23-closure.md) | 结构校正、证据化诊断、逐条决定、L4 信号、采纳项修订和部署证据 | 开始 WP2.4 或复核 WP2.3 状态时 |
 | [模拟信息替换台账](src/docs/2026-stage1-synthetic-replacement-ledger.md) | 当前模拟项、真实替换入口、门禁与回归要求 | 替换客户资料或准备正式 G0/G1 时 |
 | [架构说明](src/docs/ARCHITECTURE.md) | 当前结构与目标架构边界 | 了解代码组织时 |
 | [基础设施说明](src/infra/README.md) | Compose、部署、base-spark 运维手册 | 部署与运维时 |

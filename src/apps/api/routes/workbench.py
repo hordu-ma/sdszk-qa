@@ -34,6 +34,9 @@ from src.apps.api.schemas.workbench import (
     AlignmentCardOutput,
     AlignmentCardRequest,
     AlignmentCardResponse,
+    ApplyRevisionOutput,
+    ApplyRevisionRequest,
+    ApplyRevisionResponse,
     ClassProfileCreate,
     ClassProfileResponse,
     DesignBlueprintOutput,
@@ -42,6 +45,9 @@ from src.apps.api.schemas.workbench import (
     DiagnoseArtifactOutput,
     DiagnoseArtifactRequest,
     DiagnoseArtifactResponse,
+    DiagnosisDecisionRequest,
+    DiagnosisStructureConfirm,
+    DiagnosisStructureNode,
     DocumentResponse,
     DocumentReviewRequest,
     EvaluationCaseBulkImport,
@@ -87,6 +93,11 @@ from src.apps.api.schemas.workbench import (
     VersionDiffResponse,
 )
 from src.apps.api.services.audit import write_audit_log
+from src.apps.api.services.diagnosis_workflow_service import (
+    confirm_diagnosis_structure,
+    detect_diagnosis_structure,
+    save_diagnosis_decision,
+)
 from src.apps.api.services.evaluation_service import (
     EvaluationCaseInput,
     add_case,
@@ -547,6 +558,88 @@ async def run_diagnose_artifact(
     )
     assert isinstance(output, DiagnoseArtifactOutput)
     return DiagnoseArtifactResponse(
+        skill_run_id=run.id, skill_version=run.skill_version, **output.model_dump()
+    )
+
+
+@router.get(
+    "/projects/{project_id}/diagnosis/structure",
+    response_model=list[DiagnosisStructureNode],
+)
+async def preview_diagnosis_structure(
+    project_id: int, db: DbSession, current_user: CurrentUser
+) -> list[DiagnosisStructureNode]:
+    project = await get_owned_project(db, project_id, current_user.id)
+    result = await db.execute(
+        select(ProjectVersion)
+        .where(ProjectVersion.project_id == project.id)
+        .order_by(ProjectVersion.version_number.desc())
+        .limit(1)
+    )
+    version = result.scalar_one_or_none()
+    if version is None:
+        return []
+    return detect_diagnosis_structure(version.content)
+
+
+@router.post(
+    "/projects/{project_id}/diagnosis/structure",
+    response_model=ProjectVersionResponse,
+)
+async def confirm_diagnosis_structure_route(
+    project_id: int,
+    data: DiagnosisStructureConfirm,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ProjectVersionResponse:
+    version = await confirm_diagnosis_structure(
+        db,
+        project_id=project_id,
+        user_id=current_user.id,
+        source_version=data.source_version,
+        nodes=data.nodes,
+    )
+    await db.commit()
+    await db.refresh(version)
+    return ProjectVersionResponse.model_validate(version)
+
+
+@router.post(
+    "/projects/{project_id}/diagnosis/items/{item_id}/decision",
+    response_model=ProjectVersionResponse,
+)
+async def decide_diagnosis_item(
+    project_id: int,
+    item_id: str,
+    data: DiagnosisDecisionRequest,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ProjectVersionResponse:
+    version = await save_diagnosis_decision(
+        db,
+        project_id=project_id,
+        item_id=item_id,
+        user_id=current_user.id,
+        request=data,
+    )
+    await db.commit()
+    await db.refresh(version)
+    return ProjectVersionResponse.model_validate(version)
+
+
+@router.post("/skills/apply-revision", response_model=ApplyRevisionResponse)
+async def run_apply_revision(
+    data: ApplyRevisionRequest, db: DbSession, current_user: CurrentUser
+) -> ApplyRevisionResponse:
+    run, output = await run_skill(
+        db,
+        skill_id="skill.apply_revision",
+        user=current_user,
+        payload=data.model_dump(exclude={"memory_refs"}),
+        memory_refs=data.memory_refs,
+    )
+    assert isinstance(output, ApplyRevisionOutput)
+    return ApplyRevisionResponse(
         skill_run_id=run.id, skill_version=run.skill_version, **output.model_dump()
     )
 

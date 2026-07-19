@@ -544,13 +544,20 @@ class GenerateSectionResponse(GenerateSectionOutput):
 
 class DiagnoseArtifactInput(BaseModel):
     project_id: int
+    source_version: int | None = Field(default=None, ge=1)
 
 
 class DiagnosisItem(BaseModel):
+    item_id: str
     dimension: str
     status: str = Field(pattern="^(aligned|needs_attention)$")
+    source_path: str
+    rule_basis: str
     evidence: str
+    impact: str
     suggestion: str
+    example_revision: str
+    revision_target_path: str
 
 
 class DiagnoseArtifactOutput(BaseModel):
@@ -567,6 +574,46 @@ class DiagnoseArtifactRequest(DiagnoseArtifactInput):
 class DiagnoseArtifactResponse(DiagnoseArtifactOutput):
     skill_run_id: int
     skill_id: str = "skill.diagnose_artifact"
+    skill_version: str
+
+
+class DiagnosisStructureNode(BaseModel):
+    path: str = Field(min_length=2, max_length=200)
+    section_type: str = Field(min_length=2, max_length=80)
+    title: str = Field(min_length=1, max_length=200)
+    excerpt: str = Field(default="", max_length=1000)
+
+
+class DiagnosisStructureConfirm(BaseModel):
+    source_version: int = Field(ge=1)
+    nodes: list[DiagnosisStructureNode] = Field(min_length=1, max_length=100)
+
+
+class DiagnosisDecisionRequest(BaseModel):
+    source_version: int = Field(ge=1)
+    action: Literal["accept", "ignore", "edit", "request_expert"]
+    edited_suggestion: str | None = Field(default=None, max_length=2000)
+
+
+class ApplyRevisionInput(BaseModel):
+    project_id: int
+    source_version: int | None = Field(default=None, ge=1)
+
+
+class ApplyRevisionOutput(BaseModel):
+    applied_item_ids: list[str]
+    skipped_item_ids: list[str]
+    changed_paths: list[str]
+    version_number: int
+
+
+class ApplyRevisionRequest(ApplyRevisionInput):
+    memory_refs: list[MemoryRef] = Field(default_factory=list, max_length=10)
+
+
+class ApplyRevisionResponse(ApplyRevisionOutput):
+    skill_run_id: int
+    skill_id: str = "skill.apply_revision"
     skill_version: str
 
 

@@ -114,6 +114,7 @@ def test_registry_contains_vertical_sample_chain() -> None:
         "skill.design_blueprint",
         "skill.generate_section",
         "skill.diagnose_artifact",
+        "skill.apply_revision",
         "skill.export_artifact",
     ]
     assert all(item.degradation_policy for item in SKILL_REGISTRY.values())
@@ -122,6 +123,7 @@ def test_registry_contains_vertical_sample_chain() -> None:
         SKILL_REGISTRY["skill.generate_section"].rule_set_version
         == "stage2-structured-gen-v1"
     )
+    assert SKILL_REGISTRY["skill.diagnose_artifact"].skill_version == "1.1.0"
 
 
 def test_char_vector_similarity_prefers_related_text() -> None:

@@ -3,11 +3,14 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { showConfirmDialog, showFailToast, showSuccessToast } from "vant";
 import ArtifactEditor from "../components/ArtifactEditor.vue";
+import DiagnosisReviewPanel from "../components/DiagnosisReviewPanel.vue";
 import ProfessionalInputPanel from "../components/ProfessionalInputPanel.vue";
 import {
   cancelTask,
+  applyDiagnosisRevision,
   clearMemory,
   compareVersions,
+  confirmDiagnosisStructure,
   confirmProfessionalInput,
   createAlignmentCard,
   createClassProfile,
@@ -17,6 +20,7 @@ import {
   createDesignBlueprint,
   deleteClassProfile,
   deletePinnedItem,
+  decideDiagnosisItem,
   diagnoseArtifact,
   downloadExport,
   exportArtifact,
@@ -35,6 +39,7 @@ import {
   listProjects,
   listTasks,
   pinProject,
+  previewDiagnosisStructure,
   importEvaluationCases,
   reviewDocument,
   reviewEvaluationDataset,
@@ -51,6 +56,8 @@ import {
 import type {
   BasisCitation,
   ClassProfile,
+  DiagnosisDecisionAction,
+  DiagnosisStructureNode,
   EvaluationCase,
   EvaluationCaseInput,
   EvaluationDataOrigin,
@@ -99,6 +106,8 @@ const editorSaving = ref(false);
 const editorDirty = ref(false);
 const professionalInputSaving = ref(false);
 const professionalInputDirty = ref(false);
+const diagnosisSaving = ref(false);
+const diagnosisStructureNodes = ref<DiagnosisStructureNode[]>([]);
 const query = ref("");
 const newProject = ref({ title: "", stage: "高中", course_type: "议题式" });
 const memoryForm = ref({
@@ -157,6 +166,11 @@ const latestVersionContent = computed<Record<string, unknown>>(
 const hasAlignmentCard = computed(() => Boolean(latestVersionContent.value.alignment_card));
 const hasDesignBlueprint = computed(() => Boolean(latestVersionContent.value.design_blueprint));
 const hasLessonDesign = computed(() => Boolean(latestVersionContent.value.lesson_design));
+const hasConfirmedDiagnosisStructure = computed(() => {
+  const value = latestVersionContent.value.diagnosis_structure;
+  return value && typeof value === "object" && !Array.isArray(value)
+    && (value as Record<string, unknown>).confirmed === true;
+});
 const hasDiagnosis = computed(() => Boolean(latestVersionContent.value.diagnosis));
 const professionalInput = computed<Record<string, unknown>>(() => {
   const value = latestVersionContent.value.professional_input;
@@ -200,6 +214,9 @@ async function refreshProjectData() {
   documents.value = documentItems;
   tasks.value = taskItems;
   versions.value = versionItems;
+  diagnosisStructureNodes.value = hasLessonDesign.value
+    ? await previewDiagnosisStructure(selectedProjectId.value)
+    : [];
   const latestVersion = versionItems[0];
   const earliestVersion = versionItems[versionItems.length - 1];
   if (latestVersion && earliestVersion) {
@@ -434,6 +451,7 @@ async function runSampleStep(step: "alignment" | "blueprint" | "generate" | "dia
     } else {
       latestStep.value = await diagnoseArtifact(
         selectedProjectId.value,
+        versions.value[0]?.version_number || 1,
         selectedMemoryRefs.value,
       );
     }
@@ -441,6 +459,61 @@ async function runSampleStep(step: "alignment" | "blueprint" | "generate" | "dia
     showSuccessToast(`已完成 ${latestStep.value.skill_id}，生成版本 v${latestStep.value.version_number}`);
   } finally {
     loading.value = false;
+  }
+}
+
+async function handleConfirmDiagnosisStructure(nodes: DiagnosisStructureNode[]) {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  diagnosisSaving.value = true;
+  try {
+    await confirmDiagnosisStructure(
+      selectedProjectId.value,
+      versions.value[0].version_number,
+      nodes,
+    );
+    await refreshProjectData();
+    showSuccessToast("教案结构已确认，可运行证据化诊断");
+  } finally {
+    diagnosisSaving.value = false;
+  }
+}
+
+async function handleDiagnosisDecision(data: {
+  itemId: string;
+  action: DiagnosisDecisionAction;
+  editedSuggestion?: string;
+}) {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  diagnosisSaving.value = true;
+  try {
+    await decideDiagnosisItem(
+      selectedProjectId.value,
+      data.itemId,
+      versions.value[0].version_number,
+      data.action,
+      data.editedSuggestion,
+    );
+    await refreshProjectData();
+    showSuccessToast("诊断决定已记录为 L4 信号");
+  } finally {
+    diagnosisSaving.value = false;
+  }
+}
+
+async function handleApplyDiagnosisRevision() {
+  if (!selectedProjectId.value || !versions.value[0]) return;
+  diagnosisSaving.value = true;
+  try {
+    const result = await applyDiagnosisRevision(
+      selectedProjectId.value,
+      versions.value[0].version_number,
+      selectedMemoryRefs.value,
+    );
+    latestStep.value = result;
+    await refreshProjectData();
+    showSuccessToast(`已应用 ${result.applied_item_ids.length} 项，生成 v${result.version_number}`);
+  } finally {
+    diagnosisSaving.value = false;
   }
 }
 
@@ -1000,7 +1073,7 @@ onBeforeUnmount(() => {
           <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || (hasProfessionalInput && !professionalInputReady)" title="阶段 2 项目需先完成专业输入确认" @click="runSampleStep('alignment')">1 对齐卡</button>
           <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasAlignmentCard" title="请先完成对齐卡" @click="runSampleStep('blueprint')">2 教学蓝图</button>
           <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasDesignBlueprint" title="请先完成教学蓝图" @click="runSampleStep('generate')">3 课时设计</button>
-          <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasLessonDesign" title="请先完成课时设计并保存编辑" @click="runSampleStep('diagnose')">4 形成性诊断</button>
+          <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasLessonDesign || !hasConfirmedDiagnosisStructure" title="请先完成课时设计并确认下方教案结构" @click="runSampleStep('diagnose')">4 形成性诊断</button>
           <button :disabled="loading || hasUnsavedChanges || !selectedProjectId || !hasDiagnosis" title="请先完成形成性诊断" @click="handleExportArtifact">5 导出 Word</button>
         </div>
         <p v-if="selectedProjectId" class="workflow-progress" role="status" aria-live="polite">
@@ -1021,6 +1094,14 @@ onBeforeUnmount(() => {
           @regenerate="handleRegenerateArtifactField"
           @generate-artifact="handleGenerateTeachingArtifact"
           @restore="handleRestoreArtifactVersion"
+        />
+        <DiagnosisReviewPanel
+          :version="versions[0] || null"
+          :structure-nodes="diagnosisStructureNodes"
+          :saving="diagnosisSaving"
+          @confirm-structure="handleConfirmDiagnosisStructure"
+          @decide="handleDiagnosisDecision"
+          @apply-revision="handleApplyDiagnosisRevision"
         />
       </article>
 

@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ArtifactEditor: typeof import('./src/components/ArtifactEditor.vue')['default']
+    DiagnosisReviewPanel: typeof import('./src/components/DiagnosisReviewPanel.vue')['default']
     ProfessionalInputPanel: typeof import('./src/components/ProfessionalInputPanel.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

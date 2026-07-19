@@ -353,6 +353,48 @@ export interface StructuredGenerationResponse extends SkillStepResponse {
   preserved_locked_paths: string[];
 }
 
+export interface DiagnosisStructureNode {
+  path: string;
+  section_type: string;
+  title: string;
+  excerpt: string;
+}
+
+export type DiagnosisDecisionAction = "accept" | "ignore" | "edit" | "request_expert";
+
+export interface DiagnosisItem {
+  item_id: string;
+  dimension: string;
+  status: "aligned" | "needs_attention";
+  source_path: string;
+  rule_basis: string;
+  evidence: string;
+  impact: string;
+  suggestion: string;
+  example_revision: string;
+  revision_target_path: string;
+}
+
+export interface DiagnosisDecision {
+  action: DiagnosisDecisionAction;
+  edited_suggestion: string | null;
+  signal_level: "L4";
+  authorized_for_training: false;
+}
+
+export interface DiagnosisContent {
+  conclusion: string;
+  items: DiagnosisItem[];
+  blocking_issues: string[];
+  decisions?: Record<string, DiagnosisDecision>;
+}
+
+export interface ApplyRevisionResponse extends SkillStepResponse {
+  applied_item_ids: string[];
+  skipped_item_ids: string[];
+  changed_paths: string[];
+}
+
 export interface SkillStepResponse {
   skill_run_id: number;
   skill_id: string;

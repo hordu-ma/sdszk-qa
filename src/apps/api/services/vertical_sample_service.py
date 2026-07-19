@@ -212,10 +212,23 @@ async def diagnose_artifact_handler(
     db: AsyncSession, user: User, payload: DiagnoseArtifactInput, run: SkillRun
 ) -> DiagnoseArtifactOutput:
     project, source = await _latest_version(db, payload.project_id, user.id)
+    if payload.source_version is not None and payload.source_version != source.version_number:
+        raise BusinessError(
+            f"项目已更新到 v{source.version_number}，请刷新后重试",
+            status_code=409,
+            error_code="source_version_conflict",
+        )
     run.project_id = project.id
     alignment = _require_section(source.content, "alignment_card", "请先完成课程依据对齐卡")
     blueprint = _require_section(source.content, "design_blueprint", "请先完成教学蓝图")
     design = _require_section(source.content, "lesson_design", "请先生成课时设计")
+    structure = source.content.get("diagnosis_structure")
+    if isinstance(structure, dict) and structure.get("confirmed") is not True:
+        raise BusinessError(
+            "请先确认教案结构识别结果",
+            status_code=409,
+            error_code="diagnosis_structure_unconfirmed",
+        )
     # 诊断维度由规则字典 v2 驱动（services/diagnostic_rules.py），新增维度只需注册规则。
     checks, blocking = evaluate_diagnostic_rules(
         {

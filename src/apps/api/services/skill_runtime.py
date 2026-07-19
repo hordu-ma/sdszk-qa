@@ -33,6 +33,8 @@ from src.apps.api.models import (
 from src.apps.api.schemas.workbench import (
     AlignmentCardInput,
     AlignmentCardOutput,
+    ApplyRevisionInput,
+    ApplyRevisionOutput,
     DesignBlueprintInput,
     DesignBlueprintOutput,
     DiagnoseArtifactInput,
@@ -47,6 +49,7 @@ from src.apps.api.schemas.workbench import (
     RetrieveBasisInput,
     RetrieveBasisOutput,
 )
+from src.apps.api.services.diagnosis_workflow_service import apply_revision_handler
 from src.apps.api.services.knowledge_service import retrieve_basis_handler
 from src.apps.api.services.professional_input_service import (
     RULE_SET_VERSION as PROFESSIONAL_INPUT_RULE_SET_VERSION,
@@ -361,14 +364,28 @@ register_skill(
 register_skill(
     RegisteredSkill(
         skill_id="skill.diagnose_artifact",
-        skill_version="1.0.0",
-        name="执行证据化轻量诊断",
+        skill_version="1.1.0",
+        name="执行可定位的证据化诊断",
         input_model=DiagnoseArtifactInput,
         output_model=DiagnoseArtifactOutput,
         handler=diagnose_artifact_handler,  # pyright: ignore[reportArgumentType]
         maturity="vertical_sample",
-        rule_set_version="high-school-inquiry-v1",
+        rule_set_version="stage2-evidence-diagnosis-v1",
         degradation_policy="return_attention_items_without_total_value",
+    )
+)
+
+register_skill(
+    RegisteredSkill(
+        skill_id="skill.apply_revision",
+        skill_version="1.0.0",
+        name="按教师采纳项生成二次修改稿",
+        input_model=ApplyRevisionInput,
+        output_model=ApplyRevisionOutput,
+        handler=apply_revision_handler,  # pyright: ignore[reportArgumentType]
+        maturity="vertical_sample",
+        rule_set_version="stage2-evidence-diagnosis-v1",
+        degradation_policy="apply_only_explicitly_accepted_items",
     )
 )
 
