@@ -27,6 +27,11 @@ import type {
   DiagnosisStructureNode,
   DiagnosisDecisionAction,
   ApplyRevisionResponse,
+  L4SignalSummary,
+  SpotCheckDetail,
+  SpotCheckQueue,
+  SpotCheckReview,
+  SpotCheckVerdict,
 } from "../types/api";
 
 export function listProjects() {
@@ -406,4 +411,40 @@ export function freezeEvaluationDataset(datasetId: number) {
 
 export function runEvaluationDataset(datasetId: number) {
   return request.post(`/workbench/evaluation/datasets/${datasetId}/runs`);
+}
+
+export function sampleSpotChecks(data: { skill_id?: string; sample_size?: number }) {
+  return request.post<unknown, SpotCheckQueue>("/workbench/spot-checks/sample", data);
+}
+
+export function listSpotChecks(statusFilter?: string) {
+  return request.get<unknown, SpotCheckQueue>("/workbench/spot-checks", {
+    params: statusFilter ? { status_filter: statusFilter } : {},
+  });
+}
+
+export function getSpotCheckDetail(itemId: number) {
+  return request.get<unknown, SpotCheckDetail>(`/workbench/spot-checks/${itemId}`);
+}
+
+export function submitSpotCheckReview(
+  itemId: number,
+  data: {
+    review_kind: "independent" | "arbitration";
+    verdict: SpotCheckVerdict;
+    issue_tags: string[];
+    rubric_feedback?: string | null;
+    rationale: string;
+  },
+) {
+  return request.post<unknown, SpotCheckReview>(
+    `/workbench/spot-checks/${itemId}/reviews`,
+    data,
+  );
+}
+
+export function getL4SignalSummary(projectId?: number | null) {
+  return request.get<unknown, L4SignalSummary>("/workbench/signals/l4-summary", {
+    params: projectId ? { project_id: projectId } : {},
+  });
 }

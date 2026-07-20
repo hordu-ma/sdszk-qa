@@ -12,6 +12,7 @@ from src.apps.api.main import app
 from src.apps.api.models import (
     MemoryInjectionAudit,
     SkillRun,
+    SpotCheckItem,
     TeachingProject,
     User,
 )
@@ -1488,4 +1489,248 @@ async def test_search_degrades_when_semantic_index_missing(
                 delete(TeachingProject).where(TeachingProject.owner_id == user_id)
             )
             await db.execute(delete(User).where(User.id == user_id))
+            await db.commit()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+async def test_wp24_spot_check_queue_and_l4_signal_summary() -> None:
+    """WP2.4 增量 2：诊断运行抽检双评仲裁 + L4 信号按规则维度汇总。"""
+    await _ensure_schema()
+    password = "password123"
+    suffix = uuid4().hex[:8]
+
+    def _user(name: str, role: str) -> User:
+        return User(
+            username=f"{name}_{suffix}",
+            hashed_password=bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+            full_name=f"WP2.4 {name}",
+            role=role,
+            is_active=True,
+        )
+
+    teacher = _user("wp24_teacher", "teacher")
+    reviewer_a = _user("wp24_rev_a", "reviewer")
+    reviewer_b = _user("wp24_rev_b", "reviewer")
+    arbitrator = _user("wp24_arb", "reviewer")
+    async with AsyncSessionLocal() as db:
+        db.add_all([teacher, reviewer_a, reviewer_b, arbitrator])
+        await db.commit()
+        for row in (teacher, reviewer_a, reviewer_b, arbitrator):
+            await db.refresh(row)
+        user_ids = [teacher.id, reviewer_a.id, reviewer_b.id, arbitrator.id]
+        teacher_id = teacher.id
+
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+
+            async def _login(username: str) -> dict[str, str]:
+                response = await client.post(
+                    "/api/auth/login", json={"username": username, "password": password}
+                )
+                return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+            teacher_headers = await _login(teacher.username)
+            rev_a_headers = await _login(reviewer_a.username)
+            rev_b_headers = await _login(reviewer_b.username)
+            arb_headers = await _login(arbitrator.username)
+
+            project = await client.post(
+                "/api/workbench/projects",
+                json={"title": "WP2.4 抽检闭环", "stage": "高中", "course_type": "议题式"},
+                headers=teacher_headers,
+            )
+            project_id = project.json()["id"]
+            seeded = await client.post(
+                f"/api/workbench/projects/{project_id}/versions",
+                json={
+                    "source_version": 1,
+                    "content": {
+                        "alignment_card": {"citations": []},
+                        "design_blueprint": {
+                            "objectives": ["形成判断"],
+                            "evidence": [],
+                            "learning_tasks": [],
+                        },
+                        "lesson_design": {
+                            "section_name": "已有教案",
+                            "activities": [],
+                            "teacher_notes": [],
+                            "assessment_evidence": [],
+                        },
+                    },
+                },
+                headers=teacher_headers,
+            )
+            source_version = seeded.json()["version_number"]
+            preview = await client.get(
+                f"/api/workbench/projects/{project_id}/diagnosis/structure",
+                headers=teacher_headers,
+            )
+            confirmed = await client.post(
+                f"/api/workbench/projects/{project_id}/diagnosis/structure",
+                json={"source_version": source_version, "nodes": preview.json()},
+                headers=teacher_headers,
+            )
+            source_version = confirmed.json()["version_number"]
+            diagnosis = await client.post(
+                "/api/workbench/skills/diagnose-artifact",
+                json={"project_id": project_id, "source_version": source_version},
+                headers=teacher_headers,
+            )
+            assert diagnosis.status_code == 200
+            diagnose_run_id = diagnosis.json()["skill_run_id"]
+            source_version = diagnosis.json()["version_number"]
+            for item_id, action, edited in (
+                ("basis_traceability", "accept", None),
+                ("objective_evidence_alignment", "edit", "补充编辑后的证据。"),
+                ("task_feasibility", "request_expert", None),
+            ):
+                decision = await client.post(
+                    f"/api/workbench/projects/{project_id}/diagnosis/items/{item_id}/decision",
+                    json={
+                        "source_version": source_version,
+                        "action": action,
+                        "edited_suggestion": edited,
+                    },
+                    headers=teacher_headers,
+                )
+                assert decision.status_code == 200
+                source_version = decision.json()["version_number"]
+
+            # 教师无权操作抽检队列与全局汇总
+            forbidden = await client.get(
+                "/api/workbench/spot-checks", headers=teacher_headers
+            )
+            assert forbidden.status_code == 403
+            forbidden_summary = await client.get(
+                "/api/workbench/signals/l4-summary", headers=teacher_headers
+            )
+            assert forbidden_summary.status_code == 403
+
+            sampled = await client.post(
+                "/api/workbench/spot-checks/sample",
+                json={"skill_id": "skill.diagnose_artifact", "sample_size": 20},
+                headers=rev_a_headers,
+            )
+            assert sampled.status_code == 201
+            sampled_items = sampled.json()["items"]
+            assert sampled.json()["disclaimer"]
+            item = next(
+                row for row in sampled_items if row["skill_run_id"] == diagnose_run_id
+            )
+            assert item["status"] == "pending"
+            assert item["context_snapshot"]["authorized_for_training"] is False
+            assert item["context_snapshot"]["release_manifest"]
+            item_id = item["id"]
+
+            detail = await client.get(
+                f"/api/workbench/spot-checks/{item_id}", headers=rev_b_headers
+            )
+            assert detail.status_code == 200
+            assert detail.json()["skill_run"]["id"] == diagnose_run_id
+            assert detail.json()["skill_run"]["output_payload"]
+
+            first = await client.post(
+                f"/api/workbench/spot-checks/{item_id}/reviews",
+                json={
+                    "review_kind": "independent",
+                    "verdict": "confirmed",
+                    "issue_tags": [],
+                    "rationale": "三维证据齐全，结论成立。",
+                },
+                headers=rev_a_headers,
+            )
+            assert first.status_code == 201
+            duplicate = await client.post(
+                f"/api/workbench/spot-checks/{item_id}/reviews",
+                json={
+                    "review_kind": "independent",
+                    "verdict": "confirmed",
+                    "issue_tags": [],
+                    "rationale": "重复提交应被拒绝。",
+                },
+                headers=rev_a_headers,
+            )
+            assert duplicate.status_code == 409
+            second = await client.post(
+                f"/api/workbench/spot-checks/{item_id}/reviews",
+                json={
+                    "review_kind": "independent",
+                    "verdict": "needs_adjustment",
+                    "issue_tags": ["evidence_gap"],
+                    "rubric_feedback": "证据维度建议补充分学段口径。",
+                    "rationale": "证据链不完整。",
+                },
+                headers=rev_b_headers,
+            )
+            assert second.status_code == 201
+            queue = await client.get(
+                "/api/workbench/spot-checks?status_filter=disputed", headers=rev_a_headers
+            )
+            assert any(row["id"] == item_id for row in queue.json()["items"])
+            not_third = await client.post(
+                f"/api/workbench/spot-checks/{item_id}/reviews",
+                json={
+                    "review_kind": "arbitration",
+                    "verdict": "needs_adjustment",
+                    "issue_tags": ["evidence_gap"],
+                    "rationale": "参与过独立复核，不能仲裁。",
+                },
+                headers=rev_a_headers,
+            )
+            assert not_third.status_code == 409
+            arbitration = await client.post(
+                f"/api/workbench/spot-checks/{item_id}/reviews",
+                json={
+                    "review_kind": "arbitration",
+                    "verdict": "needs_adjustment",
+                    "issue_tags": ["evidence_gap"],
+                    "rubric_feedback": "维持复核 B 意见，规则字典补充证据口径。",
+                    "rationale": "仲裁认定证据不足。",
+                },
+                headers=arb_headers,
+            )
+            assert arbitration.status_code == 201
+            resolved = await client.get(
+                f"/api/workbench/spot-checks/{item_id}", headers=arb_headers
+            )
+            assert resolved.json()["item"]["status"] == "arbitrated"
+            assert resolved.json()["item"]["resolved_verdict"] == "needs_adjustment"
+            assert resolved.json()["item"]["resolved_issue_tags"] == ["evidence_gap"]
+            assert len(resolved.json()["reviews"]) == 3
+
+            # 项目级 L4 汇总：教师本人可见，按规则维度聚合三条决定
+            summary = await client.get(
+                f"/api/workbench/signals/l4-summary?project_id={project_id}",
+                headers=teacher_headers,
+            )
+            assert summary.status_code == 200
+            body = summary.json()
+            assert body["scope"] == "project"
+            assert body["signal_level"] == "L4"
+            assert body["authorized_for_training"] is False
+            assert body["total_signals"] == 3
+            by_dimension = {row["dimension"]: row for row in body["dimensions"]}
+            assert by_dimension["依据可追溯"]["actions"]["accept"] == 1
+            assert by_dimension["目标—证据一致"]["actions"]["edit"] == 1
+            assert by_dimension["任务可实施"]["actions"]["request_expert"] == 1
+
+            global_summary = await client.get(
+                "/api/workbench/signals/l4-summary", headers=rev_a_headers
+            )
+            assert global_summary.status_code == 200
+            assert global_summary.json()["scope"] == "global"
+            assert global_summary.json()["total_signals"] >= 3
+    finally:
+        async with AsyncSessionLocal() as db:
+            run_ids = select(SkillRun.id).where(SkillRun.user_id.in_(user_ids))
+            await db.execute(
+                delete(SpotCheckItem).where(SpotCheckItem.skill_run_id.in_(run_ids))
+            )
+            await db.execute(
+                delete(TeachingProject).where(TeachingProject.owner_id == teacher_id)
+            )
+            await db.execute(delete(User).where(User.id.in_(user_ids)))
             await db.commit()

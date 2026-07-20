@@ -69,6 +69,7 @@ from src.apps.api.schemas.workbench import (
     GenerateSectionRequest,
     GenerateSectionResponse,
     KnowledgeIndexVersionResponse,
+    L4SignalSummaryResponse,
     MemoryClearResponse,
     MemoryExportResponse,
     ModelAssetResponse,
@@ -87,6 +88,12 @@ from src.apps.api.schemas.workbench import (
     RetrieveBasisRequest,
     RetrieveBasisResponse,
     SkillInfo,
+    SpotCheckDetailResponse,
+    SpotCheckItemResponse,
+    SpotCheckQueueResponse,
+    SpotCheckReviewCreate,
+    SpotCheckReviewResponse,
+    SpotCheckSampleRequest,
     TaskResponse,
     UploadAccepted,
     UserPreferenceResponse,
@@ -137,7 +144,16 @@ from src.apps.api.services.memory_service import (
     upsert_preference,
 )
 from src.apps.api.services.project_service import create_version, get_owned_project
+from src.apps.api.services.signal_summary_service import l4_signal_summary
 from src.apps.api.services.skill_runtime import SKILL_REGISTRY, ensure_definition, run_skill
+from src.apps.api.services.spot_check_service import (
+    SPOT_CHECK_DISCLAIMER,
+    get_spot_check_detail,
+    list_spot_checks,
+    queue_status_counts,
+    sample_spot_checks,
+    submit_spot_check_review,
+)
 from src.apps.api.services.structured_generation_service import (
     restore_project_version,
     save_teacher_edit_version,
@@ -1286,3 +1302,104 @@ async def get_evaluation_results(
 ) -> list[EvaluationCaseResultResponse]:
     results = await list_run_results(db, run_id, current_user.id)
     return [EvaluationCaseResultResponse.model_validate(item) for item in results]
+
+
+@router.post(
+    "/spot-checks/sample",
+    response_model=SpotCheckQueueResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def sample_spot_check_queue(
+    payload: SpotCheckSampleRequest,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> SpotCheckQueueResponse:
+    items = await sample_spot_checks(
+        db,
+        reviewer=current_user,
+        skill_id=payload.skill_id,
+        sample_size=payload.sample_size,
+    )
+    await write_audit_log(
+        db,
+        request,
+        "sample_spot_checks",
+        current_user.id,
+        "spot_check_queue",
+        payload.skill_id,
+        {"sampled": len(items), "sample_size": payload.sample_size},
+    )
+    await db.commit()
+    return SpotCheckQueueResponse(
+        items=[SpotCheckItemResponse.model_validate(item) for item in items],
+        status_counts=queue_status_counts(items),
+        disclaimer=SPOT_CHECK_DISCLAIMER,
+    )
+
+
+@router.get("/spot-checks", response_model=SpotCheckQueueResponse)
+async def list_spot_check_queue(
+    db: DbSession,
+    current_user: CurrentUser,
+    status_filter: str | None = None,
+) -> SpotCheckQueueResponse:
+    items = await list_spot_checks(db, reviewer=current_user, status=status_filter)
+    return SpotCheckQueueResponse(
+        items=[SpotCheckItemResponse.model_validate(item) for item in items],
+        status_counts=queue_status_counts(items),
+        disclaimer=SPOT_CHECK_DISCLAIMER,
+    )
+
+
+@router.get("/spot-checks/{item_id}", response_model=SpotCheckDetailResponse)
+async def get_spot_check_item(
+    item_id: int, db: DbSession, current_user: CurrentUser
+) -> SpotCheckDetailResponse:
+    detail = await get_spot_check_detail(db, item_id=item_id, reviewer=current_user)
+    return SpotCheckDetailResponse.model_validate(detail, from_attributes=True)
+
+
+@router.post(
+    "/spot-checks/{item_id}/reviews",
+    response_model=SpotCheckReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_spot_check_review(
+    item_id: int,
+    payload: SpotCheckReviewCreate,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> SpotCheckReviewResponse:
+    review = await submit_spot_check_review(
+        db,
+        item_id=item_id,
+        reviewer=current_user,
+        review_kind=payload.review_kind,
+        verdict=payload.verdict,
+        issue_tags=payload.issue_tags,
+        rubric_feedback=payload.rubric_feedback,
+        rationale=payload.rationale,
+    )
+    await write_audit_log(
+        db,
+        request,
+        "create_spot_check_review",
+        current_user.id,
+        "spot_check_item",
+        str(item_id),
+        {"review_kind": review.review_kind, "verdict": review.verdict},
+    )
+    await db.commit()
+    return SpotCheckReviewResponse.model_validate(review)
+
+
+@router.get("/signals/l4-summary", response_model=L4SignalSummaryResponse)
+async def get_l4_signal_summary(
+    db: DbSession,
+    current_user: CurrentUser,
+    project_id: int | None = None,
+) -> L4SignalSummaryResponse:
+    summary = await l4_signal_summary(db, user=current_user, project_id=project_id)
+    return L4SignalSummaryResponse.model_validate(summary)

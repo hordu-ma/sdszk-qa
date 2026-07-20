@@ -464,3 +464,80 @@ export interface ModelStatus {
   content_mode: "synthetic" | "production";
   content_disclaimer: string;
 }
+
+export type SpotCheckVerdict = "confirmed" | "needs_adjustment";
+
+export interface SpotCheckItem {
+  id: number;
+  skill_run_id: number;
+  project_id: number | null;
+  sampled_by: number;
+  sample_source: string;
+  skill_id: string;
+  skill_version: string;
+  status: "pending" | "single_review" | "consensus" | "disputed" | "arbitrated";
+  context_snapshot: Record<string, unknown>;
+  resolved_verdict: SpotCheckVerdict | null;
+  resolved_issue_tags: string[];
+  created_at: string;
+}
+
+export interface SpotCheckQueue {
+  items: SpotCheckItem[];
+  status_counts: Record<string, number>;
+  disclaimer: string;
+}
+
+export interface SpotCheckReview {
+  id: number;
+  item_id: number;
+  reviewer_id: number;
+  review_kind: "independent" | "arbitration";
+  verdict: SpotCheckVerdict;
+  issue_tags: string[];
+  rubric_feedback: string | null;
+  rationale: string;
+  created_at: string;
+}
+
+export interface SpotCheckSkillRunEvidence {
+  id: number;
+  user_id: number;
+  project_id: number | null;
+  skill_id: string;
+  skill_version: string;
+  status: string;
+  input_payload: Record<string, unknown>;
+  output_payload: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface SpotCheckDetail {
+  item: SpotCheckItem;
+  skill_run: SpotCheckSkillRunEvidence | null;
+  reviews: SpotCheckReview[];
+  disclaimer: string;
+}
+
+export interface L4RuleSignalSummary {
+  rule_id: string;
+  total_signals: number;
+  actions: Record<string, number>;
+}
+
+export interface L4DimensionSignalSummary {
+  dimension: string;
+  total_signals: number;
+  actions: Record<string, number>;
+  rules: L4RuleSignalSummary[];
+}
+
+export interface L4SignalSummary {
+  scope: "project" | "global";
+  project_count: number;
+  signal_level: "L4";
+  authorized_for_training: false;
+  disclaimer: string;
+  total_signals: number;
+  dimensions: L4DimensionSignalSummary[];
+}

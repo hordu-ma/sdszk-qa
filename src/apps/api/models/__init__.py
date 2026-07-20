@@ -23,6 +23,7 @@ from .memory import (
 from .messages import Message
 from .sessions import Session
 from .skills import SkillDefinition
+from .spot_check import SpotCheckItem, SpotCheckReview
 from .users import User
 from .workbench import (
     ArtifactExport,
@@ -65,4 +66,6 @@ __all__ = [
     "EvaluationCaseReview",
     "EvaluationRun",
     "EvaluationCaseResult",
+    "SpotCheckItem",
+    "SpotCheckReview",
 ]

@@ -5,6 +5,7 @@ import { showConfirmDialog, showFailToast, showSuccessToast } from "vant";
 import ArtifactEditor from "../components/ArtifactEditor.vue";
 import DiagnosisReviewPanel from "../components/DiagnosisReviewPanel.vue";
 import ProfessionalInputPanel from "../components/ProfessionalInputPanel.vue";
+import SpotCheckPanel from "../components/SpotCheckPanel.vue";
 import {
   cancelTask,
   applyDiagnosisRevision,
@@ -1317,6 +1318,8 @@ onBeforeUnmount(() => {
           <p v-else class="empty">导入案例后可开始双专家独立复核。</p>
         </section>
       </article>
+
+      <SpotCheckPanel :can-review="canReview" :project-id="selectedProjectId" />
     </section>
   </main>
 </template>

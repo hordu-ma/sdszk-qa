@@ -705,3 +705,97 @@ class VersionDiffResponse(BaseModel):
     to_version: int
     changed_sections: list[VersionDiffSection]
     field_changes: list[VersionFieldChange]
+
+
+class SpotCheckSampleRequest(BaseModel):
+    skill_id: str = Field(default="skill.diagnose_artifact", min_length=2, max_length=100)
+    sample_size: int = Field(default=5, ge=1, le=20)
+
+
+class SpotCheckItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    skill_run_id: int
+    project_id: int | None
+    sampled_by: int
+    sample_source: str
+    skill_id: str
+    skill_version: str
+    status: str
+    context_snapshot: dict
+    resolved_verdict: str | None
+    resolved_issue_tags: list[str]
+    created_at: datetime
+
+
+class SpotCheckQueueResponse(BaseModel):
+    items: list[SpotCheckItemResponse]
+    status_counts: dict[str, int]
+    disclaimer: str
+
+
+class SpotCheckReviewCreate(BaseModel):
+    review_kind: Literal["independent", "arbitration"] = "independent"
+    verdict: Literal["confirmed", "needs_adjustment"]
+    issue_tags: list[str] = Field(default_factory=list, max_length=20)
+    rubric_feedback: str | None = Field(default=None, max_length=4000)
+    rationale: str = Field(min_length=2, max_length=4000)
+
+
+class SpotCheckReviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    item_id: int
+    reviewer_id: int
+    review_kind: str
+    verdict: str
+    issue_tags: list[str]
+    rubric_feedback: str | None
+    rationale: str
+    created_at: datetime
+
+
+class SpotCheckSkillRunEvidence(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    project_id: int | None
+    skill_id: str
+    skill_version: str
+    status: str
+    input_payload: dict
+    output_payload: dict | None
+    created_at: datetime
+
+
+class SpotCheckDetailResponse(BaseModel):
+    item: SpotCheckItemResponse
+    skill_run: SpotCheckSkillRunEvidence | None
+    reviews: list[SpotCheckReviewResponse]
+    disclaimer: str
+
+
+class L4RuleSignalSummary(BaseModel):
+    rule_id: str
+    total_signals: int
+    actions: dict[str, int]
+
+
+class L4DimensionSignalSummary(BaseModel):
+    dimension: str
+    total_signals: int
+    actions: dict[str, int]
+    rules: list[L4RuleSignalSummary]
+
+
+class L4SignalSummaryResponse(BaseModel):
+    scope: Literal["project", "global"]
+    project_count: int
+    signal_level: Literal["L4"]
+    authorized_for_training: Literal[False]
+    disclaimer: str
+    total_signals: int
+    dimensions: list[L4DimensionSignalSummary]
