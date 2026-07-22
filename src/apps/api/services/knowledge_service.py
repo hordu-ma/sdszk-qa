@@ -44,6 +44,59 @@ from src.apps.api.services.retrieval_gateway import (
 
 SUPPORTED_SUFFIXES = {".txt", ".md", ".pdf", ".docx"}
 
+# WP2.5：可执行文件魔数；无论声明何种类型/后缀一律拒绝
+_EXECUTABLE_MAGIC = (
+    b"MZ",  # Windows PE
+    b"\x7fELF",  # Linux ELF
+    b"\xfe\xed\xfa\xce",  # Mach-O 32
+    b"\xfe\xed\xfa\xcf",  # Mach-O 64
+    b"\xcf\xfa\xed\xfe",  # Mach-O 64 (LE)
+    b"\xca\xfe\xba\xbe",  # Mach-O fat / Java class
+)
+
+
+class UploadContentError(ValueError):
+    """上传内容与声明类型不符或包含被禁止的载荷。"""
+
+
+def validate_upload_content(filename: str, data: bytes) -> None:
+    """按真实内容（魔数/结构）校验上传文件，不信任客户端声明的 MIME。
+
+    - 任何后缀：拒绝可执行文件魔数。
+    - .pdf：必须以 %PDF- 开头。
+    - .docx：必须是含 [Content_Types].xml 与 word/ 的 ZIP；拒绝宏载荷
+      （vbaProject.bin），防止宏文档改名混入。
+    - .txt/.md：必须可按 UTF-8 解码且不含 NUL 字节，拒绝伪装文本的二进制。
+    """
+    suffix = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    head = data[:8]
+    if any(head.startswith(magic) for magic in _EXECUTABLE_MAGIC):
+        raise UploadContentError("检测到可执行文件特征，禁止上传")
+    if suffix == ".pdf":
+        if not data.startswith(b"%PDF-"):
+            raise UploadContentError("PDF 内容与后缀不符")
+    elif suffix == ".docx":
+        if not data.startswith(b"PK"):
+            raise UploadContentError("DOCX 内容与后缀不符")
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                names = set(archive.namelist())
+        except zipfile.BadZipFile as exc:
+            raise UploadContentError("DOCX 内容与后缀不符") from exc
+        if "[Content_Types].xml" not in names or not any(
+            name.startswith("word/") for name in names
+        ):
+            raise UploadContentError("DOCX 缺少必要的文档结构")
+        if any(name.lower().endswith("vbaproject.bin") for name in names):
+            raise UploadContentError("禁止包含宏代码的文档")
+    elif suffix in {".txt", ".md"}:
+        if b"\x00" in data:
+            raise UploadContentError("文本资料不能包含二进制内容")
+        try:
+            data.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise UploadContentError("文本资料必须是 UTF-8 编码") from exc
+
 
 def _utcnow() -> datetime:
     """返回与当前 PostgreSQL timestamp 列兼容的 UTC 无时区时间。"""

@@ -126,11 +126,13 @@ from src.apps.api.services.evaluation_service import (
 )
 from src.apps.api.services.knowledge_service import (
     SUPPORTED_SUFFIXES,
+    UploadContentError,
     checksum,
     get_object,
     process_document_task,
     put_object,
     rebuild_project_index,
+    validate_upload_content,
 )
 from src.apps.api.services.memory_service import (
     clear_memory,
@@ -331,6 +333,10 @@ async def upload_document(
         raise HTTPException(status_code=422, detail="上传文件为空")
     if len(data) > settings.MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="文件超过上传大小限制")
+    try:
+        validate_upload_content(filename, data)
+    except UploadContentError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
     digest = checksum(data)
     idempotency_key = f"document:{project_id}:{digest}"
     existing_task_result = await db.execute(
