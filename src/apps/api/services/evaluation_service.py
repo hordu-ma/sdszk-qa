@@ -23,6 +23,7 @@ from src.apps.api.models import (
 from src.apps.api.services.knowledge_service import assess_insufficiency, search_chunks
 from src.apps.api.services.model_asset_service import release_manifest
 from src.apps.api.services.project_service import get_owned_project
+from src.apps.api.services.rbac import owner_in_actor_scope, scope_owner_ids
 
 
 def _utcnow() -> datetime:
@@ -94,6 +95,12 @@ async def review_dataset(
         raise BusinessError(
             "评测数据集不存在", status_code=404, error_code="dataset_not_found"
         )
+    if not await owner_in_actor_scope(db, actor=reviewer, owner_id=dataset.owner_id):
+        raise BusinessError(
+            "无权审核其他组织的评测数据集",
+            status_code=403,
+            error_code="evaluation_review_forbidden",
+        )
     if dataset.data_origin == "synthetic":
         raise BusinessError(
             "模拟数据集不能标记为专业审核通过，请导入真实资料后创建新版本",
@@ -133,7 +140,7 @@ async def get_accessible_dataset(
     dataset = result.scalar_one_or_none()
     if dataset is None:
         raise BusinessError("评测数据集不存在", status_code=404, error_code="dataset_not_found")
-    if dataset.owner_id != user.id and user.role not in {"admin", "reviewer"}:
+    if not await owner_in_actor_scope(db, actor=user, owner_id=dataset.owner_id):
         raise BusinessError(
             "无权查看该评测数据集",
             status_code=403,
@@ -335,7 +342,7 @@ async def list_review_queue(db: AsyncSession, *, reviewer: User) -> list[Evaluat
             status_code=403,
             error_code="evaluation_review_forbidden",
         )
-    result = await db.execute(
+    stmt = (
         select(EvaluationDataset)
         .where(
             EvaluationDataset.data_origin != "synthetic",
@@ -343,6 +350,9 @@ async def list_review_queue(db: AsyncSession, *, reviewer: User) -> list[Evaluat
         )
         .order_by(EvaluationDataset.created_at, EvaluationDataset.id)
     )
+    # 跨组织隔离：reviewer 只见本组织资源，平台 admin 不限
+    stmt = scope_owner_ids(stmt, reviewer, EvaluationDataset.owner_id)
+    result = await db.execute(stmt)
     return list(result.scalars())
 
 
@@ -404,6 +414,12 @@ async def submit_case_review(
             "评测案例不存在", status_code=404, error_code="evaluation_case_not_found"
         )
     case_item, dataset = row
+    if not await owner_in_actor_scope(db, actor=reviewer, owner_id=dataset.owner_id):
+        raise BusinessError(
+            "无权复核其他组织的评测案例",
+            status_code=403,
+            error_code="evaluation_review_forbidden",
+        )
     if dataset.data_origin == "synthetic":
         raise BusinessError(
             "模拟案例不进入专家金标流程",
@@ -499,7 +515,7 @@ async def list_case_reviews(
             "评测案例不存在", status_code=404, error_code="evaluation_case_not_found"
         )
     _, dataset = row
-    if dataset.owner_id != user.id and user.role not in {"admin", "reviewer"}:
+    if not await owner_in_actor_scope(db, actor=user, owner_id=dataset.owner_id):
         raise BusinessError(
             "无权查看该案例复核记录",
             status_code=403,

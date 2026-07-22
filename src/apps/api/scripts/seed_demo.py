@@ -22,6 +22,7 @@ from src.apps.api.models import (
 )
 from src.apps.api.services.evaluation_service import freeze_dataset
 from src.apps.api.services.knowledge_service import put_object, rebuild_project_index
+from src.apps.api.services.organization_service import ensure_default_pilot_org
 
 SYNTHETIC_DISCLAIMER = "模拟数据，仅用于工程验证；不得作为专业验收结论。"
 SYNTHETIC_TOPICS = [
@@ -49,6 +50,7 @@ SYNTHETIC_QUERY_PATTERNS = [
 async def seed() -> None:
     users = _demo_users()
     async with AsyncSessionLocal() as db:
+        pilot_org = await ensure_default_pilot_org(db)
         seeded_users: dict[str, User] = {}
         for item in users:
             user_result = await db.execute(select(User).where(User.username == item["username"]))
@@ -62,12 +64,15 @@ async def seed() -> None:
                     full_name=item["full_name"],
                     role=item["role"],
                     is_active=True,
+                    organization_id=pilot_org.id,
                 )
                 db.add(user)
             else:
                 user.full_name = item["full_name"]
                 user.role = item["role"]
                 user.is_active = True
+                if user.organization_id is None:
+                    user.organization_id = pilot_org.id
             await db.flush()
             seeded_users[item["role"]] = user
         case_result = await db.execute(

@@ -799,3 +799,13 @@ class L4SignalSummaryResponse(BaseModel):
     disclaimer: str
     total_signals: int
     dimensions: list[L4DimensionSignalSummary]
+
+
+class UserResponseLite(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    full_name: str
+    role: str
+    organization_id: int | None

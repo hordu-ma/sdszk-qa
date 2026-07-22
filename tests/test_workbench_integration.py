@@ -6,6 +6,7 @@ import bcrypt
 import httpx
 import pytest
 from sqlalchemy import delete, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.api.dependencies import AsyncSessionLocal, engine
 from src.apps.api.main import app
@@ -17,6 +18,7 @@ from src.apps.api.models import (
     User,
 )
 from src.apps.api.services.model_asset_service import sync_model_assets
+from src.apps.api.services.organization_service import ensure_default_pilot_org
 
 
 async def _ensure_schema() -> None:
@@ -27,6 +29,14 @@ async def _ensure_schema() -> None:
         await conn.run_sync(User.metadata.create_all)
     async with AsyncSessionLocal() as db:
         await sync_model_assets(db)
+
+
+async def _attach_pilot_org(db: AsyncSession, *users: User) -> None:
+    """把测试用户挂到默认试点组织，满足 WP2.5 白名单门禁。"""
+    org = await ensure_default_pilot_org(db)
+    await db.flush()
+    for user in users:
+        user.organization_id = org.id
 
 
 @pytest.mark.integration
@@ -61,6 +71,7 @@ async def test_project_upload_retrieve_and_task_flow(monkeypatch: pytest.MonkeyP
     )
     async with AsyncSessionLocal() as db:
         db.add_all([user, reviewer, arbitrator])
+        await _attach_pilot_org(db, user, reviewer, arbitrator)
         await db.commit()
         await db.refresh(user)
         await db.refresh(reviewer)
@@ -687,6 +698,7 @@ async def test_wp22_structured_generation_lock_restore_and_artifacts() -> None:
     )
     async with AsyncSessionLocal() as db:
         db.add(user)
+        await _attach_pilot_org(db, user)
         await db.commit()
         await db.refresh(user)
         user_id = user.id
@@ -941,6 +953,7 @@ async def test_wp23_evidence_diagnosis_decisions_and_apply_revision() -> None:
     )
     async with AsyncSessionLocal() as db:
         db.add(user)
+        await _attach_pilot_org(db, user)
         await db.commit()
         await db.refresh(user)
         user_id = user.id
@@ -1096,6 +1109,7 @@ async def test_review_requires_reviewer_role_and_allows_cross_user(
     )
     async with AsyncSessionLocal() as db:
         db.add_all([teacher, reviewer])
+        await _attach_pilot_org(db, teacher, reviewer)
         await db.commit()
         await db.refresh(teacher)
         await db.refresh(reviewer)
@@ -1183,6 +1197,7 @@ async def test_memory_lifecycle_injection_and_clear() -> None:
     )
     async with AsyncSessionLocal() as db:
         db.add(user)
+        await _attach_pilot_org(db, user)
         await db.commit()
         await db.refresh(user)
         user_id = user.id
@@ -1342,6 +1357,7 @@ async def test_expired_document_excluded_from_search() -> None:
     )
     async with AsyncSessionLocal() as db:
         db.add(user)
+        await _attach_pilot_org(db, user)
         await db.commit()
         await db.refresh(user)
         user_id = user.id
@@ -1421,6 +1437,7 @@ async def test_search_degrades_when_semantic_index_missing(
     )
     async with AsyncSessionLocal() as db:
         db.add(user)
+        await _attach_pilot_org(db, user)
         await db.commit()
         await db.refresh(user)
         user_id = user.id
@@ -1515,6 +1532,7 @@ async def test_wp24_spot_check_queue_and_l4_signal_summary() -> None:
     arbitrator = _user("wp24_arb", "reviewer")
     async with AsyncSessionLocal() as db:
         db.add_all([teacher, reviewer_a, reviewer_b, arbitrator])
+        await _attach_pilot_org(db, teacher, reviewer_a, reviewer_b, arbitrator)
         await db.commit()
         for row in (teacher, reviewer_a, reviewer_b, arbitrator):
             await db.refresh(row)

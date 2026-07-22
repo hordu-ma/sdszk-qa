@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.apps.api.exceptions import BusinessError
 from src.apps.api.models import SkillRun, SpotCheckItem, SpotCheckReview, User
 from src.apps.api.services.model_asset_service import release_manifest
+from src.apps.api.services.rbac import owner_in_actor_scope, scope_owner_ids
 
 SPOT_CHECK_DISCLAIMER = (
     "内部工程抽检：复核人为内部代理，结论仅用于诊断质量回看与规则字典迭代，"
@@ -74,12 +75,15 @@ async def sample_spot_checks(
     _require_reviewer(reviewer)
     sampled = await db.execute(select(SpotCheckItem.skill_run_id))
     sampled_run_ids = set(sampled.scalars())
-    result = await db.execute(
+    stmt = (
         select(SkillRun)
         .where(SkillRun.skill_id == skill_id, SkillRun.status == "completed")
         .order_by(SkillRun.id.desc())
         .limit(_SAMPLE_CANDIDATE_WINDOW)
     )
+    # 跨组织隔离：reviewer 只能抽检本组织成员的运行，平台 admin 不限
+    stmt = scope_owner_ids(stmt, reviewer, SkillRun.user_id)
+    result = await db.execute(stmt)
     candidates = [run for run in result.scalars() if run.id not in sampled_run_ids]
     if not candidates:
         raise BusinessError(
@@ -125,6 +129,9 @@ async def list_spot_checks(
     query = select(SpotCheckItem).order_by(SpotCheckItem.id)
     if status is not None:
         query = query.where(SpotCheckItem.status == status)
+    # 跨组织隔离：按被抽检运行的所有者组织过滤（join SkillRun.user_id）
+    query = query.join(SkillRun, SkillRun.id == SpotCheckItem.skill_run_id)
+    query = scope_owner_ids(query, reviewer, SkillRun.user_id)
     result = await db.execute(query)
     return list(result.scalars())
 
@@ -150,6 +157,21 @@ async def _item_reviews(db: AsyncSession, item_id: int) -> list[SpotCheckReview]
     return list(result.scalars())
 
 
+async def _require_item_in_scope(
+    db: AsyncSession, reviewer: User, run: SkillRun | None
+) -> None:
+    """跨组织隔离：抽检项按被抽检运行的所有者组织判定可见性。"""
+    owner_id = run.user_id if run is not None else None
+    if owner_id is None or not await owner_in_actor_scope(
+        db, actor=reviewer, owner_id=owner_id
+    ):
+        raise BusinessError(
+            "无权访问其他组织的抽检项",
+            status_code=403,
+            error_code="spot_check_forbidden",
+        )
+
+
 async def get_spot_check_detail(
     db: AsyncSession, *, item_id: int, reviewer: User
 ) -> dict[str, Any]:
@@ -160,6 +182,7 @@ async def get_spot_check_detail(
         select(SkillRun).where(SkillRun.id == item.skill_run_id)
     )
     run = run_result.scalar_one_or_none()
+    await _require_item_in_scope(db, reviewer, run)
     reviews = await _item_reviews(db, item.id)
     return {
         "item": item,
@@ -189,6 +212,10 @@ async def submit_spot_check_review(
             error_code="spot_check_verdict_invalid",
         )
     item = await _get_item(db, item_id)
+    run_result = await db.execute(
+        select(SkillRun).where(SkillRun.id == item.skill_run_id)
+    )
+    await _require_item_in_scope(db, reviewer, run_result.scalar_one_or_none())
     reviews = await _item_reviews(db, item.id)
     independent = [row for row in reviews if row.review_kind == "independent"]
     arbitration = [row for row in reviews if row.review_kind == "arbitration"]

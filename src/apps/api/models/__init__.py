@@ -21,6 +21,7 @@ from .memory import (
     UserPreference,
 )
 from .messages import Message
+from .organization import Organization
 from .sessions import Session
 from .skills import SkillDefinition
 from .spot_check import SpotCheckItem, SpotCheckReview
@@ -68,4 +69,5 @@ __all__ = [
     "EvaluationCaseResult",
     "SpotCheckItem",
     "SpotCheckReview",
+    "Organization",
 ]

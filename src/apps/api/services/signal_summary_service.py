@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.apps.api.exceptions import BusinessError
 from src.apps.api.models import ProjectVersion, TeachingProject, User
 from src.apps.api.services.diagnostic_rules import diagnostic_rules
+from src.apps.api.services.rbac import owner_in_actor_scope, scope_owner_ids
 
 L4_SUMMARY_DISCLAIMER = (
     "内部工程信号汇总：L4 教师决定信号仅用于诊断规则字典与量规迭代回看，"
@@ -141,7 +142,7 @@ async def l4_signal_summary(
             raise BusinessError(
                 "教学项目不存在", status_code=404, error_code="project_not_found"
             )
-        if project.owner_id != user.id and user.role not in {"admin", "reviewer"}:
+        if not await owner_in_actor_scope(db, actor=user, owner_id=project.owner_id):
             raise BusinessError(
                 "无权查看该项目的信号汇总",
                 status_code=403,
@@ -156,7 +157,12 @@ async def l4_signal_summary(
                 status_code=403,
                 error_code="signal_summary_forbidden",
             )
-        result = await db.execute(select(TeachingProject.id))
+        # 跨组织隔离：平台 admin 覆盖全部；reviewer 限本组织项目；
+        # 无组织归属者回落为仅本人项目（与 scope_owner_ids 同一安全口径）。
+        stmt = scope_owner_ids(
+            select(TeachingProject.id), user, TeachingProject.owner_id
+        )
+        result = await db.execute(stmt)
         project_ids = list(result.scalars())
         scope = "global"
     contents = await _latest_contents(db, project_ids)

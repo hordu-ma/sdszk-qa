@@ -9,6 +9,7 @@ from uuid import uuid4
 from fastapi import (
     APIRouter,
     BackgroundTasks,
+    Depends,
     File,
     Form,
     HTTPException,
@@ -20,7 +21,7 @@ from fastapi import (
 from sqlalchemy import select
 
 from src.apps.api.config import settings
-from src.apps.api.dependencies import CurrentUser, DbSession
+from src.apps.api.dependencies import CurrentUser, DbSession, get_pilot_user
 from src.apps.api.models import (
     ArtifactExport,
     KnowledgeDocument,
@@ -146,6 +147,7 @@ from src.apps.api.services.memory_service import (
     upsert_preference,
 )
 from src.apps.api.services.project_service import create_version, get_owned_project
+from src.apps.api.services.rbac import owner_in_actor_scope
 from src.apps.api.services.signal_summary_service import l4_signal_summary
 from src.apps.api.services.skill_runtime import SKILL_REGISTRY, ensure_definition, run_skill
 from src.apps.api.services.spot_check_service import (
@@ -163,7 +165,8 @@ from src.apps.api.services.structured_generation_service import (
 )
 from src.apps.api.services.vertical_sample_service import diff_versions
 
-router = APIRouter()
+# WP2.5：整个工作台受试点白名单门禁保护（平台 admin 放行，其余须属白名单组织）
+router = APIRouter(dependencies=[Depends(get_pilot_user)])
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -423,13 +426,15 @@ async def review_document(
     db: DbSession,
     current_user: CurrentUser,
 ) -> DocumentResponse:
-    # 阶段 1A 审核范围为全库：审核员/管理员可审任意用户的资料；
-    # 组织级隔离（试点组织白名单）按开发计划 WP2.5 在阶段 2 引入。
+    # WP2.5：审核员/管理员可审核资料，但 reviewer 仅限本组织成员的资料；
+    # 平台 admin 覆盖全部（跨组织隔离缺口，见《WP2.5 收口记录》）。
     if current_user.role not in {"admin", "reviewer"}:
         raise HTTPException(status_code=403, detail="只有审核员或管理员可以审核资料")
     document = await db.get(KnowledgeDocument, document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="资料不存在")
+    if not await owner_in_actor_scope(db, actor=current_user, owner_id=document.owner_id):
+        raise HTTPException(status_code=403, detail="无权审核其他组织的资料")
     document.review_status = data.review_status
     await write_audit_log(
         db,

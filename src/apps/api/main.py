@@ -113,10 +113,11 @@ async def root() -> dict[str, str]:
 
 
 # 注册路由
-from .routes import auth, cases, chat, sessions, workbench  # noqa: E402
+from .routes import auth, cases, chat, organizations, sessions, workbench  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(cases.router, prefix="/api/topics", tags=["topics"])
 app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(workbench.router, prefix="/api/workbench", tags=["workbench"])
+app.include_router(organizations.router, prefix="/api/organizations", tags=["organizations"])

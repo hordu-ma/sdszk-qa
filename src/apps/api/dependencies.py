@@ -111,6 +111,22 @@ async def get_current_user(
     return user
 
 
+async def get_pilot_user(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """要求当前用户可使用试点工作台（平台 admin 放行，其余须属白名单组织）。"""
+    from src.apps.api.exceptions import BusinessError
+    from src.apps.api.services.rbac import require_pilot_membership
+
+    try:
+        await require_pilot_membership(db, current_user)
+    except BusinessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return current_user
+
+
 # 依赖注入类型别名
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
+PilotUser = Annotated[User, Depends(get_pilot_user)]

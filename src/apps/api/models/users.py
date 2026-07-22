@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -30,6 +30,13 @@ class User(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(default=True, comment="是否激活")
     external_user_id: Mapped[str | None] = mapped_column(
         String(100), unique=True, nullable=True, index=True, comment="外部系统用户ID"
+    )
+    # WP2.5 试点组织归属；nullable 以兼容平台 admin（组织无关）与迁移前存量数据
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="试点组织ID（平台 admin 可为空）",
     )
 
     # 关系
